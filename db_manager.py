@@ -18,5 +18,7 @@ def store_document(collection, document):
         db_collection = db.requests
     elif collection == "responses":
         db_collection = db.responses
+    elif collection == "param_functions":
+        db_collection = db.param_functions
 
     db_collection.insert_one(document).inserted_id
