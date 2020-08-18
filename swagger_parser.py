@@ -13,7 +13,11 @@ API_REQUEST_INFO = "requests"
 API_RESPONSE_INFO = "responses"
 
 _HTTP_VERBS = set(["get", "put", "post", "delete", "options", "head", "patch"])
-_PARAMETER_TYPES = set(["path", "query", "header", "body", "formData"])
+_PARAMETER_TYPES = set(["path", "query", "header", "body",
+                        "formData", "cookie"])   # cookie - openapi 3.0
+
+# minimum, maximum, minLength, maxLength, minItems, maxItems ...
+OTHER_FIELDS = set(["enum", "default"])
 
 
 def get_all_paths(jsondata):
@@ -35,7 +39,10 @@ def get_all_paths(jsondata):
                     method_data["method"] = http_method
                     method_data["tags"] = http_method_specs.get("tags")
                     method_data["summary"] = http_method_specs.get("summary")
-                    method_data["description"] = http_method_specs.get("description")
+                    method_data["description"] = http_method_specs.get(
+                        "description")
+                    method_data["operationId"] = http_method_specs.get(
+                        "operationId")
                     method_data["consumes"] = http_method_specs.get("consumes")
                     method_data["produces"] = http_method_specs.get("produces")
 
@@ -48,8 +55,10 @@ def get_all_paths(jsondata):
 def extract_body_param(param):
     param_data = {}
 
+    """
     param_data["name"] = param.get("name")  # fixed-field
     param_data["in"] = param.get("in")  # fixed-field
+    """
 
     # no type field. Check schema (a JSON Schema) for the body structure
     # Reference - https://json-schema.org/learn/getting-started-step-by-step.html
@@ -74,19 +83,47 @@ def extract_not_body_param(param):
     param_name = param["name"]  # fixed-field
 
     param_data[param_name] = {}
-    param_data[param_name]["type"] = param["type"]  # fixed-filed, if not in body
+    # fixed-filed, if not in body
+    param_data[param_name]["type"] = param.get("type")
     param_data[param_name]["description"] = param.get("description")
     param_data[param_name]["format"] = param.get("format")
     param_data[param_name]["required"] = param.get("required", False)
 
-    if param["type"] == "array":
+    if "type" in param and param["type"] == "array":
         param_data[param_name]["items"] = utils.extract_type_array(param)
         param_data[param_name]["collectionFormat"] = param.get(
             "collectionFormat", "csv"
         )
 
-    elif param["type"] == "object":
+    elif "type" in param and param["type"] == "object":
         param_data[param_name]["properties"] = utils.extract_type_object(param)
+
+    for f in OTHER_FIELDS:
+        if f in param:
+            param_data[param_name][f] = param.get(f)
+
+    # openapi 3.0
+    if "schema" in param:
+        param_schema = param["schema"]
+        param_data[param_name]["type"] = param_schema.get(
+            "type")
+        param_data[param_name]["format"] = param_schema.get(
+            "format")
+
+        for f in OTHER_FIELDS:
+            if f in param_schema:
+                param_data[param_name][f] = param_schema.get(f)
+
+        if "type" in param_schema and param_schema["type"] == "array":
+            param_data[param_name]["items"] = utils.extract_type_array(
+                param_schema)
+            param_data[param_name]["collectionFormat"] = param_schema.get(
+                "collectionFormat", "csv"
+            )
+
+        elif "type" in param_schema and param_schema["type"] == "object":
+            param_data[param_name]["properties"] = utils.extract_type_object(
+                param_schema)
 
     return param_data
 
@@ -100,7 +137,7 @@ def extract_response_schema(schema):
         param_data["properties"] = utils.extract_type_object(schema)
 
     elif param_data["type"] == "array":
-        param_data["properties"] = utils.extract_type_array(schema)
+        param_data["items"] = utils.extract_type_array(schema)
 
     return param_data
 
@@ -110,16 +147,37 @@ def get_request_data(jsondata, api_path, method_type):
     for param in _PARAMETER_TYPES:
         all_request_params[param] = []
 
-    api_params = jsondata["paths"][api_path][method_type].get("parameters")
+    api_params = jsondata["paths"][api_path][method_type].get("parameters", [])
+
+    # Parameters that are applicable for all the operations described under this path
+    # Reference - https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#pathsObject
+    if not api_params:
+        api_params = jsondata["paths"][api_path].get("parameters", [])
 
     for p in api_params:
         pin = p.get("in")  # required, fixed-field
 
         if pin in _PARAMETER_TYPES:
             param = (
-                extract_body_param(p) if pin == "body" else extract_not_body_param(p)
+                extract_body_param(
+                    p) if pin == "body" else extract_not_body_param(p)
             )
             all_request_params[pin].append(param)
+
+    # openapi 3.0
+    requestBody = jsondata["paths"][api_path][method_type].get("requestBody")
+    if requestBody:
+        body_content = requestBody["content"]
+
+        if "application/json" in body_content:
+            body_content = body_content["application/json"]
+        elif "application/x-www-form-urlencoded" in body_content:
+            body_content = body_content["application/x-www-form-urlencoded"]
+        elif "application/octet-stream" in body_content:
+            body_content = body_content["application/octet-stream"]
+
+        param = extract_body_param(body_content)
+        all_request_params["body"].append(param)
 
     return all_request_params
 
@@ -140,6 +198,11 @@ def get_response_data(jsondata, api_path, method_type):
         if "schema" in resp_specs:
             param["schema"] = extract_response_schema(resp_specs["schema"])
 
+        # openapi 3.0
+        if "content" in resp_specs:
+            resp_schema = resp_specs["content"].get("application/json")
+            param["schema"] = extract_response_schema(resp_schema["schema"])
+
         all_response_params.append(param)
 
     return all_response_params
@@ -148,7 +211,8 @@ def get_response_data(jsondata, api_path, method_type):
 def get_api_info(jsondata):
     api_info = {}
 
-    KEYS = ["swagger", "info", "host", "basePath", "tags", "schemes"]
+    KEYS = ["swagger", "info", "host", "basePath",
+            "tags", "schemes", "openapi", "servers"]
     for k in KEYS:
         api_info[k] = jsondata.get(k)
 
@@ -163,9 +227,11 @@ def parse_swagger_api(filepath):
 
     api_document = get_api_info(jsondata)
     api_document["api_ops_id"] = api_ops_id
+    pprint(api_document)
     db_manager.store_document(API_INFO, api_document)
 
     all_paths = get_all_paths(jsondata)
+    pprint(all_paths)
 
     for path in all_paths:
         path["api_ops_id"] = api_ops_id
@@ -175,8 +241,15 @@ def parse_swagger_api(filepath):
         methods = path["allowed_method"]
 
         for m in methods:
+            print("\n----------------------\n", p, m, "\n")
             request_data = get_request_data(jsondata, p, m)
+            print("\nRequest ==>\n")
+            pprint(request_data)
+            print("\n\n")
+
             response_data = get_response_data(jsondata, p, m)
+            print("\nResponse ==>\n")
+            pprint(response_data)
 
             request_document = {
                 "path": p,
@@ -196,5 +269,5 @@ def parse_swagger_api(filepath):
             db_manager.store_document(API_RESPONSE_INFO, response_document)
 
 
-filepath = "./petstore.json"
+filepath = "./tests/checkout_openapi.json"
 parse_swagger_api(filepath)
