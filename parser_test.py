@@ -110,7 +110,8 @@ def get_api_info(api_ops_id, path, method):
     print(type(data))
 
     jsondata = json.dumps(data)
-    headers = {"Content-type": "application/json", "Accept": "application/json"}
+    headers = {"Content-type": "application/json",
+               "Accept": "application/json"}
 
     print(request_url)
     r = requests.post(request_url, data=jsondata, headers=headers)
@@ -118,4 +119,4 @@ def get_api_info(api_ops_id, path, method):
     print(r.json())
 
 
-get_api_info("b587c0cc7a1d41aebee648ace8a2a7a3", "/pet", "post")
+get_api_info("dfc1668a55f244ae95f81d1647a41f04", "/pet", "post")
