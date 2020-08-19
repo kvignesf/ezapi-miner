@@ -46,6 +46,9 @@ def get_all_paths(jsondata):
                     method_data["consumes"] = http_method_specs.get("consumes")
                     method_data["produces"] = http_method_specs.get("produces")
 
+                    method_data["apiops_description"] = utils.extract_apiops_description(
+                        method_data["operationId"], method_data["description"], method_data["summary"])
+
                     path_data["method_definition"].append(method_data)
 
             all_paths.append(path_data)
@@ -220,54 +223,64 @@ def get_api_info(jsondata):
 
 
 def parse_swagger_api(filepath):
-    jsondata = json.loads(open(filepath).read())
-    jsondata = utils.deref_json(jsondata)
+    print("Inside function")
+    try:
+        jsondata = json.loads(open(filepath).read())
+        jsondata = utils.deref_json(jsondata)
 
-    api_ops_id = str(uuid.uuid4().hex)
+        api_ops_id = str(uuid.uuid4().hex)
+        print("api_ops_id generated ", api_ops_id)
 
-    api_document = get_api_info(jsondata)
-    api_document["api_ops_id"] = api_ops_id
-    pprint(api_document)
-    db_manager.store_document(API_INFO, api_document)
+        api_document = get_api_info(jsondata)
+        api_document["api_ops_id"] = api_ops_id
+        db_manager.store_document(API_INFO, api_document)
 
-    all_paths = get_all_paths(jsondata)
-    pprint(all_paths)
+        all_paths = get_all_paths(jsondata)
 
-    for path in all_paths:
-        path["api_ops_id"] = api_ops_id
-        db_manager.store_document(API_PATH, path)
+        for path in all_paths:
+            path["api_ops_id"] = api_ops_id
+            db_manager.store_document(API_PATH, path)
 
-        p = path["path"]
-        methods = path["allowed_method"]
+            p = path["path"]
+            methods = path["allowed_method"]
 
-        for m in methods:
-            print("\n----------------------\n", p, m, "\n")
-            request_data = get_request_data(jsondata, p, m)
-            print("\nRequest ==>\n")
-            pprint(request_data)
-            print("\n\n")
+            for m in methods:
+                request_data = get_request_data(jsondata, p, m)
 
-            response_data = get_response_data(jsondata, p, m)
-            print("\nResponse ==>\n")
-            pprint(response_data)
+                response_data = get_response_data(jsondata, p, m)
 
-            request_document = {
-                "path": p,
-                "method": m,
-                "params": request_data,
-                "api_ops_id": api_ops_id,
-            }
+                request_document = {
+                    "path": p,
+                    "method": m,
+                    "params": request_data,
+                    "api_ops_id": api_ops_id,
+                }
 
-            response_document = {
-                "path": p,
-                "method": m,
-                "params": response_data,
-                "api_ops_id": api_ops_id,
-            }
+                response_document = {
+                    "path": p,
+                    "method": m,
+                    "params": response_data,
+                    "api_ops_id": api_ops_id,
+                }
 
-            db_manager.store_document(API_REQUEST_INFO, request_document)
-            db_manager.store_document(API_RESPONSE_INFO, response_document)
+                db_manager.store_document(API_REQUEST_INFO, request_document)
+                db_manager.store_document(API_RESPONSE_INFO, response_document)
 
+        res = {
+            'success': True,
+            'message': 'ok',
+            'status': 200,
+            'api_ops_id': api_ops_id
+        }
+    except Exception as e:
+        res = {
+            'success': False,
+            'message': str(e),
+            'status': 500,
+        }
+    return res
 
-filepath = "./tests/checkout_openapi.json"
-parse_swagger_api(filepath)
+# filepath = './petstore.json'
+# filepath = './petstore3.json'
+# filepath = "./tests/checkout_openapi.json"
+# parse_swagger_api(filepath)
