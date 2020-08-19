@@ -6,6 +6,11 @@ from flask import Flask, request, jsonify
 app = Flask(__name__)
 
 
+@app.route("/")
+def home():
+    return "Hello APIOPS"
+
+
 @app.route("/swagger_parser", methods=["POST"])
 def swagger_parser():
     f = request.files["file"]
