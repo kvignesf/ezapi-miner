@@ -33,7 +33,7 @@ You may need to open multiple bash/command line/terminal windows to run all the 
     Open your browser and browse to [http://127.0.0.1:5000](http://127.0.0.1:5000). You will see a default homepage
    
 ## API Endpoints
-1. **/api/swagger_parser** : This API  is use to parse a swagger specification and store in the mongo collection. It accepts POST request with the following body parameters:
+1. **/swagger_parser** : This API  is use to parse a swagger specification and store in the mongo collection. It accepts POST request with the following body parameters:
  
     1. **file** _(form_data)_: File path needs to be parsed
     
@@ -44,7 +44,7 @@ You may need to open multiple bash/command line/terminal windows to run all the 
     3. **api_ops_id** (_String_): Unique id generated for the input file. This id canbe used to retrieve all apiops related data
     4. **message** (_String_): An ok or failure message
 
-2. **/api/param_functions** : This API handles extracting element and element scores with storing that info in mongo collection. It accepts POST request with following body parameters:
+2. **/param_functions** : This API handles extracting element and element scores with storing that info in mongo collection. It accepts POST request with following body parameters:
 
     1. **api_ops_id** _(String)_: api_ops_id that was generated from swagger_parser
     
@@ -53,6 +53,13 @@ You may need to open multiple bash/command line/terminal windows to run all the 
     1. **success** (_Boolean_): Indicates if parsed successful.
     2. **status** (_String_): Status code. 200 for a successful response
     4. **message** (_String_): An ok or failure message
+
+3. **/visualizer** : This API returns sankey template for an api_ops_id and tag. It's an GET request and accepts api_ops_id and tag in the url:
+
+    1. **api_ops_id** _(String)_: api_ops_id that was generated from swagger_parser
+    2. **tag** _(String)_:
+
+    Returns the Sankey D3 template JSON response
 
 ## Design Principal
 
@@ -75,3 +82,5 @@ Here're all the .py files and their functions -
 5. **flask_api.py** - Flask code to handle all the endpoints
 
 6. **parser_test.py** - A sample test script to generate a random test case for a particular endpoint based on elements and their format.
+
+7. **visualizer.py** - A python script to generate Sankey D3 visualization template. The generated template contains list of nodes and links.
