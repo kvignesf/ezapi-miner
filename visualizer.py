@@ -50,15 +50,20 @@ def fetch_sankey_data(apiopsid, tag):
             spec_method = spec['method']
             spec_path = spec['path']
 
+            # For distinguishing purpose (de-clutter the visualization)
+            spec_method_2 = spec_desc + "|" + spec_method
+
             spec_desc_node = {'name': spec_desc}
-            spec_method_node = {'name': spec_method}
+            spec_method_node = {'name': spec_method_2}
             spec_path_node = {'name': spec_path}
 
             statuses = get_response_status(
                 all_responses, spec_path, spec_method)
             for s in statuses:
-                _node = {'name': s}
-                _link = {'source': spec_method, 'target': s, 'value': 3.0}
+                # For distinguishing purpose (de-clutter the visualization)
+                tmp = s + "|" + spec_desc
+                _node = {'name': tmp}
+                _link = {'source': spec_method_2, 'target': tmp, 'value': 3.0}
 
                 if _node not in NODES:
                     NODES.append(_node)
@@ -83,7 +88,7 @@ def fetch_sankey_data(apiopsid, tag):
 
             # path to method
             LINKS.append({'source': spec_path,
-                          'target': spec_method,
+                          'target': spec_method_2,
                           'value': 3.0})
 
     result = {
