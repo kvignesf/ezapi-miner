@@ -16,6 +16,8 @@ def home():
 
 @app.route("/swagger_parser", methods=["POST"])
 def swagger_parser():
+    print("In swagger parser")
+    print(request.files)
     f = request.files["file"]
 
     filepath = "./files/inputfile.json"
@@ -36,15 +38,13 @@ def param_functions():
 
 @app.route("/visualizer", methods=["GET"])
 def visualizer_function():
-    request_data = dict(request.args)
-    if 'api_ops_id' in request_data:
-        api_ops_id = str(request_data['api_ops_id'])
-    if 'tag' in request_data:
-        tag = str(request_data['tag'])
+    api_ops_id = str(request.args.get('api_ops_id'))
+    tags = request.args.getlist('tag', None)
 
-    print(api_ops_id, tag)
+    if not api_ops_id:
+        return jsonify({"success": false, "status": 500, "message": "api ops id is missing"})
 
-    result = fetch_sankey_data(api_ops_id, tag)
+    result = fetch_sankey_data(api_ops_id, tags)
     return jsonify(result)
 
 

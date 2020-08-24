@@ -235,6 +235,9 @@ def parse_swagger_api(filepath):
         api_document["api_ops_id"] = api_ops_id
         db_manager.store_document(API_INFO, api_document)
 
+        tags = api_document["tags"]
+        tags = [t["name"] for t in tags]
+
         all_paths = get_all_paths(jsondata)
 
         for path in all_paths:
@@ -270,7 +273,10 @@ def parse_swagger_api(filepath):
             'success': True,
             'message': 'ok',
             'status': 200,
-            'api_ops_id': api_ops_id
+            'data': {
+                'api_ops_id': api_ops_id,
+                'tags': tags
+            }
         }
     except Exception as e:
         res = {
