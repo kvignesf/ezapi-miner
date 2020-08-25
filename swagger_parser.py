@@ -1,3 +1,4 @@
+import codecs
 from datetime import datetime
 from pprint import pprint
 import json
@@ -224,66 +225,72 @@ def get_api_info(jsondata):
 
 def parse_swagger_api(filepath):
     print("Inside function")
+    # try:
+    jsondata = json.load(codecs.open(filepath, 'r', 'utf-8-sig'))
+    # jsondata = json.loads(open(filepath).read().decode('utf-8-sig'))
+    # jsondata = json.loads(open(filepath).read())
+    jsondata = utils.deref_json(jsondata)
+
+    api_ops_id = str(uuid.uuid4().hex)
+    print("api_ops_id generated ", api_ops_id)
+
+    api_document = get_api_info(jsondata)
+    api_document["api_ops_id"] = api_ops_id
+    db_manager.store_document(API_INFO, api_document)
+
+    tags = api_document["tags"]
+
     try:
-        jsondata = json.loads(open(filepath).read())
-        jsondata = utils.deref_json(jsondata)
-
-        api_ops_id = str(uuid.uuid4().hex)
-        print("api_ops_id generated ", api_ops_id)
-
-        api_document = get_api_info(jsondata)
-        api_document["api_ops_id"] = api_ops_id
-        db_manager.store_document(API_INFO, api_document)
-
-        tags = api_document["tags"]
         tags = [t["name"] for t in tags]
+    except:
+        tags = []
 
-        all_paths = get_all_paths(jsondata)
+    all_paths = get_all_paths(jsondata)
 
-        for path in all_paths:
-            path["api_ops_id"] = api_ops_id
-            db_manager.store_document(API_PATH, path)
+    for path in all_paths:
+        path["api_ops_id"] = api_ops_id
+        db_manager.store_document(API_PATH, path)
 
-            p = path["path"]
-            methods = path["allowed_method"]
+        p = path["path"]
+        methods = path["allowed_method"]
 
-            for m in methods:
-                request_data = get_request_data(jsondata, p, m)
+        for m in methods:
+            request_data = get_request_data(jsondata, p, m)
 
-                response_data = get_response_data(jsondata, p, m)
+            response_data = get_response_data(jsondata, p, m)
 
-                request_document = {
-                    "path": p,
-                    "method": m,
-                    "params": request_data,
-                    "api_ops_id": api_ops_id,
-                }
-
-                response_document = {
-                    "path": p,
-                    "method": m,
-                    "params": response_data,
-                    "api_ops_id": api_ops_id,
-                }
-
-                db_manager.store_document(API_REQUEST_INFO, request_document)
-                db_manager.store_document(API_RESPONSE_INFO, response_document)
-
-        res = {
-            'success': True,
-            'message': 'ok',
-            'status': 200,
-            'data': {
-                'api_ops_id': api_ops_id,
-                'tags': tags
+            request_document = {
+                "path": p,
+                "method": m,
+                "params": request_data,
+                "api_ops_id": api_ops_id,
             }
+
+            response_document = {
+                "path": p,
+                "method": m,
+                "params": response_data,
+                "api_ops_id": api_ops_id,
+            }
+
+            db_manager.store_document(API_REQUEST_INFO, request_document)
+            db_manager.store_document(API_RESPONSE_INFO, response_document)
+
+    res = {
+        'success': True,
+        'message': 'ok',
+        'status': 200,
+        'data': {
+            'api_ops_id': api_ops_id,
+            'tags': tags
         }
-    except Exception as e:
-        res = {
-            'success': False,
-            'message': str(e),
-            'status': 500,
-        }
+    }
+    # except Exception as e:
+    #     res = {
+    #         'success': False,
+    #         'message': str(e),
+    #         'status': 500,
+    #     }
     return res
 
 # filepath = './petstore.json'
