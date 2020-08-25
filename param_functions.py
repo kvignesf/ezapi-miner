@@ -12,7 +12,33 @@ API_ELEMENTS_FUNCTIONS = 'elements'
 
 def get_all_tags(api_ops_id):
     apiinfo = db.apiinfo.find_one({"api_ops_id": api_ops_id})
-    return apiinfo["tags"]
+    tags = apiinfo["tags"]
+
+    if not tags:
+        tags = []
+    else:
+        tags = [t["name"] for t in tags]
+
+    return tags
+
+
+def get_tags_from_paths(api_ops_id):
+    tags = set()
+    all_paths = db.paths.find({"api_ops_id": api_ops_id})
+    all_paths = list(all_paths)
+
+    for p in all_paths:
+        method_def = p.get("method_definition", [])
+        print(method_def)
+        for m in method_def:
+            if "tags" in m:
+                m_tags = m["tags"]
+                if m_tags:
+                    for t in m_tags:
+                        tags.add(t)
+
+    print(tags)
+    return list(tags)
 
 
 def get_apiops_description(all_paths, path, method):
@@ -41,10 +67,11 @@ def cluster_paths(api_ops_id):  # path -> tags mapping
 
 
 def extract_request_params(api_ops_id, paths_tag, tags):
+    print("request para")
+    print(tags)
     result = {}
 
-    for tag in tags:
-        t = tag['name']
+    for t in tags:
         # score 1 for each occurence and an additional 0.5 for required fields
         result[t] = {
             # 'paths': [],  # removed from the collection
@@ -69,7 +96,7 @@ def extract_request_params(api_ops_id, paths_tag, tags):
 
         all_data = body_data + headers_data + path_data + form_data + query_data
 
-        tags = paths_tag[path]
+        tags = paths_tag.get(path, [])
 
         for t in tags:
             # result[t]['paths'].append(path)   # removed from the collection
@@ -97,7 +124,7 @@ def extract_request_params(api_ops_id, paths_tag, tags):
 
     for r in all_responses:
         path = r['path']
-        tags = paths_tag[path]
+        tags = paths_tag.get(path, [])
 
         for t in tags:
             params = r['params']
@@ -124,8 +151,7 @@ def extract_request_params(api_ops_id, paths_tag, tags):
 
 def map_request_elements(api_ops_id, paths_tag, tags):
     result = {}
-    for tag in tags:
-        t = tag['name']
+    for t in tags:
         result[t] = {}  # element, description mapping
 
     all_requests = db.requests.find({"api_ops_id": api_ops_id})
@@ -143,7 +169,7 @@ def map_request_elements(api_ops_id, paths_tag, tags):
         query_data = params['query']
         all_data = body_data + headers_data + path_data + form_data + query_data
 
-        tags = paths_tag[path]
+        tags = paths_tag.get(path, [])
         for t in tags:  # can be multiple tags for a path
             for d in all_data:
 
@@ -169,7 +195,11 @@ def map_request_elements(api_ops_id, paths_tag, tags):
 
 def handle_param_functions(api_ops_id):
     try:
-        tags = get_all_tags(api_ops_id)
+        tags_info = get_all_tags(api_ops_id)
+        tags_paths = get_tags_from_paths(api_ops_id)
+
+        tags = list(set(tags_info + tags_paths))
+
         paths_tag = cluster_paths(api_ops_id)
 
         result_params = extract_request_params(api_ops_id, paths_tag, tags)
@@ -194,7 +224,3 @@ def handle_param_functions(api_ops_id):
         }
 
     return res
-
-
-# api_ops_id = '1bff708487084473a4e4d4e73f468b08'
-# handle_param_functions(api_ops_id)
