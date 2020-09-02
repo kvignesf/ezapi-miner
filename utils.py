@@ -3,6 +3,8 @@ from pprint import pprint
 import json
 import re
 
+import db_manager
+
 import jsonref
 
 
@@ -14,6 +16,10 @@ def deref_json(dict_data):
 
 def extract_type_array(param_array, is_json_schema=False):
     assert param_array["type"] == "array"
+
+    for k, v in param_array.items():
+        if(k == "format"):
+            print("--$--", v)
 
     result = {}
 
@@ -63,6 +69,10 @@ def extract_type_object(param_object, is_json_schema=False):
         else:
             result[key]["format"] = val.get("format")
             result[key]["description"] = val.get("description")
+
+            for k2, v2 in val.items():
+                if k2 == "format":
+                    print("--$--", v2)
 
     return result
 
@@ -123,6 +133,37 @@ def extract_apiops_description(operationId, description, summary):
             else:
                 return summary
     return None
+
+
+def get_all_tags(api_ops_id):
+    db = db_manager.get_db_connection()
+    apiinfo = db.apiinfo.find_one({"api_ops_id": api_ops_id})
+    tags = apiinfo["tags"]
+
+    if not tags:
+        tags = []
+    else:
+        tags = [t["name"] for t in tags]
+
+    return tags
+
+
+def get_tags_from_paths(api_ops_id):
+    db = db_manager.get_db_connection()
+    tags = set()
+    all_paths = db.paths.find({"api_ops_id": api_ops_id})
+    all_paths = list(all_paths)
+
+    for p in all_paths:
+        method_def = p.get("method_definition", [])
+        for m in method_def:
+            if "tags" in m:
+                m_tags = m["tags"]
+                if m_tags:
+                    for t in m_tags:
+                        tags.add(t)
+
+    return list(tags)
 
 
 # JFT - Petstore

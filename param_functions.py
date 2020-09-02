@@ -1,5 +1,6 @@
 import pymongo
 import db_manager
+import utils
 
 from pprint import pprint
 import operator
@@ -10,45 +11,14 @@ API_PARAM_FUNCTIONS = 'scores'
 API_ELEMENTS_FUNCTIONS = 'elements'
 
 
-def get_all_tags(api_ops_id):
-    apiinfo = db.apiinfo.find_one({"api_ops_id": api_ops_id})
-    tags = apiinfo["tags"]
-
-    if not tags:
-        tags = []
-    else:
-        tags = [t["name"] for t in tags]
-
-    return tags
-
-
-def get_tags_from_paths(api_ops_id):
-    tags = set()
-    all_paths = db.paths.find({"api_ops_id": api_ops_id})
-    all_paths = list(all_paths)
-
-    for p in all_paths:
-        method_def = p.get("method_definition", [])
-        print(method_def)
-        for m in method_def:
-            if "tags" in m:
-                m_tags = m["tags"]
-                if m_tags:
-                    for t in m_tags:
-                        tags.add(t)
-
-    print(tags)
-    return list(tags)
-
-
 def get_apiops_description(all_paths, path, method):
     for p in all_paths:
         if path == p['path']:
             all_methods = p["method_definition"]
             for m in all_methods:
                 if method == m['method']:
-                    return m.get("apiops_description")
-    return None
+                    return (m.get("summary"), m.get("apiops_description"))
+    return (None, None)
 
 
 def cluster_paths(api_ops_id):  # path -> tags mapping
@@ -58,17 +28,21 @@ def cluster_paths(api_ops_id):  # path -> tags mapping
     for p in all_paths:
         path = p['path']
         # assuming all methods belongs to same set of tags
-        tags = p['method_definition'][0].get('tags')
+
+        try:
+            tags = p['method_definition'][0].get('tags')
+        except:
+            tags = None
 
         if tags and path not in paths_tag:
             paths_tag[path] = tags
+        else:
+            paths_tag[path] = ["API MODEL"]
 
     return paths_tag
 
 
 def extract_request_params(api_ops_id, paths_tag, tags):
-    print("request para")
-    print(tags)
     result = {}
 
     for t in tags:
@@ -99,6 +73,14 @@ def extract_request_params(api_ops_id, paths_tag, tags):
         tags = paths_tag.get(path, [])
 
         for t in tags:
+
+            if t not in result:
+                result[t] = {
+                    'request_fields': {},
+                    'required_fields': {},
+                    'response_fields': {},
+                    'fields_score': {}
+                }
             # result[t]['paths'].append(path)   # removed from the collection
 
             for d in all_data:
@@ -171,6 +153,9 @@ def map_request_elements(api_ops_id, paths_tag, tags):
 
         tags = paths_tag.get(path, [])
         for t in tags:  # can be multiple tags for a path
+            if t not in result:
+                result[t] = {}
+
             for d in all_data:
 
                 if "type" in d and d["type"] == "object":
@@ -183,33 +168,47 @@ def map_request_elements(api_ops_id, paths_tag, tags):
                         if k not in result[t]:
                             result[t][k] = []
 
-                        elem_description = get_apiops_description(
+                        path_summary, path_description = get_apiops_description(
                             all_paths, path, method)
                         result[t][k].append({
                             'path': path,
                             'method': method,
-                            'description': elem_description})
+                            'summary': path_summary,
+                            'description': path_description})
 
     return result
 
 
 def handle_param_functions(api_ops_id):
     try:
-        tags_info = get_all_tags(api_ops_id)
-        tags_paths = get_tags_from_paths(api_ops_id)
-
+        tags_info = utils.get_all_tags(api_ops_id)
+        tags_paths = utils.get_tags_from_paths(api_ops_id)
         tags = list(set(tags_info + tags_paths))
 
+        # mapping from path -> tags (multiple tags are allowed)
         paths_tag = cluster_paths(api_ops_id)
 
+        print(paths_tag)
+        print(tags)
+
+        # tag is the keyword
         result_params = extract_request_params(api_ops_id, paths_tag, tags)
         result_elements = map_request_elements(api_ops_id, paths_tag, tags)
 
-        result_params['api_ops_id'] = api_ops_id
-        result_elements['api_ops_id'] = api_ops_id
+        # tag name contains special characters, which maybe not proper mongo document key format. So change it accordingly
+        result_params_new = {'api_ops_id': api_ops_id, 'data': []}
+        result_elements_new = {'api_ops_id': api_ops_id, 'data': []}
 
-        db_manager.store_document(API_PARAM_FUNCTIONS, result_params)
-        db_manager.store_document(API_ELEMENTS_FUNCTIONS, result_elements)
+        for key, val in result_params.items():
+            tmp = {'tag': key, 'data': val}
+            result_params_new['data'].append(tmp)
+
+        for key, val in result_elements.items():
+            tmp = {'tag': key, 'data': val}
+            result_elements_new['data'].append(tmp)
+
+        db_manager.store_document(API_PARAM_FUNCTIONS, result_params_new)
+        db_manager.store_document(API_ELEMENTS_FUNCTIONS, result_elements_new)
 
         res = {
             'status': 200,
@@ -219,7 +218,9 @@ def handle_param_functions(api_ops_id):
     except Exception as e:
         res = {
             'status': 500,
-            'message': str(e),
+            'errorType': type(e).__name__,
+            'error': str(e),
+            'message': 'Some error has occured in extracting data',
             'success': False
         }
 

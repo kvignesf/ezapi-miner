@@ -2,7 +2,11 @@ import codecs
 from datetime import datetime
 from pprint import pprint
 import json
+import os
+import sys
 import uuid
+
+import jsonref
 
 import utils
 import db_manager
@@ -64,6 +68,10 @@ def extract_body_param(param):
     param_data["in"] = param.get("in")  # fixed-field
     """
 
+    for k, v in param.items():
+        if k == 'format':
+            print('--$--', v)
+
     # no type field. Check schema (a JSON Schema) for the body structure
     # Reference - https://json-schema.org/learn/getting-started-step-by-step.html
     param_schema = param["schema"]
@@ -102,6 +110,10 @@ def extract_not_body_param(param):
     elif "type" in param and param["type"] == "object":
         param_data[param_name]["properties"] = utils.extract_type_object(param)
 
+    for k, v in param.items():
+        if k == 'format':
+            print("--$--", v)
+
     for f in OTHER_FIELDS:
         if f in param:
             param_data[param_name][f] = param.get(f)
@@ -113,6 +125,10 @@ def extract_not_body_param(param):
             "type")
         param_data[param_name]["format"] = param_schema.get(
             "format")
+
+        for k, v in param_schema.items():
+            if k == 'format':
+                print("--$--", v)
 
         for f in OTHER_FIELDS:
             if f in param_schema:
@@ -224,76 +240,85 @@ def get_api_info(jsondata):
 
 
 def parse_swagger_api(filepath):
-    print("Inside function")
-    # try:
-    jsondata = json.load(codecs.open(filepath, 'r', 'utf-8-sig'))
-    # jsondata = json.loads(open(filepath).read().decode('utf-8-sig'))
-    # jsondata = json.loads(open(filepath).read())
-    jsondata = utils.deref_json(jsondata)
-
-    api_ops_id = str(uuid.uuid4().hex)
-    print("api_ops_id generated ", api_ops_id)
-
-    api_document = get_api_info(jsondata)
-    api_document["api_ops_id"] = api_ops_id
-    db_manager.store_document(API_INFO, api_document)
-
-    tags = api_document["tags"]
-
     try:
-        tags = [t["name"] for t in tags]
-    except:
-        tags = []
+        jsondata = json.load(codecs.open(filepath, 'r', 'utf-8-sig'))
+        # jsondata = json.loads(open(filepath).read().decode('utf-8-sig'))
+        # jsondata = json.loads(open(filepath).read())
+        jsondata = utils.deref_json(jsondata)
 
-    all_paths = get_all_paths(jsondata)
+        api_ops_id = str(uuid.uuid4().hex)
+        print("api_ops_id generated ", api_ops_id)
 
-    for path in all_paths:
-        path["api_ops_id"] = api_ops_id
-        db_manager.store_document(API_PATH, path)
+        api_document = get_api_info(jsondata)
+        api_document["api_ops_id"] = api_ops_id
+        db_manager.store_document(API_INFO, api_document)
 
-        p = path["path"]
-        methods = path["allowed_method"]
+        all_paths = get_all_paths(jsondata)
 
-        for m in methods:
-            request_data = get_request_data(jsondata, p, m)
+        for path in all_paths:
+            path["api_ops_id"] = api_ops_id
+            db_manager.store_document(API_PATH, path)
 
-            response_data = get_response_data(jsondata, p, m)
+            p = path["path"]
+            methods = path["allowed_method"]
 
-            request_document = {
-                "path": p,
-                "method": m,
-                "params": request_data,
-                "api_ops_id": api_ops_id,
+            for m in methods:
+                request_data = get_request_data(jsondata, p, m)
+
+                response_data = get_response_data(jsondata, p, m)
+
+                request_document = {
+                    "path": p,
+                    "method": m,
+                    "params": request_data,
+                    "api_ops_id": api_ops_id,
+                }
+
+                response_document = {
+                    "path": p,
+                    "method": m,
+                    "params": response_data,
+                    "api_ops_id": api_ops_id,
+                }
+
+                db_manager.store_document(API_REQUEST_INFO, request_document)
+                db_manager.store_document(API_RESPONSE_INFO, response_document)
+
+        tags_info = utils.get_all_tags(api_ops_id)
+        tags_paths = utils.get_tags_from_paths(api_ops_id)
+        tags = list(set(tags_info + tags_paths))
+
+        res = {
+            'success': True,
+            'message': 'ok',
+            'status': 200,
+            'data': {
+                'api_ops_id': api_ops_id,
+                'tags': tags
             }
-
-            response_document = {
-                "path": p,
-                "method": m,
-                "params": response_data,
-                "api_ops_id": api_ops_id,
-            }
-
-            db_manager.store_document(API_REQUEST_INFO, request_document)
-            db_manager.store_document(API_RESPONSE_INFO, response_document)
-
-    res = {
-        'success': True,
-        'message': 'ok',
-        'status': 200,
-        'data': {
-            'api_ops_id': api_ops_id,
-            'tags': tags
         }
-    }
-    # except Exception as e:
-    #     res = {
-    #         'success': False,
-    #         'message': str(e),
-    #         'status': 500,
-    #     }
+    except jsonref.JsonRefError as e:
+        res = {
+            'success': False,
+            'errorType': type(e).__name__,
+            'message': "JSON Referencing Error. APIOPS doesn't support remote reference",
+            'error': str(e),
+            'status': 500,
+        }
+    except json.JSONDecodeError as e:
+        res = {
+            'success': False,
+            'errorType': type(e).__name__,
+            'message': "Please validate your JSON",
+            'error': str(e),
+            'status': 500,
+        }
+    except Exception as e:
+        res = {
+            'success': False,
+            'errorType': type(e).__name__,
+            'error': str(e),
+            'message': 'Some error has occured in parsing data',
+            'status': 500,
+        }
     return res
-
-# filepath = './petstore.json'
-# filepath = './petstore3.json'
-# filepath = "./tests/checkout_openapi.json"
-# parse_swagger_api(filepath)
