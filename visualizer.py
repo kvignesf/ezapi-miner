@@ -106,7 +106,7 @@ def fetch_sankey_data(apiopsid):   # tags can be multiple
                             all_responses, spec_path, spec_method)
                         for status in all_status:
                             # spec_path extra added as different endpoints can have same status code
-                            status_name = status + "|" + "status" + "|" + elem_tag + "|" + spec_path
+                            status_name = status + "|" + "status" + "|" + elem_tag + "|" + spec_description
                             status_node = {"name": status_name,
                                            "api_ops_type": "status", "tag": elem_tag}
                             graph_data[elem_tag]["NODES"].append(status_node)
