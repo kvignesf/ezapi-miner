@@ -3,8 +3,8 @@ from param_functions import handle_param_functions
 from visualizer import fetch_sankey_data
 
 
-def parse_swagger_openapi(filepath):
-    parsed_result = parse_swagger_api(filepath)
+def parse_swagger_openapi(filepath, filename):
+    parsed_result = parse_swagger_api(filepath, filename)
     if 'success' in parsed_result and parsed_result['success']:
         api_ops_id = parsed_result['data']['api_ops_id']
 
