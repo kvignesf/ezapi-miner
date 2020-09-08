@@ -7,6 +7,9 @@ import db_manager
 
 import jsonref
 
+# minimum, maximum, minLength, maxLength, minItems, maxItems ...
+OTHER_FIELDS = set(["enum", "default"])
+
 
 def deref_json(dict_data):
     jsondata = json.dumps(dict_data)
@@ -15,16 +18,27 @@ def deref_json(dict_data):
 
 
 def extract_type_array(param_array, is_json_schema=False):
+    if "type" not in param_array and "items" in param_array:
+        param_array["type"] = "array"
+
     assert param_array["type"] == "array"
 
-    for k, v in param_array.items():
-        if(k == "format"):
-            print("--$--", v)
+    # res = {}
+    # res["type"] = "array"
+    # res["items"] = None
 
     result = {}
 
     array_items = param_array.get("items")  # required-field
     item_type = array_items.get("type")  # required-field
+
+    if not item_type:
+        if "items" in array_items:
+            array_items["type"] = "array"
+            item_type = "array"
+        elif "properties" in array_items:
+            array_items["type"] = "object"
+            item_type = "object"
 
     result["type"] = item_type
 
@@ -38,11 +52,24 @@ def extract_type_array(param_array, is_json_schema=False):
         result["format"] = array_items.get("format")
         result["description"] = array_items.get("description")
 
+        for f in OTHER_FIELDS:
+            if f in array_items:
+                result[f] = array_items.get(f)
+
+    # res["items"] = result
+    # return res
     return result
 
 
 def extract_type_object(param_object, is_json_schema=False):
+    if "type" not in param_object and "properties" in param_object:
+        param_object["type"] = "object"
+
     assert param_object["type"] == "object"
+
+    # res = {}
+    # res["type"] = "object"
+    # res["properties"] = None
 
     result = {}
 
@@ -52,17 +79,27 @@ def extract_type_object(param_object, is_json_schema=False):
 
     for key, val in param_object["properties"].items():
         result[key] = {}
-        result[key]["type"] = val["type"]
+        val_type = val.get("type")
+
+        if not val_type:
+            if "items" in val:
+                val["type"] = "array"
+                val_type = "array"
+            elif "properties" in val:
+                val["type"] = "object"
+                val_type = "object"
+
+        result[key]["type"] = val_type
 
         if not is_json_schema:
             result[key]["required"] = val.get("required", False)
         else:
             result[key]["required"] = key in all_required_fields
 
-        if val["type"] == "array":
+        if val_type == "array":
             result[key]["items"] = extract_type_array(val, is_json_schema)
 
-        elif val["type"] == "object":
+        elif val_type == "object":
             result[key]["properties"] = extract_type_object(
                 val, is_json_schema)
 
@@ -70,10 +107,12 @@ def extract_type_object(param_object, is_json_schema=False):
             result[key]["format"] = val.get("format")
             result[key]["description"] = val.get("description")
 
-            for k2, v2 in val.items():
-                if k2 == "format":
-                    print("--$--", v2)
+            for f in OTHER_FIELDS:
+                if f in val:
+                    result[key][f] = val.get(f)
 
+    # res["properties"] = result
+    # return res
     return result
 
 

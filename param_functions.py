@@ -62,17 +62,24 @@ def extract_request_params(api_ops_id, paths_tag, tags):
         path = r['path']
         params = r['params']
 
-        body_data = params['body']
+        body_data = [params['body']]
         headers_data = params['header']
         path_data = params['path']
         form_data = params['formData']
         query_data = params['query']
+
+        print("body", type(body_data), body_data)
+        print(type(query_data), query_data)
+        print(type(path_data), path_data)
+        print(type(form_data), form_data)
+        print(type(headers_data), headers_data)
 
         all_data = body_data + headers_data + path_data + form_data + query_data
 
         tags = paths_tag.get(path, [])
 
         for t in tags:
+
 
             if t not in result:
                 result[t] = {
@@ -144,7 +151,7 @@ def map_request_elements(api_ops_id, paths_tag, tags):
         method = r['method']
         params = r['params']
 
-        body_data = params['body']
+        body_data = [params['body']]
         headers_data = params['header']
         path_data = params['path']
         form_data = params['formData']
@@ -180,48 +187,48 @@ def map_request_elements(api_ops_id, paths_tag, tags):
 
 
 def handle_param_functions(api_ops_id):
-    try:
-        tags_info = utils.get_all_tags(api_ops_id)
-        tags_paths = utils.get_tags_from_paths(api_ops_id)
-        tags = list(set(tags_info + tags_paths))
+    # try:
+    tags_info = utils.get_all_tags(api_ops_id)
+    tags_paths = utils.get_tags_from_paths(api_ops_id)
+    tags = list(set(tags_info + tags_paths))
 
-        # mapping from path -> tags (multiple tags are allowed)
-        paths_tag = cluster_paths(api_ops_id)
+    # mapping from path -> tags (multiple tags are allowed)
+    paths_tag = cluster_paths(api_ops_id)
 
-        print(paths_tag)
-        print(tags)
+    print(paths_tag)
+    print(tags)
 
-        # tag is the keyword
-        result_params = extract_request_params(api_ops_id, paths_tag, tags)
-        result_elements = map_request_elements(api_ops_id, paths_tag, tags)
+    # tag is the keyword
+    result_params = extract_request_params(api_ops_id, paths_tag, tags)
+    result_elements = map_request_elements(api_ops_id, paths_tag, tags)
 
-        # tag name contains special characters, which maybe not proper mongo document key format. So change it accordingly
-        result_params_new = {'api_ops_id': api_ops_id, 'data': []}
-        result_elements_new = {'api_ops_id': api_ops_id, 'data': []}
+    # tag name contains special characters, which maybe not proper mongo document key format. So change it accordingly
+    result_params_new = {'api_ops_id': api_ops_id, 'data': []}
+    result_elements_new = {'api_ops_id': api_ops_id, 'data': []}
 
-        for key, val in result_params.items():
-            tmp = {'tag': key, 'data': val}
-            result_params_new['data'].append(tmp)
+    for key, val in result_params.items():
+        tmp = {'tag': key, 'data': val}
+        result_params_new['data'].append(tmp)
 
-        for key, val in result_elements.items():
-            tmp = {'tag': key, 'data': val}
-            result_elements_new['data'].append(tmp)
+    for key, val in result_elements.items():
+        tmp = {'tag': key, 'data': val}
+        result_elements_new['data'].append(tmp)
 
-        db_manager.store_document(API_PARAM_FUNCTIONS, result_params_new)
-        db_manager.store_document(API_ELEMENTS_FUNCTIONS, result_elements_new)
+    db_manager.store_document(API_PARAM_FUNCTIONS, result_params_new)
+    db_manager.store_document(API_ELEMENTS_FUNCTIONS, result_elements_new)
 
-        res = {
-            'status': 200,
-            'message': 'ok',
-            'success': True
-        }
-    except Exception as e:
-        res = {
-            'status': 500,
-            'errorType': type(e).__name__,
-            'error': str(e),
-            'message': 'Some error has occured in extracting data',
-            'success': False
-        }
+    res = {
+        'status': 200,
+        'message': 'ok',
+        'success': True
+    }
+    # except Exception as e:
+    #     res = {
+    #         'status': 500,
+    #         'errorType': type(e).__name__,
+    #         'error': str(e),
+    #         'message': 'Some error has occured in extracting data',
+    #         'success': False
+    #     }
 
     return res
