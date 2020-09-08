@@ -18,11 +18,12 @@ def home():
 @app.route("/apiops_parser", methods=["POST"])
 def apiops_parser():
     f = request.files["file"]
+    filename = f.filename
 
-    filepath = "./files/inputfile.json"
+    filepath = "./files/" + filename
     f.save(filepath)
 
-    res = parse_swagger_openapi(filepath)
+    res = parse_swagger_openapi(filepath, filename)
     return jsonify(res)
 
 
