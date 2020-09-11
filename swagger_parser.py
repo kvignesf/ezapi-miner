@@ -63,17 +63,14 @@ def get_all_paths(jsondata):
 def extract_body_param(param):
     param_data = {}
 
-    """
-    param_data["name"] = param.get("name")  # fixed-field
-    param_data["in"] = param.get("in")  # fixed-field
-    """
+    param_name = param.get("name")
+    param_required = param.get("required", False)
+    param_description = param.get("description")
 
-    # no type field. Check schema (a JSON Schema) for the body structure
-    # Reference - https://json-schema.org/learn/getting-started-step-by-step.html
     param_schema = param["schema"]
     param_schema_type = param_schema.get("type")
 
-    if param_schema_type == None:
+    if not param_schema_type:
         if "items" in param_schema:
             param_schema_type["type"] = "array"
             param_schema_type = "array"
@@ -81,20 +78,137 @@ def extract_body_param(param):
             param_schema_type["type"] = "object"
             param_schema_type = "object"
 
-    param_data["type"] = param_schema_type
-    param_data["required"] = param.get("required", False)
+    if param_name and param_name != "body":
+        param_data["type"] = "object"
+        param_data["required"] = param_required
+        param_data["description"] = param_description
+        param_data["properties"] = {}
+        param_data["properties"][param_name] = {}
 
-    if param_schema_type == "array" and "items" in param_schema:
-        param_data["items"] = utils.extract_type_array(
-            param_schema, True
-        )  # is_json_schema - True
+        param_data["properties"][param_name]["type"] = param_schema_type
 
-    elif param_schema_type == "object" and "properties" in param_schema:
-        param_data["properties"] = utils.extract_type_object(
-            param_schema, True
-        )  # is_json_schema - True
+        if param_schema_type == "object" and "properties" in param_schema:
+            param_data["properties"][param_name]["properties"] = utils.extract_type_object(
+                param_schema, True
+            )  # is_json_schema - True
+
+        if param_schema_type == "array" and "items" in param_schema:
+            param_data["properties"][param_name]["items"] = utils.extract_type_array(
+                param_schema, True
+            )  # is_json_schema - True
+    else:
+        param_data["type"] = param_schema_type
+
+        if param_schema_type == "object" and "properties" in param_schema:
+            param_data["properties"] = utils.extract_type_object(
+                param_schema, True
+            )  # is_json_schema - True
+
+        if param_schema_type == "array" and "items" in param_schema:
+            param_data["items"] = utils.extract_type_array(
+                param_schema, True
+            )  # is_json_schema - True
 
     return param_data
+
+
+# def extract_body_param(param):
+#     param_data = {}
+
+#     """
+#     param_data["name"] = param.get("name")  # fixed-field
+#     param_data["in"] = param.get("in")  # fixed-field
+#     """
+
+#     # no type field. Check schema (a JSON Schema) for the body structure
+#     # Reference - https://json-schema.org/learn/getting-started-step-by-step.html
+#     param_name = param.get("name")
+#     param_required = param.get("required", False)
+#     param_description = param.get("description")
+
+#     param_schema = param["schema"]
+#     param_schema_type = param_schema.get("type")
+#     param_schema_format = param_schema.get("format")
+
+#     if param_name and param_name != "body":
+#         param_data["type"] = "object"
+#         param_data["properties"] = {}
+#         param_data["properties"][param_name] = {}
+
+#     if param_schema_type == None:
+#         if "items" in param_schema:
+#             param_schema_type["type"] = "array"
+#             param_schema_type = "array"
+#         elif "properties" in param_schema:
+#             param_schema_type["type"] = "object"
+#             param_schema_type = "object"
+
+#     param_data["type"] = param_schema_type
+#     param_data["required"] = param.get("required", False)
+
+#     if param_schema_type == "object" and "properties" in param_schema:
+#         param_data["properties"] = utils.extract_type_object(
+#             param_schema, True
+#         )  # is_json_schema - True
+
+#     else:
+#         param_data["type"] = "object"
+#         param_data["required"] = True   # body - always required
+#         param_data["properties"] = {}
+
+#         if param_name:
+#             param_data["properties"][param_name] = {}
+#             param_data["properties"][param_name]["type"] = param_schema_type
+#             param_data["properties"][param_name]["format"] = param_schema_format
+#             param_data["properties"][param_name]["required"] = param_required
+#             param_data["properties"][param_name]["description"] = param_description
+
+#         if param_schema_type == "array" and "items" in param_schema:
+#             print("\narray schema")
+#             pprint(param_schema)
+#             param_data["properties"][param_name]["items"] = utils.extract_type_array(
+#                 param_schema, True)  # is_json_schema - True
+
+#     print("\n\n -> param data\n")
+#     pprint(param_data)
+#     return param_data
+
+
+# def extract_body_param(param):
+#     param_data = {}
+
+#     """
+#     param_data["name"] = param.get("name")  # fixed-field
+#     param_data["in"] = param.get("in")  # fixed-field
+#     """
+
+#     # no type field. Check schema (a JSON Schema) for the body structure
+#     # Reference - https://json-schema.org/learn/getting-started-step-by-step.html
+#     param_schema = param["schema"]
+#     param_schema_type = param_schema.get("type")
+
+#     if param_schema_type == None:
+#         if "items" in param_schema:
+#             param_schema_type["type"] = "array"
+#             param_schema_type = "array"
+#         elif "properties" in param_schema:
+#             param_schema_type["type"] = "object"
+#             param_schema_type = "object"
+
+#     param_data["type"] = param_schema_type
+#     param_data["required"] = param.get("required", False)
+
+#     if param_schema_type == "array" and "items" in param_schema:
+#         param_data["items"] = utils.extract_type_array(
+#             param_schema, True
+#         )  # is_json_schema - True
+
+#     elif param_schema_type == "object" and "properties" in param_schema:
+#         param_data["properties"] = utils.extract_type_object(
+#             param_schema, True
+#         )  # is_json_schema - True
+
+#     return param_data
 
 
 def extract_not_body_param(param):
@@ -172,6 +286,7 @@ def extract_response_schema(schema):
 
 
 def get_request_data(jsondata, api_path, method_type):
+    print("------------------>", api_path, method_type, "\n")
     all_request_params = {}
     for param in _PARAMETER_TYPES:
         all_request_params[param] = []
@@ -252,86 +367,86 @@ def get_api_info(jsondata):
 
 
 def parse_swagger_api(filepath, filename):
-    # try:
-    jsondata = json.load(codecs.open(filepath, 'r', 'utf-8-sig'))
-    # jsondata = json.loads(open(filepath).read().decode('utf-8-sig'))
-    # jsondata = json.loads(open(filepath).read())
-    jsondata = utils.deref_json(jsondata)
+    try:
+        jsondata = json.load(codecs.open(filepath, 'r', 'utf-8-sig'))
+        # jsondata = json.loads(open(filepath).read().decode('utf-8-sig'))
+        # jsondata = json.loads(open(filepath).read())
+        jsondata = utils.deref_json(jsondata)
 
-    api_ops_id = str(uuid.uuid4().hex)
-    print("api_ops_id generated ", api_ops_id)
+        api_ops_id = str(uuid.uuid4().hex)
+        print("api_ops_id generated ", api_ops_id)
 
-    api_document = get_api_info(jsondata)
-    api_document["api_ops_id"] = api_ops_id
-    api_document["filename"] = filename
-    db_manager.store_document(API_INFO, api_document)
+        api_document = get_api_info(jsondata)
+        api_document["api_ops_id"] = api_ops_id
+        api_document["filename"] = filename
+        db_manager.store_document(API_INFO, api_document)
 
-    all_paths = get_all_paths(jsondata)
+        all_paths = get_all_paths(jsondata)
 
-    for path in all_paths:
-        path["api_ops_id"] = api_ops_id
-        db_manager.store_document(API_PATH, path)
+        for path in all_paths:
+            path["api_ops_id"] = api_ops_id
+            db_manager.store_document(API_PATH, path)
 
-        p = path["path"]
-        methods = path["allowed_method"]
+            p = path["path"]
+            methods = path["allowed_method"]
 
-        for m in methods:
-            request_data = get_request_data(jsondata, p, m)
+            for m in methods:
+                request_data = get_request_data(jsondata, p, m)
 
-            response_data = get_response_data(jsondata, p, m)
+                response_data = get_response_data(jsondata, p, m)
 
-            request_document = {
-                "path": p,
-                "method": m,
-                "params": request_data,
-                "api_ops_id": api_ops_id,
+                request_document = {
+                    "path": p,
+                    "method": m,
+                    "params": request_data,
+                    "api_ops_id": api_ops_id,
+                }
+
+                response_document = {
+                    "path": p,
+                    "method": m,
+                    "params": response_data,
+                    "api_ops_id": api_ops_id,
+                }
+
+                db_manager.store_document(API_REQUEST_INFO, request_document)
+                db_manager.store_document(API_RESPONSE_INFO, response_document)
+
+        tags_info = utils.get_all_tags(api_ops_id)
+        tags_paths = utils.get_tags_from_paths(api_ops_id)
+        tags = list(set(tags_info + tags_paths))
+
+        res = {
+            'success': True,
+            'message': 'ok',
+            'status': 200,
+            'data': {
+                'api_ops_id': api_ops_id,
+                'tags': tags
             }
-
-            response_document = {
-                "path": p,
-                "method": m,
-                "params": response_data,
-                "api_ops_id": api_ops_id,
-            }
-
-            db_manager.store_document(API_REQUEST_INFO, request_document)
-            db_manager.store_document(API_RESPONSE_INFO, response_document)
-
-    tags_info = utils.get_all_tags(api_ops_id)
-    tags_paths = utils.get_tags_from_paths(api_ops_id)
-    tags = list(set(tags_info + tags_paths))
-
-    res = {
-        'success': True,
-        'message': 'ok',
-        'status': 200,
-        'data': {
-            'api_ops_id': api_ops_id,
-            'tags': tags
         }
-    }
-    # except jsonref.JsonRefError as e:
-    #     res = {
-    #         'success': False,
-    #         'errorType': type(e).__name__,
-    #         'message': "JSON Referencing Error. APIOPS doesn't support remote reference",
-    #         'error': str(e),
-    #         'status': 500,
-    #     }
-    # except json.JSONDecodeError as e:
-    #     res = {
-    #         'success': False,
-    #         'errorType': type(e).__name__,
-    #         'message': "Please validate your JSON",
-    #         'error': str(e),
-    #         'status': 500,
-    #     }
-    # except Exception as e:
-    #     res = {
-    #         'success': False,
-    #         'errorType': type(e).__name__,
-    #         'error': str(e),
-    #         'message': 'Some error has occured in parsing data',
-    #         'status': 500,
-    #     }
+    except jsonref.JsonRefError as e:
+        res = {
+            'success': False,
+            'errorType': type(e).__name__,
+            'message': "JSON Referencing Error. APIOPS doesn't support remote reference",
+            'error': str(e),
+            'status': 500,
+        }
+    except json.JSONDecodeError as e:
+        res = {
+            'success': False,
+            'errorType': type(e).__name__,
+            'message': "Please validate your JSON",
+            'error': str(e),
+            'status': 500,
+        }
+    except Exception as e:
+        res = {
+            'success': False,
+            'errorType': type(e).__name__,
+            'error': str(e),
+            'message': 'Some error has occured in parsing data',
+            'status': 500,
+        }
     return res
