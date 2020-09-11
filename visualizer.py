@@ -27,13 +27,14 @@ def get_response_status(all_responses, path, method):
 
 def fetch_sankey_data(apiopsid):   # tags can be multiple
     try:
-        db = db_manager.get_db_connection()
+        client, db = db_manager.get_db_connection()
 
         all_elements = db.elements.find({'api_ops_id': apiopsid})
         all_responses = db.responses.find({'api_ops_id': apiopsid})
         all_elements = list(all_elements)[0]
         all_responses = list(all_responses)
 
+        # todo - graph_data -> graph_metamodel
         graph_data = {}  # tag wise
 
         element_data = all_elements['data']

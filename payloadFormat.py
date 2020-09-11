@@ -9,7 +9,7 @@ import requests
 from faker import Faker
 fake = Faker()
 
-# db = db_manager.get_db_connection()
+# client, db = db_manager.get_db_connection()
 
 # toss = random.randint(0, 1)
 

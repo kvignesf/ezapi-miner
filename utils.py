@@ -174,7 +174,7 @@ def extract_apiops_description(operationId, description, summary):
 
 
 def get_all_tags(api_ops_id):
-    db = db_manager.get_db_connection()
+    client, db = db_manager.get_db_connection()
     apiinfo = db.apiinfo.find_one({"api_ops_id": api_ops_id})
     tags = apiinfo["tags"]
 
@@ -187,7 +187,7 @@ def get_all_tags(api_ops_id):
 
 
 def get_tags_from_paths(api_ops_id):
-    db = db_manager.get_db_connection()
+    client, db = db_manager.get_db_connection()
     tags = set()
     all_paths = db.paths.find({"api_ops_id": api_ops_id})
     all_paths = list(all_paths)

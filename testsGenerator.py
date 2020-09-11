@@ -8,7 +8,7 @@ import utils
 from payloadFormat import get_request_schema, get_response_schema
 from payload import get_request_data, get_response_data
 
-db = db_manager.get_db_connection()
+client, db = db_manager.get_db_connection()
 
 MAX_ITER = 20
 TESTCASE_COLLECTION = 'testcases'
@@ -185,14 +185,14 @@ def generate(api_ops_id):
                                 testdata['inputData'] = payload_request
                                 testdata['assertionData'] = mapped_resp
 
-                                db_manager.store_document(
-                                    TESTCASE_COLLECTION, testdata)
+                                # db_manager.store_document(
+                                #     TESTCASE_COLLECTION, testdata)
 
-                                # pprint(testdata)
-                                # print("\n--------------------------\n")
+                                pprint(testdata)
+                                print("\n--------------------------\n")
     except Exception as e:
         print("**Error: " + str(e))
 
 
 # generate("7e455a71cb514d11a9fcd611138e6f4d")
-# generate("6320fb8486164e76823c2d6e7209b2f0")
+generate("6320fb8486164e76823c2d6e7209b2f0")

@@ -5,7 +5,7 @@ import utils
 from pprint import pprint
 import operator
 
-db = db_manager.get_db_connection()
+client, db = db_manager.get_db_connection()
 
 API_PARAM_FUNCTIONS = 'scores'
 API_ELEMENTS_FUNCTIONS = 'elements'
