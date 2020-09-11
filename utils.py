@@ -17,59 +17,11 @@ def deref_json(dict_data):
     return jsondata
 
 
-def extract_type_array(param_array, is_json_schema=False):
-    if "type" not in param_array and "items" in param_array:
-        param_array["type"] = "array"
-
-    assert param_array["type"] == "array"
-
-    # res = {}
-    # res["type"] = "array"
-    # res["items"] = None
-
-    result = {}
-
-    array_items = param_array.get("items")  # required-field
-    item_type = array_items.get("type")  # required-field
-
-    if not item_type:
-        if "items" in array_items:
-            array_items["type"] = "array"
-            item_type = "array"
-        elif "properties" in array_items:
-            array_items["type"] = "object"
-            item_type = "object"
-
-    result["type"] = item_type
-
-    if item_type == "array":
-        result["items"] = extract_type_array(array_items, is_json_schema)
-
-    elif item_type == "object":
-        result["properties"] = extract_type_object(array_items, is_json_schema)
-
-    else:
-        result["format"] = array_items.get("format")
-        result["description"] = array_items.get("description")
-
-        for f in OTHER_FIELDS:
-            if f in array_items:
-                result[f] = array_items.get(f)
-
-    # res["items"] = result
-    # return res
-    return result
-
-
 def extract_type_object(param_object, is_json_schema=False):
     if "type" not in param_object and "properties" in param_object:
         param_object["type"] = "object"
 
     assert param_object["type"] == "object"
-
-    # res = {}
-    # res["type"] = "object"
-    # res["properties"] = None
 
     result = {}
 
@@ -111,15 +63,62 @@ def extract_type_object(param_object, is_json_schema=False):
                 if f in val:
                     result[key][f] = val.get(f)
 
-    # res["properties"] = result
-    # return res
     return result
 
 
-def camel_case_split(word):
+def extract_type_array(param_array, is_json_schema=False):
+    if "type" not in param_array and "items" in param_array:
+        param_array["type"] = "array"
+
+    assert param_array["type"] == "array"
+
+    result = {}
+
+    array_items = param_array.get("items")  # required-field
+    item_type = array_items.get("type")  # required-field
+
+    if not item_type:
+        if "items" in array_items:
+            array_items["type"] = "array"
+            item_type = "array"
+        elif "properties" in array_items:
+            array_items["type"] = "object"
+            item_type = "object"
+
+    result["type"] = item_type
+
+    if item_type == "array":
+        result["items"] = extract_type_array(array_items, is_json_schema)
+
+    elif item_type == "object":
+        result["properties"] = extract_type_object(array_items, is_json_schema)
+
+    else:
+        result["format"] = array_items.get("format")
+        result["description"] = array_items.get("description")
+
+        for f in OTHER_FIELDS:
+            if f in array_items:
+                result[f] = array_items.get(f)
+
+    return result
+
+
+# def camel_case_split(word):
+#     try:
+#         word = word[0].upper() + word[1:]
+#         res = re.findall(r'[A-Z](?:[a-z]+|[A-Z]*(?=[A-Z]|$))', word)
+#         print(res)
+#         return (" ".join(res)).lower()
+#     except:
+#         return None
+
+
+def camel_case_split(identifier):
     try:
-        word = word[0].upper() + word[1:]
-        res = re.findall(r'[A-Z](?:[a-z]+|[A-Z]*(?=[A-Z]|$))', word)
+        matches = re.finditer(
+            '.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)', identifier)
+        res = [m.group(0) for m in matches]
         return (" ".join(res)).lower()
     except:
         return None
@@ -203,6 +202,35 @@ def get_tags_from_paths(api_ops_id):
                         tags.add(t)
 
     return list(tags)
+
+
+def special_character_split(operationId):
+    res = re.split(r"[^a-zA-Z0-9]", operationId)
+    return res
+
+
+def possibleMatch(s1, s2):  # match str1, str2
+    if s1 == s2:
+        return 1
+
+    t1 = special_character_split(s1)
+    t2 = special_character_split(s2)
+
+    s1 = split_operation_id(s1)
+    s2 = split_operation_id(s2)
+
+    s1 = s1.split()
+    s2 = s2.split()
+
+    if t1 == t2 or s1 == t2 or s2 == t1:    # all words matched
+        return 1
+
+    # for t1 in s1:
+    #     for t2 in s2:
+    #         if t1 == t2:    # some words matched
+    #             return 2
+
+    return 0
 
 
 # JFT - Petstore
