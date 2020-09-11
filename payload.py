@@ -9,10 +9,6 @@ import requests
 from faker import Faker
 fake = Faker()
 
-# db = db_manager.get_db_connection()
-
-# toss = random.randint(0, 1)
-
 # todo - required elements
 STRING_FILTERS = ["minLength", "maxLength", "pattern"]  # todo - pattern
 NUMBER_FILTERS = ["minimum", "maximum"]
@@ -174,8 +170,9 @@ def generate_random_object(obj, is_response=False):
 
     return res
 
-
 # path, query, formData, headers
+
+
 def get_other_payload(request_data):
     payload_data = {}
 
@@ -225,32 +222,7 @@ def get_body_payload(request_body, is_response=False):
     return payload_body
 
 
-def get_request(base_url, endpoint, m):
-    url = base_url + endpoint
-    r = None
-
-    if m == 'get':
-        r = requests.get(url)
-    if m == 'post':
-        r = requests.post(url)
-    if m == 'put':
-        r = requests.put(url)
-    if m == 'delete':
-        r = requests.delete(url)
-    if m == 'patch':
-        r = requests.patch(url)
-    if m == 'option':
-        r = requests.option(url)
-    if m == 'head':
-        r = requests.head(url)
-
-    return r
-
-
 def get_request_data(request_data):
-    # request_data=db.requests.find_one(
-    #     {"api_ops_id": api_ops_id, "path": path, "method": method})
-
     request_params = request_data["params"]
 
     request_path = request_params.get("path")
@@ -283,9 +255,6 @@ def get_request_data(request_data):
 
 
 def get_response_data(response_data):
-    # response_data = db.responses.find_one(
-    #     {"api_ops_id": api_ops_id, "path": path, "method": method})
-
     res = []
 
     response_params = response_data['params']
@@ -299,22 +268,3 @@ def get_response_data(response_data):
         res.append({'status': status_code, 'body': payload})
 
     return res
-
-
-# api_ops_id = "f57c06e9075544958eb776f27d0b8208"
-# all_paths = list(db.paths.find({"api_ops_id": api_ops_id}))
-# for path in all_paths:
-#     endpoint = path['path']
-#     methods = path['allowed_method']
-
-#     for m in methods:
-#         print("\n-------------------------\n")
-#         print(endpoint, m, "==>")
-#         payload_request = get_request_data(api_ops_id, endpoint, m)
-#         print("---------- Request payload ==> \n")
-#         pprint(payload_request)
-#         print("\n\n")
-#         payload_response = get_response_data(api_ops_id, endpoint, m)
-#         print("---------- Response payload ==> \n")
-#         pprint(payload_response)
-#         print("\n\n")
