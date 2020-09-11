@@ -22,5 +22,7 @@ def store_document(collection, document):
         db_collection = db.scores
     elif collection == "elements":
         db_collection = db.elements
+    elif collection == "testcases":
+        db_collection = db.testcases
 
     db_collection.insert_one(document).inserted_id
