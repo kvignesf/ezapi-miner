@@ -218,3 +218,9 @@ dmypy.json
 
 .vscode
 tests
+files
+.DS_Store
+*.json
+*.txt
+apiops/
+files/
