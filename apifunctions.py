@@ -1,6 +1,7 @@
 from swagger_parser import parse_swagger_api
 from param_functions import handle_param_functions
 from visualizer import fetch_sankey_data
+from testsGenerator import generate
 
 
 def parse_swagger_openapi(filepath, filename):
@@ -20,3 +21,8 @@ def parse_swagger_openapi(filepath, filename):
 def get_sankey_data(api_ops_id):
     sankey_result = fetch_sankey_data(api_ops_id)
     return sankey_result
+
+
+def generate_test_cases(api_ops_id):
+    res = generate(api_ops_id)
+    return res
