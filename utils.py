@@ -7,6 +7,9 @@ import db_manager
 
 import jsonref
 
+import sys
+import os
+
 # minimum, maximum, minLength, maxLength, minItems, maxItems ...
 OTHER_FIELDS = set(["enum", "default"])
 
@@ -25,43 +28,48 @@ def extract_type_object(param_object, is_json_schema=False):
 
     result = {}
 
-    all_required_fields = []
-    if is_json_schema:
-        all_required_fields = param_object.get("required", [])
+    try:
+        all_required_fields = []
+        if is_json_schema:
+            all_required_fields = param_object.get("required", [])
 
-    for key, val in param_object["properties"].items():
-        result[key] = {}
-        val_type = val.get("type")
+        for key, val in param_object["properties"].items():
+            result[key] = {}
+            val_type = val.get("type")
 
-        if not val_type:
-            if "items" in val:
-                val["type"] = "array"
-                val_type = "array"
-            elif "properties" in val:
-                val["type"] = "object"
-                val_type = "object"
+            if not val_type:
+                if "items" in val:
+                    val["type"] = "array"
+                    val_type = "array"
+                elif "properties" in val:
+                    val["type"] = "object"
+                    val_type = "object"
 
-        result[key]["type"] = val_type
+            result[key]["type"] = val_type
 
-        if not is_json_schema:
-            result[key]["required"] = val.get("required", False)
-        else:
-            result[key]["required"] = key in all_required_fields
+            if not is_json_schema:
+                result[key]["required"] = val.get("required", False)
+            else:
+                result[key]["required"] = key in all_required_fields
 
-        if val_type == "array":
-            result[key]["items"] = extract_type_array(val, is_json_schema)
+            if val_type == "array":
+                result[key]["items"] = extract_type_array(val, is_json_schema)
 
-        elif val_type == "object":
-            result[key]["properties"] = extract_type_object(
-                val, is_json_schema)
+            elif val_type == "object":
+                result[key]["properties"] = extract_type_object(
+                    val, is_json_schema)
 
-        else:
-            result[key]["format"] = val.get("format")
-            result[key]["description"] = val.get("description")
+            else:
+                result[key]["format"] = val.get("format")
+                result[key]["description"] = val.get("description")
 
-            for f in OTHER_FIELDS:
-                if f in val:
-                    result[key][f] = val.get(f)
+                for f in OTHER_FIELDS:
+                    if f in val:
+                        result[key][f] = val.get(f)
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        print(exc_type, fname, exc_tb.tb_lineno, str(e))
 
     return result
 
@@ -74,32 +82,38 @@ def extract_type_array(param_array, is_json_schema=False):
 
     result = {}
 
-    array_items = param_array.get("items")  # required-field
-    item_type = array_items.get("type")  # required-field
+    try:
+        array_items = param_array.get("items")  # required-field
+        item_type = array_items.get("type")  # required-field
 
-    if not item_type:
-        if "items" in array_items:
-            array_items["type"] = "array"
-            item_type = "array"
-        elif "properties" in array_items:
-            array_items["type"] = "object"
-            item_type = "object"
+        if not item_type:
+            if "items" in array_items:
+                array_items["type"] = "array"
+                item_type = "array"
+            elif "properties" in array_items:
+                array_items["type"] = "object"
+                item_type = "object"
 
-    result["type"] = item_type
+        result["type"] = item_type
 
-    if item_type == "array":
-        result["items"] = extract_type_array(array_items, is_json_schema)
+        if item_type == "array":
+            result["items"] = extract_type_array(array_items, is_json_schema)
 
-    elif item_type == "object":
-        result["properties"] = extract_type_object(array_items, is_json_schema)
+        elif item_type == "object":
+            result["properties"] = extract_type_object(
+                array_items, is_json_schema)
 
-    else:
-        result["format"] = array_items.get("format")
-        result["description"] = array_items.get("description")
+        else:
+            result["format"] = array_items.get("format")
+            result["description"] = array_items.get("description")
 
-        for f in OTHER_FIELDS:
-            if f in array_items:
-                result[f] = array_items.get(f)
+            for f in OTHER_FIELDS:
+                if f in array_items:
+                    result[f] = array_items.get(f)
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        print(exc_type, fname, exc_tb.tb_lineno, str(e))
 
     return result
 

@@ -2,16 +2,21 @@ import db_manager
 from pprint import pprint
 import random
 
+import copy
+
 import re
 import utils
 
-from payloadFormat import get_request_schema, get_response_schema
-from payload import get_request_data, get_response_data
+import sys
+import os
 
-client, db = db_manager.get_db_connection()
+from payloadFormat import get_request_schema, get_response_schema
+from payload import get_request_data, get_response_data, check_enum_covered, get_enum_data
 
 MAX_ITER = 20
 TESTCASE_COLLECTION = 'testcases'
+_HTTP_VERBS = set(["get", "put", "post", "delete", "options", "head", "patch"])
+_HTTP_COMMON_VERBS = set(["get", "put", "post", "delete", "patch"])
 
 
 def get_all_keys(d, res=[], prefix=""):
@@ -77,7 +82,6 @@ def map_request_response_schema(request_schema, response_schema):
 
 
 def map_matched_response(request_data, response_data, matched):
-    print("all matched", matched, "\n")
     for match_type in ['body', 'path', 'query']:
         if matched[match_type]:
             for m in matched[match_type]:
@@ -132,12 +136,16 @@ def generate(api_ops_id):
     try:
         testcases = 0
 
+        client, db = db_manager.get_db_connection()
         all_paths = db.paths.find({"api_ops_id": api_ops_id})
         for path in all_paths:
+            filename = path['filename']
             endpoint = path['path']
             methods = path['allowed_method']
 
             for m in methods:
+                method_operation_id = next(x['operationId']
+                                           for x in path['method_definition'] if x['method'] == m) or 'OperationId'
                 print("===>", endpoint, m)
 
                 request_data = db.requests.find_one(
@@ -154,26 +162,48 @@ def generate(api_ops_id):
                     'endpoint': endpoint,
                     'method': m,
                     'requestSchema': request_schema,
-                    'responseSchema': response_schema
+                    'responseSchema': response_schema,
+                    'filename': filename,
+                    'test_case_type': 'F',
+                    'test_case_name': None,
+                    'operation_id': method_operation_id,
+                    'request_response_mapping': None,
+                    'testcaseId': None,
+                    'delete': False
                 }
 
                 for resp in payload_response:
                     if resp['status'] == '200' or resp['status'] == 'default':
+                        testdata['test_case_name'] = method_operation_id + '__P'
                         resp_body = next(
                             (x for x in response_schema if x['status'] == resp['status']))
                         mapped_result = map_request_response_schema(
                             request_schema, resp_body)
+                        testdata['request_response_mapping'] = mapped_result
+
+                        enum_data = get_enum_data(request_data)
 
                         ALL_REQUEST_KEYS_SET = set()
+                        ALL_ENUM_COVERED = {}
+
+                        entities = ['path', 'query', 'form', 'header', 'body']
+                        ALL_ENUM_COVERED = copy.deepcopy(enum_data)
+
+                        for ent in entities:
+                            for key, val in ALL_ENUM_COVERED[ent].items():
+                                ALL_ENUM_COVERED[ent][key] = []
 
                         for iter in range(MAX_ITER):
-                            payload_request = get_request_data(request_data)
+                            payload_request, _ = get_request_data(request_data)
                             request_keys = get_all_keys(
                                 payload_request, res=[], prefix="")
                             request_keys = sorted(request_keys)
                             request_keys = ",".join(request_keys)
 
-                            if request_keys not in ALL_REQUEST_KEYS_SET:
+                            ALL_ENUM_COVERED, enum_check_res = check_enum_covered(
+                                payload_request, enum_data, ALL_ENUM_COVERED)
+
+                            if request_keys not in ALL_REQUEST_KEYS_SET or enum_check_res:
                                 ALL_REQUEST_KEYS_SET.add(request_keys)
                                 testcases += 1
 
@@ -184,15 +214,117 @@ def generate(api_ops_id):
                                 testdata['testcaseId'] = testcases
                                 testdata['inputData'] = payload_request
                                 testdata['assertionData'] = mapped_resp
-
-                                # db_manager.store_document(
-                                #     TESTCASE_COLLECTION, testdata)
+                                testdata['description'] = 'ok'
 
                                 pprint(testdata)
-                                print("\n--------------------------\n")
+                                print("\n----------------------------\n")
+
+                                db_manager.store_document(
+                                    TESTCASE_COLLECTION, testdata)
+
+                        testdata['request_response_mapping'] = None
+
+                    # missing mandatory parameter, Deceptive request (add %/ in endpoint uri)
+                    elif resp['status'] == '400':
+                        testdata['test_case_name'] = method_operation_id + '__P'
+                        ALL_REQUEST_KEYS_SET = set()
+
+                        for iter in range(MAX_ITER):
+                            payload_request, missed_found = get_request_data(
+                                request_data, missing_required=True)
+                            if missed_found:
+                                request_keys = get_all_keys(
+                                    payload_request, res=[], prefix="")
+                                request_keys = sorted(request_keys)
+                                request_keys = ",".join(request_keys)
+
+                                if request_keys not in ALL_REQUEST_KEYS_SET:
+                                    ALL_REQUEST_KEYS_SET.add(request_keys)
+                                    testcases += 1
+
+                                    testdata['status'] = resp['status']
+                                    testdata['testcaseId'] = testcases
+                                    testdata['inputData'] = payload_request
+                                    testdata['description'] = 'missing mandatory parameter'
+
+                                    pprint(testdata)
+                                    print("\n----------------------------\n")
+
+                        # Deceptive request
+                        testcases += 1
+                        payload_request = get_request_data(request_data)
+                        testdata['status'] = resp['status']
+                        testdata['testcaseId'] = testcases
+                        testdata['inputData'] = payload_request
+
+                        tmp = testdata['endpoint'].split('?')
+                        tmp[0] += '%/'
+                        if len(tmp) > 1:
+                            tmp[0] += '?'
+                        testdata['endpoint'] = ''.join(tmp)
+                        testdata['description'] = 'deceptive request'
+
+                        pprint(testdata)
+                        print("\n----------------------------\n")
+
+                        testdata['endpoint'] = endpoint
+
+                    # not found (chnage endpoint uri)
+                    elif resp['status'] == '404':
+                        testdata['test_case_name'] = method_operation_id + '__P'
+                        testcases += 1
+                        payload_request = get_request_data(request_data)
+                        testdata['status'] = resp['status']
+                        testdata['testcaseId'] = testcases
+                        testdata['inputData'] = payload_request
+
+                        tmp = testdata['endpoint'].split('?')
+                        tmp[0] += 'abc'
+                        if len(tmp) > 1:
+                            tmp[0] += '?'
+                        testdata['endpoint'] = ''.join(tmp)
+                        testdata['description'] = 'uri not found'
+
+                        pprint(testdata)
+                        print("\n----------------------------\n")
+
+                        testdata['endpoint'] = endpoint
+
+                    # method not allowed
+                    elif resp['status'] == '405':
+                        testdata['test_case_name'] = method_operation_id + '__P'
+                        payload_request = get_request_data(request_data)
+                        for cm in _HTTP_COMMON_VERBS:
+                            if cm not in methods:
+                                testcases += 1
+                                testdata['method'] = cm
+                                testdata['status'] = resp['status']
+                                testdata['testcaseId'] = testcases
+                                testdata['inputData'] = payload_request
+                                testdata['description'] = 'method not allowed'
+
+                                pprint(testdata)
+                                print("\n----------------------------\n")
+
+        res = {
+            'success': True,
+            'message': 'ok',
+            'status': 200
+        }
     except Exception as e:
-        print("**Error: " + str(e))
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        print(exc_type, fname, exc_tb.tb_lineno, str(e))
+        res = {
+            'success': False,
+            'errorType': type(e).__name__,
+            'error': str(e),
+            'message': 'Some error has occured in generating testcases',
+            'status': 500,
+        }
+
+    return res
 
 
-# generate("7e455a71cb514d11a9fcd611138e6f4d")
-generate("6320fb8486164e76823c2d6e7209b2f0")
+# generate("49af482258fb42d496df7e6506725589")    # petstore3
+# generate("f5554781ed934013afa2858d8909aed6")    # petstore

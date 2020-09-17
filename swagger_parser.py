@@ -112,105 +112,6 @@ def extract_body_param(param):
     return param_data
 
 
-# def extract_body_param(param):
-#     param_data = {}
-
-#     """
-#     param_data["name"] = param.get("name")  # fixed-field
-#     param_data["in"] = param.get("in")  # fixed-field
-#     """
-
-#     # no type field. Check schema (a JSON Schema) for the body structure
-#     # Reference - https://json-schema.org/learn/getting-started-step-by-step.html
-#     param_name = param.get("name")
-#     param_required = param.get("required", False)
-#     param_description = param.get("description")
-
-#     param_schema = param["schema"]
-#     param_schema_type = param_schema.get("type")
-#     param_schema_format = param_schema.get("format")
-
-#     if param_name and param_name != "body":
-#         param_data["type"] = "object"
-#         param_data["properties"] = {}
-#         param_data["properties"][param_name] = {}
-
-#     if param_schema_type == None:
-#         if "items" in param_schema:
-#             param_schema_type["type"] = "array"
-#             param_schema_type = "array"
-#         elif "properties" in param_schema:
-#             param_schema_type["type"] = "object"
-#             param_schema_type = "object"
-
-#     param_data["type"] = param_schema_type
-#     param_data["required"] = param.get("required", False)
-
-#     if param_schema_type == "object" and "properties" in param_schema:
-#         param_data["properties"] = utils.extract_type_object(
-#             param_schema, True
-#         )  # is_json_schema - True
-
-#     else:
-#         param_data["type"] = "object"
-#         param_data["required"] = True   # body - always required
-#         param_data["properties"] = {}
-
-#         if param_name:
-#             param_data["properties"][param_name] = {}
-#             param_data["properties"][param_name]["type"] = param_schema_type
-#             param_data["properties"][param_name]["format"] = param_schema_format
-#             param_data["properties"][param_name]["required"] = param_required
-#             param_data["properties"][param_name]["description"] = param_description
-
-#         if param_schema_type == "array" and "items" in param_schema:
-#             print("\narray schema")
-#             pprint(param_schema)
-#             param_data["properties"][param_name]["items"] = utils.extract_type_array(
-#                 param_schema, True)  # is_json_schema - True
-
-#     print("\n\n -> param data\n")
-#     pprint(param_data)
-#     return param_data
-
-
-# def extract_body_param(param):
-#     param_data = {}
-
-#     """
-#     param_data["name"] = param.get("name")  # fixed-field
-#     param_data["in"] = param.get("in")  # fixed-field
-#     """
-
-#     # no type field. Check schema (a JSON Schema) for the body structure
-#     # Reference - https://json-schema.org/learn/getting-started-step-by-step.html
-#     param_schema = param["schema"]
-#     param_schema_type = param_schema.get("type")
-
-#     if param_schema_type == None:
-#         if "items" in param_schema:
-#             param_schema_type["type"] = "array"
-#             param_schema_type = "array"
-#         elif "properties" in param_schema:
-#             param_schema_type["type"] = "object"
-#             param_schema_type = "object"
-
-#     param_data["type"] = param_schema_type
-#     param_data["required"] = param.get("required", False)
-
-#     if param_schema_type == "array" and "items" in param_schema:
-#         param_data["items"] = utils.extract_type_array(
-#             param_schema, True
-#         )  # is_json_schema - True
-
-#     elif param_schema_type == "object" and "properties" in param_schema:
-#         param_data["properties"] = utils.extract_type_object(
-#             param_schema, True
-#         )  # is_json_schema - True
-
-#     return param_data
-
-
 def extract_not_body_param(param):
     param_data = {}
     param_name = param["name"]  # fixed-field
@@ -263,6 +164,7 @@ def extract_not_body_param(param):
 
 def extract_response_schema(schema):
     param_data = {}
+    # try:
     schema_type = schema.get("type")
 
     if schema_type == None:
@@ -281,12 +183,15 @@ def extract_response_schema(schema):
 
     elif schema_type == "array" and "items" in schema:
         param_data["items"] = utils.extract_type_array(schema)
+    # except Exception as e:
+    #     exc_type, exc_obj, exc_tb = sys.exc_info()
+    #     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    #     print(exc_type, fname, exc_tb.tb_lineno, str(e))
 
     return param_data
 
 
 def get_request_data(jsondata, api_path, method_type):
-    print("------------------>", api_path, method_type, "\n")
     all_request_params = {}
     for param in _PARAMETER_TYPES:
         all_request_params[param] = []
@@ -332,6 +237,7 @@ def get_request_data(jsondata, api_path, method_type):
 def get_response_data(jsondata, api_path, method_type):
     all_response_params = []
 
+    # try:
     api_params = jsondata["paths"][api_path][method_type].get("responses")
 
     for resp, resp_specs in api_params.items():
@@ -348,9 +254,14 @@ def get_response_data(jsondata, api_path, method_type):
         # openapi 3.0
         if "content" in resp_specs:
             resp_schema = resp_specs["content"].get("application/json")
-            param["schema"] = extract_response_schema(resp_schema["schema"])
+            param["schema"] = extract_response_schema(
+                resp_schema["schema"])
 
         all_response_params.append(param)
+    # except Exception as e:
+    #     exc_type, exc_obj, exc_tb = sys.exc_info()
+    #     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    #     print(exc_type, fname, exc_tb.tb_lineno, str(e))
 
     return all_response_params
 
@@ -385,6 +296,7 @@ def parse_swagger_api(filepath, filename):
 
         for path in all_paths:
             path["api_ops_id"] = api_ops_id
+            path["filename"] = filename
             db_manager.store_document(API_PATH, path)
 
             p = path["path"]
@@ -400,6 +312,7 @@ def parse_swagger_api(filepath, filename):
                     "method": m,
                     "params": request_data,
                     "api_ops_id": api_ops_id,
+                    "filename": filename
                 }
 
                 response_document = {
@@ -407,6 +320,7 @@ def parse_swagger_api(filepath, filename):
                     "method": m,
                     "params": response_data,
                     "api_ops_id": api_ops_id,
+                    "filename": filename
                 }
 
                 db_manager.store_document(API_REQUEST_INFO, request_document)
@@ -426,6 +340,10 @@ def parse_swagger_api(filepath, filename):
             }
         }
     except jsonref.JsonRefError as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        print(exc_type, fname, exc_tb.tb_lineno, str(e))
+
         res = {
             'success': False,
             'errorType': type(e).__name__,
@@ -434,6 +352,10 @@ def parse_swagger_api(filepath, filename):
             'status': 500,
         }
     except json.JSONDecodeError as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        print(exc_type, fname, exc_tb.tb_lineno, str(e))
+
         res = {
             'success': False,
             'errorType': type(e).__name__,
@@ -442,6 +364,10 @@ def parse_swagger_api(filepath, filename):
             'status': 500,
         }
     except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        print(exc_type, fname, exc_tb.tb_lineno, str(e))
+
         res = {
             'success': False,
             'errorType': type(e).__name__,

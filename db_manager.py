@@ -1,6 +1,8 @@
 from pprint import pprint
 import pymongo
 
+import copy
+
 
 def get_db_connection(host="localhost", port=27017):
     client = pymongo.MongoClient("localhost", 27017)
@@ -9,7 +11,7 @@ def get_db_connection(host="localhost", port=27017):
 
 
 def store_document(collection, document):
-    pprint(document)
+    copyDocument = copy.deepcopy(document)
     client, db = get_db_connection()
 
     if collection == "apiinfo":
@@ -27,5 +29,5 @@ def store_document(collection, document):
     elif collection == "testcases":
         db_collection = db.testcases
 
-    db_collection.insert_one(document).inserted_id
+    db_collection.insert_one(copyDocument).inserted_id
     client.close()
