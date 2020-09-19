@@ -6,6 +6,7 @@ import copy
 
 import re
 import utils
+from urllib.parse import urlencode
 
 import sys
 import os
@@ -15,6 +16,7 @@ from payload import get_request_data, get_response_data, check_enum_covered, get
 
 MAX_ITER = 20
 TESTCASE_COLLECTION = 'testcases'
+VIRTUAL_SERVICE_COLLECTION = 'virtual'
 _HTTP_VERBS = set(["get", "put", "post", "delete", "options", "head", "patch"])
 _HTTP_COMMON_VERBS = set(["get", "put", "post", "delete", "patch"])
 
@@ -132,6 +134,42 @@ def map_matched_response(request_data, response_data, matched):
     return response_data
 
 
+def get_virtual_collection_data(testdata):
+    try:
+        virtual_service_data = {
+            'httpMethod': testdata['method'],
+            'headers': testdata['inputData']['header'],
+            'formData': testdata['inputData']['form'],
+            'requestBody': testdata['inputData']['body'],
+            'responseStatusCode': testdata['status'],
+            'responseBody': testdata.get('assertionData', {})
+        }
+
+        virtual_service_data['responseBody'] = testdata.get(
+            'assertionData', {})
+        virtual_service_data['responseBody'] = virtual_service_data['responseBody'].get(
+            'body', {})
+
+        endpoint = testdata['endpoint']
+        pathData = testdata['inputData']['path']
+        queryData = testdata['inputData']['query']
+
+        print(endpoint, end=' , ')
+
+        endpoint = endpoint.format(**pathData)
+        tmp = urlencode(queryData)
+        if tmp:
+            endpoint += '?' + tmp
+        print(endpoint)
+        virtual_service_data['endpoint'] = endpoint
+
+        return virtual_service_data
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        print(exc_type, fname, exc_tb.tb_lineno, str(e))
+
+
 def generate(api_ops_id):
     try:
         testcases = 0
@@ -146,7 +184,7 @@ def generate(api_ops_id):
             for m in methods:
                 method_operation_id = next(x['operationId']
                                            for x in path['method_definition'] if x['method'] == m) or 'OperationId'
-                print("===>", endpoint, m)
+                # print("===>", endpoint, m)
 
                 request_data = db.requests.find_one(
                     {"api_ops_id": api_ops_id, "path": endpoint, "method": m})
@@ -216,11 +254,16 @@ def generate(api_ops_id):
                                 testdata['assertionData'] = mapped_resp
                                 testdata['description'] = 'ok'
 
-                                pprint(testdata)
-                                print("\n----------------------------\n")
+                                # pprint(testdata)
+                                # print("\n----------------------------\n")
+
+                                virtual_testdata = get_virtual_collection_data(
+                                    testdata)
 
                                 db_manager.store_document(
                                     TESTCASE_COLLECTION, testdata)
+                                db_manager.store_document(
+                                    VIRTUAL_SERVICE_COLLECTION, virtual_testdata)
 
                         testdata['request_response_mapping'] = None
 
@@ -247,25 +290,41 @@ def generate(api_ops_id):
                                     testdata['inputData'] = payload_request
                                     testdata['description'] = 'missing mandatory parameter'
 
-                                    pprint(testdata)
-                                    print("\n----------------------------\n")
+                                    # pprint(testdata)
+                                    # print("\n----------------------------\n")
+
+                                    virtual_testdata = get_virtual_collection_data(
+                                        testdata)
+
+                                    db_manager.store_document(
+                                        TESTCASE_COLLECTION, testdata)
+                                    db_manager.store_document(
+                                        VIRTUAL_SERVICE_COLLECTION, virtual_testdata)
 
                         # Deceptive request
                         testcases += 1
-                        payload_request = get_request_data(request_data)
+                        payload_request, _ = get_request_data(request_data)
                         testdata['status'] = resp['status']
                         testdata['testcaseId'] = testcases
                         testdata['inputData'] = payload_request
 
-                        tmp = testdata['endpoint'].split('?')
+                        tmp = testdata['endpoint'].split('{')
                         tmp[0] += '%/'
                         if len(tmp) > 1:
-                            tmp[0] += '?'
+                            tmp[0] += '{'
                         testdata['endpoint'] = ''.join(tmp)
                         testdata['description'] = 'deceptive request'
 
-                        pprint(testdata)
-                        print("\n----------------------------\n")
+                        # pprint(testdata)
+                        # print("\n----------------------------\n")
+
+                        virtual_testdata = get_virtual_collection_data(
+                            testdata)
+
+                        db_manager.store_document(
+                            TESTCASE_COLLECTION, testdata)
+                        db_manager.store_document(
+                            VIRTUAL_SERVICE_COLLECTION, virtual_testdata)
 
                         testdata['endpoint'] = endpoint
 
@@ -273,7 +332,7 @@ def generate(api_ops_id):
                     elif resp['status'] == '404':
                         testdata['test_case_name'] = method_operation_id + '__P'
                         testcases += 1
-                        payload_request = get_request_data(request_data)
+                        payload_request, _ = get_request_data(request_data)
                         testdata['status'] = resp['status']
                         testdata['testcaseId'] = testcases
                         testdata['inputData'] = payload_request
@@ -285,15 +344,23 @@ def generate(api_ops_id):
                         testdata['endpoint'] = ''.join(tmp)
                         testdata['description'] = 'uri not found'
 
-                        pprint(testdata)
-                        print("\n----------------------------\n")
+                        # pprint(testdata)
+                        # print("\n----------------------------\n")
+
+                        virtual_testdata = get_virtual_collection_data(
+                            testdata)
+
+                        db_manager.store_document(
+                            TESTCASE_COLLECTION, testdata)
+                        db_manager.store_document(
+                            VIRTUAL_SERVICE_COLLECTION, virtual_testdata)
 
                         testdata['endpoint'] = endpoint
 
                     # method not allowed
                     elif resp['status'] == '405':
                         testdata['test_case_name'] = method_operation_id + '__P'
-                        payload_request = get_request_data(request_data)
+                        payload_request, _ = get_request_data(request_data)
                         for cm in _HTTP_COMMON_VERBS:
                             if cm not in methods:
                                 testcases += 1
@@ -303,8 +370,16 @@ def generate(api_ops_id):
                                 testdata['inputData'] = payload_request
                                 testdata['description'] = 'method not allowed'
 
-                                pprint(testdata)
-                                print("\n----------------------------\n")
+                                # pprint(testdata)
+                                # print("\n----------------------------\n")
+
+                                virtual_testdata = get_virtual_collection_data(
+                                    testdata)
+
+                                db_manager.store_document(
+                                    TESTCASE_COLLECTION, testdata)
+                                db_manager.store_document(
+                                    VIRTUAL_SERVICE_COLLECTION, virtual_testdata)
 
         res = {
             'success': True,

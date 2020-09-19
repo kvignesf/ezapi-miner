@@ -28,6 +28,8 @@ def store_document(collection, document):
         db_collection = db.elements
     elif collection == "testcases":
         db_collection = db.testcases
+    elif collection == "virtual":
+        db_collection = db.virtual
 
     db_collection.insert_one(copyDocument).inserted_id
     client.close()
