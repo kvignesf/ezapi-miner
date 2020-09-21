@@ -31,5 +31,5 @@ def store_document(collection, document):
     elif collection == "virtual":
         db_collection = db.virtual
 
-    db_collection.insert_one(copyDocument).inserted_id
+    db_collection.insert_one(copyDocument)
     client.close()

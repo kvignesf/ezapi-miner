@@ -98,37 +98,37 @@ def map_matched_response(request_data, response_data, matched):
                         if req_key == key:
                             key_data = request_data[match_type][key]
 
-                    if isinstance(response_data['body'], dict):
-                        for key in response_data['body']:   # always body
+                    if isinstance(response_data, dict):
+                        for key in response_data:   # always body
                             if resp_key == key:
                                 if key_data:
-                                    response_data['body'][key] = key_data
+                                    response_data[key] = key_data
 
-                    elif isinstance(response_data['body'], list):
-                        for r in range(len(response_data['body'])):
-                            for key in response_data['body'][r]:
+                    elif isinstance(response_data, list):
+                        for r in range(len(response_data)):
+                            for key in response_data[r]:
                                 if resp_key == key:
                                     if key_data:
-                                        response_data['body'][r][key] = key_data
+                                        response_data[r][key] = key_data
 
                 elif match_level == 'flat array':
                     for key in request_data[match_type]:
                         if req_key == key:
                             key_data = request_data[match_type][key]
 
-                    if isinstance(response_data['body'], dict):
-                        for key in response_data['body']:   # always body
+                    if isinstance(response_data, dict):
+                        for key in response_data:   # always body
                             if resp_key == key:
                                 if key_data:
-                                    response_data['body'][key] = random.choice(
+                                    response_data[key] = random.choice(
                                         key_data)
 
-                    elif isinstance(response_data['body'], list):
-                        for r in range(len(response_data['body'])):
-                            for key in response_data['body'][r]:
+                    elif isinstance(response_data, list):
+                        for r in range(len(response_data)):
+                            for key in response_data[r]:
                                 if resp_key == key:
                                     if key_data:
-                                        response_data['body'][r][key] = random.choice(
+                                        response_data[r][key] = random.choice(
                                             key_data)
 
     return response_data
@@ -137,30 +137,25 @@ def map_matched_response(request_data, response_data, matched):
 def get_virtual_collection_data(testdata):
     try:
         virtual_service_data = {
+            'api_ops_id': testdata['api_ops_id'],
             'httpMethod': testdata['method'],
             'headers': testdata['inputData']['header'],
             'formData': testdata['inputData']['form'],
             'requestBody': testdata['inputData']['body'],
-            'responseStatusCode': testdata['status'],
-            'responseBody': testdata.get('assertionData', {})
+            'responseStatusCode': testdata['status']
         }
 
         virtual_service_data['responseBody'] = testdata.get(
             'assertionData', {})
-        virtual_service_data['responseBody'] = virtual_service_data['responseBody'].get(
-            'body', {})
 
         endpoint = testdata['endpoint']
         pathData = testdata['inputData']['path']
         queryData = testdata['inputData']['query']
 
-        print(endpoint, end=' , ')
-
         endpoint = endpoint.format(**pathData)
         tmp = urlencode(queryData)
         if tmp:
             endpoint += '?' + tmp
-        print(endpoint)
         virtual_service_data['endpoint'] = endpoint
 
         return virtual_service_data
@@ -246,7 +241,7 @@ def generate(api_ops_id):
                                 testcases += 1
 
                                 mapped_resp = map_matched_response(
-                                    payload_request, resp, mapped_result)
+                                    payload_request, resp['body'], mapped_result)
 
                                 testdata['status'] = resp['status']
                                 testdata['testcaseId'] = testcases
@@ -405,6 +400,6 @@ def generate(api_ops_id):
     return res
 
 
-generate("95266a7909b049bcaea4e01451621556")
-# generate("49af482258fb42d496df7e6506725589")    # petstore3
+# generate("95266a7909b049bcaea4e01451621556")  # Citi account
+generate("49af482258fb42d496df7e6506725589")    # petstore3
 # generate("f5554781ed934013afa2858d8909aed6")    # petstore
