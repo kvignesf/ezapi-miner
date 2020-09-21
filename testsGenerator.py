@@ -167,6 +167,7 @@ def get_virtual_collection_data(testdata):
 
 def generate(api_ops_id):
     try:
+        random.seed(42)
         testcases = 0
 
         client, db = db_manager.get_db_connection()
@@ -175,6 +176,9 @@ def generate(api_ops_id):
             filename = path['filename']
             endpoint = path['path']
             methods = path['allowed_method']
+            method_definition = path['method_definition']
+
+            method_tags = {t['method']: t['tags'] for t in method_definition}
 
             for m in methods:
                 method_operation_id = next(x['operationId']
@@ -202,7 +206,8 @@ def generate(api_ops_id):
                     'operation_id': method_operation_id,
                     'request_response_mapping': None,
                     'testcaseId': None,
-                    'delete': False
+                    'delete': False,
+                    'resource': method_tags[m]
                 }
 
                 for resp in payload_response:
