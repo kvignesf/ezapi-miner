@@ -254,8 +254,8 @@ def generate(api_ops_id):
                                 testdata['assertionData'] = mapped_resp
                                 testdata['description'] = 'ok'
 
-                                # pprint(testdata)
-                                # print("\n----------------------------\n")
+                                pprint(testdata)
+                                print("\n----------------------------\n")
 
                                 virtual_testdata = get_virtual_collection_data(
                                     testdata)
@@ -289,9 +289,10 @@ def generate(api_ops_id):
                                     testdata['testcaseId'] = testcases
                                     testdata['inputData'] = payload_request
                                     testdata['description'] = 'missing mandatory parameter'
+                                    testdata['assertionData'] = resp['body']
 
-                                    # pprint(testdata)
-                                    # print("\n----------------------------\n")
+                                    pprint(testdata)
+                                    print("\n----------------------------\n")
 
                                     virtual_testdata = get_virtual_collection_data(
                                         testdata)
@@ -307,6 +308,7 @@ def generate(api_ops_id):
                         testdata['status'] = resp['status']
                         testdata['testcaseId'] = testcases
                         testdata['inputData'] = payload_request
+                        testdata['assertionData'] = resp['body']
 
                         tmp = testdata['endpoint'].split('{')
                         tmp[0] += '%/'
@@ -315,8 +317,8 @@ def generate(api_ops_id):
                         testdata['endpoint'] = ''.join(tmp)
                         testdata['description'] = 'deceptive request'
 
-                        # pprint(testdata)
-                        # print("\n----------------------------\n")
+                        pprint(testdata)
+                        print("\n----------------------------\n")
 
                         virtual_testdata = get_virtual_collection_data(
                             testdata)
@@ -336,6 +338,7 @@ def generate(api_ops_id):
                         testdata['status'] = resp['status']
                         testdata['testcaseId'] = testcases
                         testdata['inputData'] = payload_request
+                        testdata['assertionData'] = resp['body']
 
                         tmp = testdata['endpoint'].split('?')
                         tmp[0] += 'abc'
@@ -344,8 +347,8 @@ def generate(api_ops_id):
                         testdata['endpoint'] = ''.join(tmp)
                         testdata['description'] = 'uri not found'
 
-                        # pprint(testdata)
-                        # print("\n----------------------------\n")
+                        pprint(testdata)
+                        print("\n----------------------------\n")
 
                         virtual_testdata = get_virtual_collection_data(
                             testdata)
@@ -369,9 +372,10 @@ def generate(api_ops_id):
                                 testdata['testcaseId'] = testcases
                                 testdata['inputData'] = payload_request
                                 testdata['description'] = 'method not allowed'
+                                testdata['assertionData'] = resp['body']
 
-                                # pprint(testdata)
-                                # print("\n----------------------------\n")
+                                pprint(testdata)
+                                print("\n----------------------------\n")
 
                                 virtual_testdata = get_virtual_collection_data(
                                     testdata)
@@ -401,5 +405,6 @@ def generate(api_ops_id):
     return res
 
 
+generate("95266a7909b049bcaea4e01451621556")
 # generate("49af482258fb42d496df7e6506725589")    # petstore3
 # generate("f5554781ed934013afa2858d8909aed6")    # petstore
