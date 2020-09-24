@@ -11,7 +11,7 @@ import sys
 import os
 
 # minimum, maximum, minLength, maxLength, minItems, maxItems ...
-OTHER_FIELDS = set(["enum", "default"])
+OTHER_FIELDS = set(["enum", "default", "example"])
 
 
 def deref_json(dict_data):

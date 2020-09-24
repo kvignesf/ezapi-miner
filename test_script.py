@@ -21,7 +21,7 @@ for path in paths:
 
             testcases_result = generate_test_cases(api_ops_id)
             if 'success' in testcases_result and testcases_result['success']:
-                print("** Correct")
+                print("** Correct", api_ops_id)
             else:
                 print("** Error Generation")
         else:

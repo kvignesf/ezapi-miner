@@ -7,6 +7,7 @@ from random import choice
 from string import ascii_lowercase
 
 import requests
+import re
 
 from faker import Faker
 fake = Faker()
@@ -34,14 +35,132 @@ MAX_LEN_STRING = 20
 MIN_ITEMS = 1
 MAX_ITEMS = 3
 
+# Reference - https://stackoverflow.com/a/26227853
 
-# A value of type other than (object, array)
-# example - string, integer, time
-def generate_random_value(val):
+
+def gen_phone():    # mobile number
+    first = str(random.randint(100, 999))
+    second = str(random.randint(1, 888)).zfill(3)
+
+    last = (str(random.randint(1, 9998)).zfill(4))
+    while last in ['1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888']:
+        last = (str(random.randint(1, 9998)).zfill(4))
+
+    return '{}-{}-{}'.format(first, second, last)
+
+
+EZAPI_VOCAB = {
+    "mobileNumber": {
+        "value": "gen_phone()",
+        "matchType": "word"
+    },
+    "firstName": {
+        "value": "fake.first_name()",
+        "matchType": "word"
+    },
+    "lastName": {
+        "value": "fake.last_name()",
+        "matchType": "word"
+    },
+    "city": {
+        "value": "fake.city()",
+        "matchType": "full"
+    },
+    "countryCode": {
+        "value": "fake.country_code()",
+        "matchType": "word"
+    },
+    "email": {
+        "value": "fake.profile()['mail']",
+        "matchType": "full"
+    },
+    "phone": {
+        "value": "fake.phone_number()",
+        "matchType": "full"
+    },
+    "country": {
+        "value": "fake.country()",
+        "matchType": "full"
+    },
+    "emailAddress": {
+        "value": "fake.profile()['mail']",
+        "matchType": "word"
+    },
+    "socialSecurityNumber": {
+        "value": "fake.ssn()",
+        "matchType": "word"
+    },
+    "postalCode": {
+        "value": "fake.postcode()",
+        "matchType": "word"
+    },
+    "zipCode": {
+        "value": "fake.postcode()",
+        "matchType": "word"
+    },
+    "fullName": {
+        "value": "fake.name()",
+        "matchType": "word"
+    },
+    "cityName": {
+        "value": "fake.city()",
+        "matchType": "word"
+    },
+    "countryName": {
+        "value": "fake.country()",
+        "matchType": "word"
+    },
+    "phoneNumber": {
+        "value": "fake.phone_number()",
+        "matchType": "word"
+    },
+    "username": {
+        "value": "fake.profile()['username']",
+        "matchType": "full"
+    }
+}
+
+
+def camel_case_words(identifier):
+    matches = re.finditer(
+        '.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)', identifier)
+    res = [m.group(0) for m in matches]
+    return res
+
+
+def isNameMatched(key):
+    if not key:
+        return False
+
+    res = None
+    matched = False
+
+    for k, v in EZAPI_VOCAB.items():
+        if v["matchType"] == "full" and key.lower() == k.lower():
+            matched = True
+
+        if v["matchType"] == "word":
+            words = camel_case_words(k)
+            matched = all(w.lower() in key.lower() for w in words)
+
+        if matched:
+            try:
+                res = eval(v['value'])
+            except:
+                res = None
+            return res
+
+            # A value of type other than (object, array)
+            # example - string, integer, time
+
+
+def generate_random_value(val, key=None):  # key
     val_type = val.get("type")
     val_format = val.get("format")
     val_enum = val.get("enum")
     val_default = val.get("default")
+    val_example = val.get("example")
+    res = None
 
     # enum, default
     if val_enum:
@@ -54,28 +173,44 @@ def generate_random_value(val):
     elif val_format == "int32" or val_type == "integer":
         min_val = val.get("minimum", MIN_INT)
         max_val = val.get("maximum", MAX_INT)
+
+        if val_example and isinstance(val_example, int):
+            if val_example > 0:
+                min_val = int(val_example * 0.9)
+                max_val = int(val_example * 1.1)
+            elif val_example < 0:
+                min_val = int(val_example * 1.1)
+                max_val = int(val_example * 0.9)
+
         res = random.randint(min_val, max_val)
 
     elif val_format == "int64" or val_type == "long":
         min_val = val.get("minimum", MIN_LONG)
         max_val = val.get("maximum", MAX_LONG)
+
+        if val_example and isinstance(val_example, int):
+            if val_example > 0:
+                min_val = int(val_example * 0.9)
+                max_val = int(val_example * 1.1)
+            elif val_example < 0:
+                min_val = int(val_example * 1.1)
+                max_val = int(val_example * 0.9)
+
         res = random.randint(min_val, max_val)
 
     elif val_type == "number" or (val_format in ["float", "double"]):
         min_val = val.get("minimum", MIN_LONG)
         max_val = val.get("maximum", MAX_LONG)
-        res = random.uniform(min_val, max_val)
 
-    # string
-    elif val_type == "string":
-        min_len = val.get("minLength", MIN_LEN_STRING)
-        max_len = val.get("maxLength", MAX_LEN_STRING)
-        random_len = random.randrange(min_len, max_len)
-        res = ''.join(choice(ascii_lowercase) for i in range(random_len))
+        if val_example and isinstance(val_example, float):
+            if val_example > 0:
+                min_val = val_example * 0.9
+                max_val = val_example * 1.1
+            elif val_example < 0:
+                min_val = val_example * 1.1
+                max_val = val_example * 0.9
 
-    # boolean
-    elif val_type == "boolean":
-        res = bool(random.getrandbits(1))
+        res = round(random.uniform(min_val, max_val), 2)
 
     # date - full-date, date-time
     # Reference - https://xml2rfc.tools.ietf.org/public/rfc/html/rfc3339.html#anchor14
@@ -89,6 +224,28 @@ def generate_random_value(val):
     elif val_format == 'date-time':
         res = fake.iso8601()    # todo - tzinfo
 
+    # string
+    elif val_type == "string":
+        min_len = val.get("minLength", MIN_LEN_STRING)
+        max_len = val.get("maxLength", MAX_LEN_STRING)
+
+        res = None
+        vocabResult = isNameMatched(key)
+        if vocabResult:
+            res = vocabResult
+
+        if not res:
+            if val_example and isinstance(val_example, str):
+                min_len = len(val_example)
+                max_len = len(val_example) + 1  # for random.randrange
+
+            random_len = random.randrange(min_len, max_len)
+            res = ''.join(choice(ascii_lowercase) for i in range(random_len))
+
+    # boolean
+    elif val_type == "boolean":
+        res = bool(random.getrandbits(1))
+
     else:
         # print("***", val_type)
         res = "Unidentified type"
@@ -96,7 +253,7 @@ def generate_random_value(val):
     return res
 
 
-def generate_random_array(arr, is_response=False):
+def generate_random_array(arr, key=None, is_response=False):
     res = []
 
     # try:
@@ -122,17 +279,18 @@ def generate_random_array(arr, is_response=False):
     if toss:
         for i in range(arr_len):
             if val_type == "object" and "properties" in val:    # todo - additionalProperties
-                generated = generate_random_object(val, is_response)
+                generated = generate_random_object(
+                    val, is_response=is_response)
                 if generated:
                     res.append(generated)
                 # res.append(generate_random_object(val))
             elif val_type == "array" and "items" in val:
-                generated = generate_random_array(val, is_response)
+                generated = generate_random_array(val, is_response=is_response)
                 if generated:
                     res.append(generated)
                 # res.append(generate_random_array(val))
             elif val_type not in ["object", "array"]:
-                generated = generate_random_value(val)
+                generated = generate_random_value(val, key=key)
                 if generated:
                     res.append(generated)
                 # res.append(generate_random_value(val))
@@ -162,17 +320,19 @@ def generate_random_object(obj, is_response=False):
 
         if toss:
             if val_type == "object" and "properties" in val:
-                generated = generate_random_object(val, is_response)
+                generated = generate_random_object(
+                    val, is_response=is_response)
                 if generated:
                     res[key] = generated
                 # res[key] = generate_random_object(val)
             elif val_type == "array" and "items" in val:
-                generated = generate_random_array(val, is_response)
+                generated = generate_random_array(
+                    val, key=key, is_response=is_response)
                 if generated:
                     res[key] = generated
                 # res[key] = generate_random_array(val)
             elif val_type not in ["object", "array"]:
-                generated = generate_random_value(val)
+                generated = generate_random_value(val, key=key)
                 if generated:
                     res[key] = generated
                 # res[key] = generate_random_value(val)
@@ -228,10 +388,12 @@ def get_body_payload(request_body, is_response=False):
     request_body_type = request_body.get("type")
 
     if request_body_type == "object" and "properties" in request_body:
-        payload_body = generate_random_object(request_body, is_response)
+        payload_body = generate_random_object(
+            request_body, is_response=is_response)
 
     elif request_body_type == "array" and "items" in request_body:
-        payload_body = generate_random_array(request_body, is_response)
+        payload_body = generate_random_array(
+            request_body, is_response=is_response)
     # except Exception as e:
     #     print("Body payload error", str(e))
 
@@ -257,7 +419,8 @@ def get_body_payload_with_missing_required(request_body):
             payload_body.pop(missed_param, None)
 
     elif request_body_type == "array" and "items" in request_body:
-        payload_body = generate_random_array(request_body, is_response)
+        payload_body = generate_random_array(
+            request_body, is_response=is_response)
 
         # remove a required param
         array_data = request_body["items"]
@@ -330,7 +493,8 @@ def get_response_data(response_data):
         schema = resp_param["schema"]
         headers = resp_param["headers"]
 
-        payload = get_body_payload(schema, True)    # is_response = True
+        payload = get_body_payload(
+            schema, is_response=True)    # is_response = True
         res.append({'status': status_code, 'body': payload})
 
     return res

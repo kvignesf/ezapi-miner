@@ -22,7 +22,7 @@ _PARAMETER_TYPES = set(["path", "query", "header", "body",
                         "formData", "cookie"])   # cookie - openapi 3.0
 
 # minimum, maximum, minLength, maxLength, minItems, maxItems ...
-OTHER_FIELDS = set(["enum", "default"])
+OTHER_FIELDS = set(["enum", "default", "example"])
 
 
 def get_all_paths(jsondata):
@@ -251,11 +251,17 @@ def get_response_data(jsondata, api_path, method_type):
         if "schema" in resp_specs:
             param["schema"] = extract_response_schema(resp_specs["schema"])
 
+        # if "example" in resp_specs:  # without s
+        #     param["example"] = resp_specs["example"]
+
         # openapi 3.0
         if "content" in resp_specs:
             resp_schema = resp_specs["content"].get("application/json")
             param["schema"] = extract_response_schema(
                 resp_schema["schema"])
+
+            # if "examples" in resp_schema:
+            #     param["examples"] = resp_schema["examples"]
 
         all_response_params.append(param)
     # except Exception as e:

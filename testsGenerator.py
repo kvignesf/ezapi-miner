@@ -166,212 +166,129 @@ def get_virtual_collection_data(testdata):
 
 
 def generate(api_ops_id):
-    try:
-        random.seed(42)
-        testcases = 0
+    # try:
+    random.seed(42)
+    testcases = 0
 
-        client, db = db_manager.get_db_connection()
-        all_paths = db.paths.find({"api_ops_id": api_ops_id})
-        for path in all_paths:
-            filename = path['filename']
-            endpoint = path['path']
-            methods = path['allowed_method']
-            method_definition = path['method_definition']
+    client, db = db_manager.get_db_connection()
+    all_paths = db.paths.find({"api_ops_id": api_ops_id})
+    for path in all_paths:
+        filename = path['filename']
+        endpoint = path['path']
+        methods = path['allowed_method']
+        method_definition = path['method_definition']
 
-            method_tags = {t['method']: t['tags'] for t in method_definition}
+        method_tags = {t['method']: t['tags'] for t in method_definition}
 
-            for m in methods:
-                method_operation_id = next(x['operationId']
-                                           for x in path['method_definition'] if x['method'] == m) or 'OperationId'
-                # print("===>", endpoint, m)
+        for m in methods:
+            method_operation_id = next(x['operationId']
+                                       for x in path['method_definition'] if x['method'] == m) or 'OperationId'
+            print("===>", endpoint, m)
 
-                request_data = db.requests.find_one(
-                    {"api_ops_id": api_ops_id, "path": endpoint, "method": m})
-                response_data = db.responses.find_one(
-                    {"api_ops_id": api_ops_id, "path": endpoint, "method": m})
+            request_data = db.requests.find_one(
+                {"api_ops_id": api_ops_id, "path": endpoint, "method": m})
+            response_data = db.responses.find_one(
+                {"api_ops_id": api_ops_id, "path": endpoint, "method": m})
 
-                request_schema = get_request_schema(request_data)
-                response_schema = get_response_schema(response_data)
-                payload_response = get_response_data(response_data)
+            request_schema = get_request_schema(request_data)
+            response_schema = get_response_schema(response_data)
+            payload_response = get_response_data(response_data)
 
-                testdata = {
-                    'api_ops_id': api_ops_id,
-                    'endpoint': endpoint,
-                    'method': m,
-                    'requestSchema': request_schema,
-                    'responseSchema': response_schema,
-                    'filename': filename,
-                    'test_case_type': 'F',
-                    'test_case_name': None,
-                    'operation_id': method_operation_id,
-                    'request_response_mapping': None,
-                    'testcaseId': None,
-                    'delete': False,
-                    'resource': method_tags[m]
-                }
+            testdata = {
+                'api_ops_id': api_ops_id,
+                'endpoint': endpoint,
+                'method': m,
+                'requestSchema': request_schema,
+                'responseSchema': response_schema,
+                'filename': filename,
+                'test_case_type': 'F',
+                'test_case_name': None,
+                'operation_id': method_operation_id,
+                'request_response_mapping': None,
+                'testcaseId': None,
+                'delete': False,
+                'resource': method_tags[m]
+            }
 
-                for resp in payload_response:
-                    if resp['status'] == '200' or resp['status'] == 'default':
-                        testdata['test_case_name'] = method_operation_id + '__P'
-                        resp_body = next(
-                            (x for x in response_schema if x['status'] == resp['status']))
-                        mapped_result = map_request_response_schema(
-                            request_schema, resp_body)
-                        testdata['request_response_mapping'] = mapped_result
+            for resp in payload_response:
+                if resp['status'] == '200' or resp['status'] == 'default':
+                    testdata['test_case_name'] = method_operation_id + '__P'
+                    resp_body = next(
+                        (x for x in response_schema if x['status'] == resp['status']))
+                    mapped_result = map_request_response_schema(
+                        request_schema, resp_body)
+                    testdata['request_response_mapping'] = mapped_result
 
-                        enum_data = get_enum_data(request_data)
+                    enum_data = get_enum_data(request_data)
 
-                        ALL_REQUEST_KEYS_SET = set()
-                        ALL_ENUM_COVERED = {}
+                    ALL_REQUEST_KEYS_SET = set()
+                    ALL_ENUM_COVERED = {}
 
-                        entities = ['path', 'query', 'form', 'header', 'body']
-                        ALL_ENUM_COVERED = copy.deepcopy(enum_data)
+                    entities = ['path', 'query', 'form', 'header', 'body']
+                    ALL_ENUM_COVERED = copy.deepcopy(enum_data)
 
-                        for ent in entities:
-                            for key, val in ALL_ENUM_COVERED[ent].items():
-                                ALL_ENUM_COVERED[ent][key] = []
+                    for ent in entities:
+                        for key, val in ALL_ENUM_COVERED[ent].items():
+                            ALL_ENUM_COVERED[ent][key] = []
 
-                        for iter in range(MAX_ITER):
-                            payload_request, _ = get_request_data(request_data)
+                    for iter in range(MAX_ITER):
+                        payload_request, _ = get_request_data(request_data)
+                        request_keys = get_all_keys(
+                            payload_request, res=[], prefix="")
+                        request_keys = sorted(request_keys)
+                        request_keys = ",".join(request_keys)
+
+                        ALL_ENUM_COVERED, enum_check_res = check_enum_covered(
+                            payload_request, enum_data, ALL_ENUM_COVERED)
+
+                        if request_keys not in ALL_REQUEST_KEYS_SET or enum_check_res:
+                            ALL_REQUEST_KEYS_SET.add(request_keys)
+                            testcases += 1
+
+                            mapped_resp = map_matched_response(
+                                payload_request, resp['body'], mapped_result)
+
+                            testdata['status'] = resp['status']
+                            testdata['testcaseId'] = testcases
+                            testdata['inputData'] = payload_request
+                            testdata['assertionData'] = mapped_resp
+                            testdata['description'] = 'ok'
+
+                            pprint(testdata)
+                            print("\n----------------------------\n")
+
+                            virtual_testdata = get_virtual_collection_data(
+                                testdata)
+
+                            db_manager.store_document(
+                                TESTCASE_COLLECTION, testdata)
+                            db_manager.store_document(
+                                VIRTUAL_SERVICE_COLLECTION, virtual_testdata)
+
+                    testdata['request_response_mapping'] = None
+
+                # missing mandatory parameter, Deceptive request (add %/ in endpoint uri)
+                elif resp['status'] == '400':
+                    testdata['test_case_name'] = method_operation_id + '__P'
+                    ALL_REQUEST_KEYS_SET = set()
+
+                    for iter in range(MAX_ITER):
+                        payload_request, missed_found = get_request_data(
+                            request_data, missing_required=True)
+                        if missed_found:
                             request_keys = get_all_keys(
                                 payload_request, res=[], prefix="")
                             request_keys = sorted(request_keys)
                             request_keys = ",".join(request_keys)
 
-                            ALL_ENUM_COVERED, enum_check_res = check_enum_covered(
-                                payload_request, enum_data, ALL_ENUM_COVERED)
-
-                            if request_keys not in ALL_REQUEST_KEYS_SET or enum_check_res:
+                            if request_keys not in ALL_REQUEST_KEYS_SET:
                                 ALL_REQUEST_KEYS_SET.add(request_keys)
                                 testcases += 1
 
-                                mapped_resp = map_matched_response(
-                                    payload_request, resp['body'], mapped_result)
-
                                 testdata['status'] = resp['status']
                                 testdata['testcaseId'] = testcases
                                 testdata['inputData'] = payload_request
-                                testdata['assertionData'] = mapped_resp
-                                testdata['description'] = 'ok'
-
-                                pprint(testdata)
-                                print("\n----------------------------\n")
-
-                                virtual_testdata = get_virtual_collection_data(
-                                    testdata)
-
-                                db_manager.store_document(
-                                    TESTCASE_COLLECTION, testdata)
-                                db_manager.store_document(
-                                    VIRTUAL_SERVICE_COLLECTION, virtual_testdata)
-
-                        testdata['request_response_mapping'] = None
-
-                    # missing mandatory parameter, Deceptive request (add %/ in endpoint uri)
-                    elif resp['status'] == '400':
-                        testdata['test_case_name'] = method_operation_id + '__P'
-                        ALL_REQUEST_KEYS_SET = set()
-
-                        for iter in range(MAX_ITER):
-                            payload_request, missed_found = get_request_data(
-                                request_data, missing_required=True)
-                            if missed_found:
-                                request_keys = get_all_keys(
-                                    payload_request, res=[], prefix="")
-                                request_keys = sorted(request_keys)
-                                request_keys = ",".join(request_keys)
-
-                                if request_keys not in ALL_REQUEST_KEYS_SET:
-                                    ALL_REQUEST_KEYS_SET.add(request_keys)
-                                    testcases += 1
-
-                                    testdata['status'] = resp['status']
-                                    testdata['testcaseId'] = testcases
-                                    testdata['inputData'] = payload_request
-                                    testdata['description'] = 'missing mandatory parameter'
-                                    testdata['assertionData'] = resp['body']
-
-                                    pprint(testdata)
-                                    print("\n----------------------------\n")
-
-                                    virtual_testdata = get_virtual_collection_data(
-                                        testdata)
-
-                                    db_manager.store_document(
-                                        TESTCASE_COLLECTION, testdata)
-                                    db_manager.store_document(
-                                        VIRTUAL_SERVICE_COLLECTION, virtual_testdata)
-
-                        # Deceptive request
-                        testcases += 1
-                        payload_request, _ = get_request_data(request_data)
-                        testdata['status'] = resp['status']
-                        testdata['testcaseId'] = testcases
-                        testdata['inputData'] = payload_request
-                        testdata['assertionData'] = resp['body']
-
-                        tmp = testdata['endpoint'].split('{')
-                        tmp[0] += '%/'
-                        if len(tmp) > 1:
-                            tmp[0] += '{'
-                        testdata['endpoint'] = ''.join(tmp)
-                        testdata['description'] = 'deceptive request'
-
-                        pprint(testdata)
-                        print("\n----------------------------\n")
-
-                        virtual_testdata = get_virtual_collection_data(
-                            testdata)
-
-                        db_manager.store_document(
-                            TESTCASE_COLLECTION, testdata)
-                        db_manager.store_document(
-                            VIRTUAL_SERVICE_COLLECTION, virtual_testdata)
-
-                        testdata['endpoint'] = endpoint
-
-                    # not found (chnage endpoint uri)
-                    elif resp['status'] == '404':
-                        testdata['test_case_name'] = method_operation_id + '__P'
-                        testcases += 1
-                        payload_request, _ = get_request_data(request_data)
-                        testdata['status'] = resp['status']
-                        testdata['testcaseId'] = testcases
-                        testdata['inputData'] = payload_request
-                        testdata['assertionData'] = resp['body']
-
-                        tmp = testdata['endpoint'].split('?')
-                        tmp[0] += 'abc'
-                        if len(tmp) > 1:
-                            tmp[0] += '?'
-                        testdata['endpoint'] = ''.join(tmp)
-                        testdata['description'] = 'uri not found'
-
-                        pprint(testdata)
-                        print("\n----------------------------\n")
-
-                        virtual_testdata = get_virtual_collection_data(
-                            testdata)
-
-                        db_manager.store_document(
-                            TESTCASE_COLLECTION, testdata)
-                        db_manager.store_document(
-                            VIRTUAL_SERVICE_COLLECTION, virtual_testdata)
-
-                        testdata['endpoint'] = endpoint
-
-                    # method not allowed
-                    elif resp['status'] == '405':
-                        testdata['test_case_name'] = method_operation_id + '__P'
-                        payload_request, _ = get_request_data(request_data)
-                        for cm in _HTTP_COMMON_VERBS:
-                            if cm not in methods:
-                                testcases += 1
-                                testdata['method'] = cm
-                                testdata['status'] = resp['status']
-                                testdata['testcaseId'] = testcases
-                                testdata['inputData'] = payload_request
-                                testdata['description'] = 'method not allowed'
+                                testdata['description'] = 'missing mandatory parameter'
                                 testdata['assertionData'] = resp['body']
 
                                 pprint(testdata)
@@ -385,26 +302,123 @@ def generate(api_ops_id):
                                 db_manager.store_document(
                                     VIRTUAL_SERVICE_COLLECTION, virtual_testdata)
 
-        res = {
-            'success': True,
-            'message': 'ok',
-            'status': 200
-        }
-    except Exception as e:
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        print(exc_type, fname, exc_tb.tb_lineno, str(e))
-        res = {
-            'success': False,
-            'errorType': type(e).__name__,
-            'error': str(e),
-            'message': 'Some error has occured in generating testcases',
-            'status': 500,
-        }
+                    # Deceptive request
+                    testcases += 1
+                    payload_request, _ = get_request_data(request_data)
+                    testdata['status'] = resp['status']
+                    testdata['testcaseId'] = testcases
+                    testdata['inputData'] = payload_request
+                    testdata['assertionData'] = resp['body']
+
+                    tmp = testdata['endpoint'].split('{')
+                    tmp[0] += '%/'
+                    if len(tmp) > 1:
+                        tmp[0] += '{'
+                    testdata['endpoint'] = ''.join(tmp)
+                    testdata['description'] = 'deceptive request'
+
+                    pprint(testdata)
+                    print("\n----------------------------\n")
+
+                    virtual_testdata = get_virtual_collection_data(
+                        testdata)
+
+                    db_manager.store_document(
+                        TESTCASE_COLLECTION, testdata)
+                    db_manager.store_document(
+                        VIRTUAL_SERVICE_COLLECTION, virtual_testdata)
+
+                    testdata['endpoint'] = endpoint
+
+                # not found (chnage endpoint uri)
+                elif resp['status'] == '404':
+                    testdata['test_case_name'] = method_operation_id + '__P'
+                    testcases += 1
+                    payload_request, _ = get_request_data(request_data)
+                    testdata['status'] = resp['status']
+                    testdata['testcaseId'] = testcases
+                    testdata['inputData'] = payload_request
+                    testdata['assertionData'] = resp['body']
+
+                    tmp = testdata['endpoint'].split('?')
+                    tmp[0] += 'abc'
+                    if len(tmp) > 1:
+                        tmp[0] += '?'
+                    testdata['endpoint'] = ''.join(tmp)
+                    testdata['description'] = 'uri not found'
+
+                    pprint(testdata)
+                    print("\n----------------------------\n")
+
+                    virtual_testdata = get_virtual_collection_data(
+                        testdata)
+
+                    db_manager.store_document(
+                        TESTCASE_COLLECTION, testdata)
+                    db_manager.store_document(
+                        VIRTUAL_SERVICE_COLLECTION, virtual_testdata)
+
+                    testdata['endpoint'] = endpoint
+
+                # method not allowed
+                elif resp['status'] == '405':
+                    testdata['test_case_name'] = method_operation_id + '__P'
+                    payload_request, _ = get_request_data(request_data)
+                    for cm in _HTTP_COMMON_VERBS:
+                        if cm not in methods:
+                            testcases += 1
+                            testdata['method'] = cm
+                            testdata['status'] = resp['status']
+                            testdata['testcaseId'] = testcases
+                            testdata['inputData'] = payload_request
+                            testdata['description'] = 'method not allowed'
+                            testdata['assertionData'] = resp['body']
+
+                            pprint(testdata)
+                            print("\n----------------------------\n")
+
+                            virtual_testdata = get_virtual_collection_data(
+                                testdata)
+
+                            db_manager.store_document(
+                                TESTCASE_COLLECTION, testdata)
+                            db_manager.store_document(
+                                VIRTUAL_SERVICE_COLLECTION, virtual_testdata)
+
+    res = {
+        'success': True,
+        'message': f'{testcases} testcases successfully generated',
+        'status': 200
+    }
+    # except Exception as e:
+    #     exc_type, exc_obj, exc_tb = sys.exc_info()
+    #     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    #     print(exc_type, fname, exc_tb.tb_lineno, str(e))
+    #     res = {
+    #         'success': False,
+    #         'errorType': type(e).__name__,
+    #         'error': str(e),
+    #         'message': 'Some error has occured in generating testcases',
+    #         'status': 500,
+    #     }
 
     return res
 
 
-# generate("95266a7909b049bcaea4e01451621556")  # Citi account
-generate("49af482258fb42d496df7e6506725589")    # petstore3
+APIOPSIDS = ["30a4c21325f948d7959c3609c4f2276b",
+             "c7fe5d30449041af8dab99ca0568ff31",
+             "6e1e389d49ea4f18a118abaf87dc2a98",
+             "b082cf1986484e18b138149e03939326",
+             "dbc6181a57534585b0533a5c6ace0cb6",
+             "8cd803dc61de40678d3452f0a8d6f2b6",
+             "f190ec5343a6406ba1842ef5cf0945a6",
+             "4f2bfe2626cb4f619c2a27b7ea221e97"]
+
+for t in APIOPSIDS:
+    generate(t)
+    print("\n\n__________________________\n\n")
+
+
+# generate("34a26d6cea7546c3b9200222b9a9be3b")  # Citi account
+# generate("49af482258fb42d496df7e6506725589")    # petstore3
 # generate("f5554781ed934013afa2858d8909aed6")    # petstore
