@@ -11,7 +11,8 @@ import sys
 import os
 
 # minimum, maximum, minLength, maxLength, minItems, maxItems ...
-OTHER_FIELDS = set(["enum", "default", "example"])
+OTHER_FIELDS = set(["enum", "default", "example", "minimum",
+                    "maximum", "minLength", "maxLength", "minItems", "maxItems"])
 
 
 def deref_json(dict_data):
@@ -118,16 +119,6 @@ def extract_type_array(param_array, is_json_schema=False):
     return result
 
 
-# def camel_case_split(word):
-#     try:
-#         word = word[0].upper() + word[1:]
-#         res = re.findall(r'[A-Z](?:[a-z]+|[A-Z]*(?=[A-Z]|$))', word)
-#         print(res)
-#         return (" ".join(res)).lower()
-#     except:
-#         return None
-
-
 def camel_case_split(identifier):
     try:
         matches = re.finditer(
@@ -187,8 +178,8 @@ def extract_apiops_description(operationId, description, summary):
     return None
 
 
-def get_all_tags(api_ops_id):
-    client, db = db_manager.get_db_connection()
+def get_all_tags(api_ops_id, db):
+    # client, db = db_manager.get_db_connection()
     apiinfo = db.apiinfo.find_one({"api_ops_id": api_ops_id})
     tags = apiinfo["tags"]
 
@@ -200,8 +191,8 @@ def get_all_tags(api_ops_id):
     return tags
 
 
-def get_tags_from_paths(api_ops_id):
-    client, db = db_manager.get_db_connection()
+def get_tags_from_paths(api_ops_id, db):
+    # client, db = db_manager.get_db_connection()
     tags = set()
     all_paths = db.paths.find({"api_ops_id": api_ops_id})
     all_paths = list(all_paths)

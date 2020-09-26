@@ -1,16 +1,18 @@
-# import db_manager
+from reverseRegex import get_regex_string
+from pprint import pprint
+from random import choice
+import string
+
 import os
 import sys
-from pprint import pprint
 import random
-from random import choice
-from string import ascii_lowercase
 
 import requests
 import re
 
 from faker import Faker
 fake = Faker()
+Faker.seed(0)
 
 
 # todo - required elements
@@ -235,12 +237,27 @@ def generate_random_value(val, key=None):  # key
             res = vocabResult
 
         if not res:
-            if val_example and isinstance(val_example, str):
-                min_len = len(val_example)
-                max_len = len(val_example) + 1  # for random.randrange
+            digits_only = False
 
-            random_len = random.randrange(min_len, max_len)
-            res = ''.join(choice(ascii_lowercase) for i in range(random_len))
+            if 'pattern' in val:
+                val_pattern = val.get('pattern')
+                res = get_regex_string(val_pattern)
+
+            if val_example and isinstance(val_example, str):
+                if val_example.isdigit():
+                    digits_only = True
+                min_len = len(val_example)
+                max_len = len(val_example)
+
+            random_len = random.randrange(min_len, max_len + 1)
+
+            if not res:
+                if digits_only:
+                    res = ''.join(choice(string.digits)
+                                  for i in range(random_len))
+                else:
+                    res = ''.join(choice(string.ascii_lowercase)
+                                  for i in range(random_len))
 
     # boolean
     elif val_type == "boolean":
@@ -633,115 +650,3 @@ def check_enum_covered(payload_request, enum_data, enum_covered):
                         return enum_covered, False
 
     return enum_covered, False
-
-# res = get_enum_data({
-#     "path": "/pet/findByStatus",
-#     "method": "get",
-#     "params": {
-#             "query": [
-#                         {
-#                             "status": {
-#                                 "type": "string",
-#                                 "description": "Status values that need to be considered for filter",
-#                                 "format": None,
-#                                         "required": False,
-#                                         "enum": [
-#                                             "available",
-#                                             "pending",
-#                                             "sold"
-#                                         ],
-#                                 "default": "available"
-#                             }
-#                         }
-#                         ],
-#             "header": [],
-#             "formData": [],
-#         "path": [],
-#         "cookie": [],
-#         "body": {
-#                 "type": "array",
-#                 "items": {
-#                     "required": [
-#                         "name",
-#                         "photoUrls"
-#                     ],
-#                     "type": "object",
-#                     "properties": {
-#                         "id": {
-#                             "type": "integer",
-#                             "format": "int64",
-#                             "example": 10
-#                         },
-#                         "name": {
-#                             "type": "string",
-#                             "example": "doggie"
-#                         },
-#                         "category": {
-#                             "type": "object",
-#                             "properties": {
-#                                 "id": {
-#                                     "type": "integer",
-#                                     "format": "int64",
-#                                     "example": 1
-#                                 },
-#                                 "name": {
-#                                     "type": "string",
-#                                     "example": "Dogs"
-#                                 }
-#                             },
-#                             "xml": {
-#                                 "name": "category"
-#                             }
-#                         },
-#                         "photoUrls": {
-#                             "type": "array",
-#                             "xml": {
-#                                 "wrapped": True
-#                             },
-#                             "items": {
-#                                 "type": "string",
-#                                 "xml": {
-#                                     "name": "photoUrl"
-#                                 }
-#                             }
-#                         },
-#                         "tags": {
-#                             "type": "array",
-#                             "xml": {
-#                                 "wrapped": True
-#                             },
-#                             "items": {
-#                                 "type": "object",
-#                                 "properties": {
-#                                     "id": {
-#                                         "type": "integer",
-#                                         "format": "int64"
-#                                     },
-#                                     "name": {
-#                                         "type": "string"
-#                                     }
-#                                 },
-#                                 "xml": {
-#                                     "name": "tag"
-#                                 }
-#                             }
-#                         },
-#                         "status": {
-#                             "type": "string",
-#                             "description": "pet status in the store",
-#                             "enum": [
-#                                 "available",
-#                                 "pending",
-#                                 "sold"
-#                             ]
-#                         }
-#                     },
-#                     "xml": {
-#                         "name": "pet"
-#                     }
-#                 }
-#             }
-#     },
-#     "api_ops_id": "49af482258fb42d496df7e6506725589",
-#     "filename": "petstore3.json"
-# })

@@ -4,15 +4,16 @@ import pymongo
 import copy
 
 
-def get_db_connection(host="localhost", port=27017):
+def get_db_connection(dbname, host="localhost", port=27017):
+    print(dbname)
     client = pymongo.MongoClient("localhost", 27017)
-    db = client.ezapi
+    db = client[dbname]
     return (client, db)
 
 
-def store_document(collection, document):
+def store_document(collection, document, dbname):
     copyDocument = copy.deepcopy(document)
-    client, db = get_db_connection()
+    client, db = get_db_connection(dbname)
 
     if collection == "apiinfo":
         db_collection = db.apiinfo
@@ -30,6 +31,8 @@ def store_document(collection, document):
         db_collection = db.testcases
     elif collection == "virtual":
         db_collection = db.virtual
+    elif collection == "sankey":
+        db_collection = db.sankey
 
     db_collection.insert_one(copyDocument)
     client.close()

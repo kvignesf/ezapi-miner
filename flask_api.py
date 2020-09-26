@@ -1,7 +1,7 @@
 # from swagger_parser import parse_swagger_api
 # from param_functions import handle_param_functions
 # from visualizer import fetch_sankey_data
-from apifunctions import parse_swagger_openapi, get_sankey_data, generate_test_cases
+from apifunctions import parse_swagger_openapi, get_sankey_data, generate_test_cases, run_apiops_model
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
@@ -48,6 +48,21 @@ def generate_test():
 
     result = generate_test_cases(api_ops_id)
     return jsonify(result)
+
+
+@app.route("/apiops_model", methods=["POST"])
+def apiops_model():
+    f = request.files["file"]
+    filename = f.filename
+
+    dbname = str(request.form['dbname'])
+    print(dbname, filename)
+
+    filepath = "./files/" + filename
+    f.save(filepath)
+
+    res = run_apiops_model(filepath, filename, dbname)
+    return jsonify(res)
 
 
 if __name__ == "__main__":

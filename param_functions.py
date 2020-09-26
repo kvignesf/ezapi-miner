@@ -5,8 +5,6 @@ import utils
 from pprint import pprint
 import operator
 
-client, db = db_manager.get_db_connection()
-
 API_PARAM_FUNCTIONS = 'scores'
 API_ELEMENTS_FUNCTIONS = 'elements'
 
@@ -21,7 +19,8 @@ def get_apiops_description(all_paths, path, method):
     return (None, None)
 
 
-def cluster_paths(api_ops_id):  # path -> tags mapping
+def cluster_paths(api_ops_id, dbname):  # path -> tags mapping
+    client, db = db_manager.get_db_connection(dbname)
     all_paths = db.paths.find({"api_ops_id": api_ops_id})
     paths_tag = {}
 
@@ -42,7 +41,8 @@ def cluster_paths(api_ops_id):  # path -> tags mapping
     return paths_tag
 
 
-def extract_request_params(api_ops_id, paths_tag, tags):
+def extract_request_params(api_ops_id, paths_tag, tags, dbname):
+    client, db = db_manager.get_db_connection(dbname)
     result = {}
 
     for t in tags:
@@ -131,7 +131,8 @@ def extract_request_params(api_ops_id, paths_tag, tags):
     return result
 
 
-def map_request_elements(api_ops_id, paths_tag, tags):
+def map_request_elements(api_ops_id, paths_tag, tags, dbname):
+    client, db = db_manager.get_db_connection(dbname)
     result = {}
     for t in tags:
         result[t] = {}  # element, description mapping
@@ -179,18 +180,22 @@ def map_request_elements(api_ops_id, paths_tag, tags):
     return result
 
 
-def handle_param_functions(api_ops_id):
+def handle_param_functions(api_ops_id, dbname):
     try:
-        tags_info = utils.get_all_tags(api_ops_id)
-        tags_paths = utils.get_tags_from_paths(api_ops_id)
+        client, db = db_manager.get_db_connection(dbname)
+
+        tags_info = utils.get_all_tags(api_ops_id, db)
+        tags_paths = utils.get_tags_from_paths(api_ops_id, db)
         tags = list(set(tags_info + tags_paths))
 
         # mapping from path -> tags (multiple tags are allowed)
-        paths_tag = cluster_paths(api_ops_id)
+        paths_tag = cluster_paths(api_ops_id, dbname)
 
         # tag is the keyword
-        result_params = extract_request_params(api_ops_id, paths_tag, tags)
-        result_elements = map_request_elements(api_ops_id, paths_tag, tags)
+        result_params = extract_request_params(
+            api_ops_id, paths_tag, tags, dbname)
+        result_elements = map_request_elements(
+            api_ops_id, paths_tag, tags, dbname)
 
         # tag name contains special characters, which maybe not proper mongo document key format. So change it accordingly
         result_params_new = {'api_ops_id': api_ops_id, 'data': []}
@@ -204,8 +209,10 @@ def handle_param_functions(api_ops_id):
             tmp = {'tag': key, 'data': val}
             result_elements_new['data'].append(tmp)
 
-        db_manager.store_document(API_PARAM_FUNCTIONS, result_params_new)
-        db_manager.store_document(API_ELEMENTS_FUNCTIONS, result_elements_new)
+        db_manager.store_document(
+            API_PARAM_FUNCTIONS, result_params_new, dbname)
+        db_manager.store_document(
+            API_ELEMENTS_FUNCTIONS, result_elements_new, dbname)
 
         res = {
             'status': 200,

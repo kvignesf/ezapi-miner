@@ -22,7 +22,8 @@ _PARAMETER_TYPES = set(["path", "query", "header", "body",
                         "formData", "cookie"])   # cookie - openapi 3.0
 
 # minimum, maximum, minLength, maxLength, minItems, maxItems ...
-OTHER_FIELDS = set(["enum", "default", "example"])
+OTHER_FIELDS = set(["enum", "default", "example", "minimum",
+                    "maximum", "minLength", "maxLength", "minItems", "maxItems"])
 
 
 def get_all_paths(jsondata):
@@ -283,7 +284,7 @@ def get_api_info(jsondata):
     return api_info
 
 
-def parse_swagger_api(filepath, filename):
+def parse_swagger_api(filepath, filename, dbname):
     try:
         jsondata = json.load(codecs.open(filepath, 'r', 'utf-8-sig'))
         # jsondata = json.loads(open(filepath).read().decode('utf-8-sig'))
@@ -296,14 +297,14 @@ def parse_swagger_api(filepath, filename):
         api_document = get_api_info(jsondata)
         api_document["api_ops_id"] = api_ops_id
         api_document["filename"] = filename
-        db_manager.store_document(API_INFO, api_document)
+        db_manager.store_document(API_INFO, api_document, dbname)
 
         all_paths = get_all_paths(jsondata)
 
         for path in all_paths:
             path["api_ops_id"] = api_ops_id
             path["filename"] = filename
-            db_manager.store_document(API_PATH, path)
+            db_manager.store_document(API_PATH, path, dbname)
 
             p = path["path"]
             methods = path["allowed_method"]
@@ -329,11 +330,14 @@ def parse_swagger_api(filepath, filename):
                     "filename": filename
                 }
 
-                db_manager.store_document(API_REQUEST_INFO, request_document)
-                db_manager.store_document(API_RESPONSE_INFO, response_document)
+                db_manager.store_document(
+                    API_REQUEST_INFO, request_document, dbname)
+                db_manager.store_document(
+                    API_RESPONSE_INFO, response_document, dbname)
 
-        tags_info = utils.get_all_tags(api_ops_id)
-        tags_paths = utils.get_tags_from_paths(api_ops_id)
+        client, db = db_manager.get_db_connection(dbname)
+        tags_info = utils.get_all_tags(api_ops_id, db)
+        tags_paths = utils.get_tags_from_paths(api_ops_id, db)
         tags = list(set(tags_info + tags_paths))
 
         res = {

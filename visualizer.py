@@ -14,20 +14,10 @@ def get_response_status(all_responses, path, method):
             break
     return res
 
-# Format -
-# {
-# 	tags: []
-# 	graph: [
-# 		{'tag', 'nodes': [], 'links': []},
-# 		{'tag', 'nodes': [], 'links': []},
-# 		{'tag', 'nodes': [], 'links': []}
-# 	]
-# }
 
-
-def fetch_sankey_data(apiopsid):   # tags can be multiple
+def fetch_sankey_data(apiopsid, dbname):   # tags can be multiple
     try:
-        client, db = db_manager.get_db_connection()
+        client, db = db_manager.get_db_connection(dbname)
 
         all_elements = db.elements.find({'api_ops_id': apiopsid})
         all_responses = db.responses.find({'api_ops_id': apiopsid})
@@ -132,6 +122,13 @@ def fetch_sankey_data(apiopsid):   # tags can be multiple
                 "links": val["LINKS"]
             })
 
+        visulaizer_document = {
+            'api_ops_id': apiopsid,
+            'data': sankey_data
+        }
+
+        db_manager.store_document("sankey", visulaizer_document, dbname)
+
         res = {
             'status': 200,
             'success': True,
@@ -143,7 +140,8 @@ def fetch_sankey_data(apiopsid):   # tags can be multiple
         res = {
             'status': 500,
             'errorType': type(e).__name__,
-            'message': str(e),
+            'error': str(e),
+            'message': 'Some error has occured in visualizing data',
             'success': False
         }
     return res
