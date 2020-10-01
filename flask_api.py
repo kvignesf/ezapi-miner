@@ -52,16 +52,20 @@ def generate_test():
 
 @app.route("/apiops_model", methods=["POST"])
 def apiops_model():
+    print("Requested")
+    print(request.files)
+    # print(request.form["file"])
     f = request.files["file"]
     filename = f.filename
 
     dbname = str(request.form['dbname'])
-    print(dbname, filename)
+    api_ops_id = str(request.form['api_ops_id'])
+    print(dbname, filename, api_ops_id)
 
     filepath = "./files/" + filename
     f.save(filepath)
 
-    res = run_apiops_model(filepath, filename, dbname)
+    res = run_apiops_model(filepath, filename, dbname, api_ops_id)
     return jsonify(res)
 
 

@@ -32,7 +32,7 @@ def fetch_sankey_data(apiopsid, dbname):   # tags can be multiple
             elem_tag = elem["tag"]
             elem_data = elem["data"]
 
-            if elem_tag not in graph_data:
+            if elem_tag not in graph_data and elem_data:    # elem_data is not none
                 # NODES - name, apiops_type, tag
                 # LINKS - source, target, value
                 graph_data[elem_tag] = {'NODES': [], 'LINKS': []}

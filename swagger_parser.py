@@ -284,15 +284,15 @@ def get_api_info(jsondata):
     return api_info
 
 
-def parse_swagger_api(filepath, filename, dbname):
+def parse_swagger_api(filepath, filename, dbname, api_ops_id):
     try:
         jsondata = json.load(codecs.open(filepath, 'r', 'utf-8-sig'))
         # jsondata = json.loads(open(filepath).read().decode('utf-8-sig'))
         # jsondata = json.loads(open(filepath).read())
         jsondata = utils.deref_json(jsondata)
 
-        api_ops_id = str(uuid.uuid4().hex)
-        print("api_ops_id generated ", api_ops_id)
+        # api_ops_id = str(uuid.uuid4().hex)
+        # print("api_ops_id generated ", api_ops_id)
 
         api_document = get_api_info(jsondata)
         api_document["api_ops_id"] = api_ops_id

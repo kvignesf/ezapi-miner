@@ -221,10 +221,18 @@ def generate_random_value(val, key=None):  # key
     # date-time = full-date "T" full-time
 
     elif val_format == 'date':
-        res = fake.date()
+        if 'pattern' in val:
+            val_pattern = val.get('pattern')
+            res = get_regex_string(val_pattern)
+        else:
+            res = fake.date()
 
     elif val_format == 'date-time':
-        res = fake.iso8601()    # todo - tzinfo
+        if 'pattern' in val:
+            val_pattern = val.get('pattern')
+            res = get_regex_string(val_pattern)
+        else:
+            res = fake.iso8601()    # todo - tzinfo
 
     # string
     elif val_type == "string":
