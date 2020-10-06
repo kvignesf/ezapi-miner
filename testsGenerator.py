@@ -15,8 +15,11 @@ from payloadFormat import get_request_schema, get_response_schema
 from payload import get_request_data, get_response_data, check_enum_covered, get_enum_data
 
 MAX_ITER = 20
+
 TESTCASE_COLLECTION = 'testcases'
 VIRTUAL_SERVICE_COLLECTION = 'virtual'
+TESTRESULT_COLLECTION = 'test_result'
+
 _HTTP_VERBS = set(["get", "put", "post", "delete", "options", "head", "patch"])
 _HTTP_COMMON_VERBS = set(["get", "put", "post", "delete", "patch"])
 
@@ -170,6 +173,8 @@ def generate(api_ops_id, dbname):
         random.seed(42)
         testcases = 0
 
+        testcase_result = {}
+
         client, db = db_manager.get_db_connection(dbname)
         all_paths = db.paths.find({"api_ops_id": api_ops_id})
         for path in all_paths:
@@ -180,10 +185,14 @@ def generate(api_ops_id, dbname):
 
             method_tags = {t['method']: t['tags'] for t in method_definition}
 
+            testcase_result['api_ops_id'] = api_ops_id
+            testcase_result['filename'] = filename
+            testcase_result['result'] = []
+
             for m in methods:
                 method_operation_id = next(x['operationId']
                                            for x in path['method_definition'] if x['method'] == m) or 'OperationId'
-                print("===>", endpoint, m)
+                # print("===>", endpoint, m)
 
                 request_data = db.requests.find_one(
                     {"api_ops_id": api_ops_id, "path": endpoint, "method": m})
@@ -254,8 +263,8 @@ def generate(api_ops_id, dbname):
                                 testdata['assertionData'] = mapped_resp
                                 testdata['description'] = 'ok'
 
-                                pprint(testdata)
-                                print("\n----------------------------\n")
+                                # pprint(testdata)
+                                # print("\n----------------------------\n")
 
                                 virtual_testdata = get_virtual_collection_data(
                                     testdata)
@@ -291,8 +300,8 @@ def generate(api_ops_id, dbname):
                                     testdata['description'] = 'missing mandatory parameter'
                                     testdata['assertionData'] = resp['body']
 
-                                    pprint(testdata)
-                                    print("\n----------------------------\n")
+                                    # pprint(testdata)
+                                    # print("\n----------------------------\n")
 
                                     virtual_testdata = get_virtual_collection_data(
                                         testdata)
@@ -317,8 +326,8 @@ def generate(api_ops_id, dbname):
                         testdata['endpoint'] = ''.join(tmp)
                         testdata['description'] = 'deceptive request'
 
-                        pprint(testdata)
-                        print("\n----------------------------\n")
+                        # pprint(testdata)
+                        # print("\n----------------------------\n")
 
                         virtual_testdata = get_virtual_collection_data(
                             testdata)
@@ -347,8 +356,8 @@ def generate(api_ops_id, dbname):
                         testdata['endpoint'] = ''.join(tmp)
                         testdata['description'] = 'uri not found'
 
-                        pprint(testdata)
-                        print("\n----------------------------\n")
+                        # pprint(testdata)
+                        # print("\n----------------------------\n")
 
                         virtual_testdata = get_virtual_collection_data(
                             testdata)
@@ -374,8 +383,8 @@ def generate(api_ops_id, dbname):
                                 testdata['description'] = 'method not allowed'
                                 testdata['assertionData'] = resp['body']
 
-                                pprint(testdata)
-                                print("\n----------------------------\n")
+                                # pprint(testdata)
+                                # print("\n----------------------------\n")
 
                                 virtual_testdata = get_virtual_collection_data(
                                     testdata)
@@ -384,6 +393,9 @@ def generate(api_ops_id, dbname):
                                     TESTCASE_COLLECTION, testdata, dbname)
                                 db_manager.store_document(
                                     VIRTUAL_SERVICE_COLLECTION, virtual_testdata, dbname)
+
+        db_manager.store_document(
+            TESTRESULT_COLLECTION, testcase_result, dbname)
 
         res = {
             'success': True,

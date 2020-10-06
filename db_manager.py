@@ -33,6 +33,8 @@ def store_document(collection, document, dbname):
         db_collection = db.virtual
     elif collection == "sankey":
         db_collection = db.sankey
+    elif collection == "test_result":
+        db_collection = db.test_result
 
     db_collection.insert_one(copyDocument)
     client.close()
