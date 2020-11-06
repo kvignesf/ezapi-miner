@@ -1,0 +1,12 @@
+version: "3.3"
+services:
+  flask:
+    build: .
+    container_name: flask
+    restart: always
+    environment:
+      - APP_NAME=MyFlaskApp
+    expose:
+      - 8080
+    ports:
+      - 0.0.0.0:5000:8080
