@@ -1,28 +1,42 @@
-# This file is a template, and might need editing before it works on your project.
-docker-build-master:
-  # Official docker image.
-  image: docker:latest
+image: node:14.14.0-alpine3.12
+stages:
+  - build
+  - deploy
+build:
   stage: build
-  services:
-    - docker:dind
-  before_script:
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
   script:
-    - docker build --pull -t "$CI_REGISTRY_IMAGE" .
-    - docker push "$CI_REGISTRY_IMAGE"
+    - apk add zip
+    - npm install
+    - ls -la ../apiops_model
+    - zip apiops_model.zip -r ../apiops_model
+  artifacts:
+    paths:
+    - apiops_model.zip
+  only:
+    - master
+deployssh:
+  image: alpine
+  stage: deploy
+  script:
+    - apk update
+    - apk add openssh
+# Install the SSH keys
+    - mkdir ~/.ssh
+    - echo "$ID_RSA" >> ~/.ssh/id_rsa
+    - echo "$ID_RSA_PUB" >> ~/.ssh/id_rsa.pub
+    - chmod 600 ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa.pub
+# Start the ssh daemon and add the private key
+    - eval $(ssh-agent -s)
+    - ssh-add ~/.ssh/id_rsa
+    #- cat ~/.ssh/id_rsa.pub > ~/.ssh/authorized_keys
+    - '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
+# Execute a remote command
+    - ssh deploy@104.197.42.14 "rm -rf /tmp/apiops_model && exit"
+    - scp apiops_model.zip deploy@34.123.13.63:/tmp/apiops_model.zip
+    - ssh deploy@104.197.42.14 "unzip -uq -d /tmp/apiops_model/ /tmp/apiops_model.zip"
+    - ssh deploy@104.197.42.14 "rm -rf /var/www/apiops_model/*"
+    - ssh deploy@104.197.42.14 "cd /tmp/apiops_model/apiops_model && docker-compose up && exit"
   only:
     - master
 
-docker-build:
-  # Official docker image.
-  image: docker:latest
-  stage: build
-  services:
-    - docker:dind
-  before_script:
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
-  script:
-    - docker build --pull -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG" .
-    - docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG"
-  only:
-    - master
