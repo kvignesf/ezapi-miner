@@ -33,7 +33,7 @@ deployssh:
     - '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
 # Execute a remote command
     - ssh deploy@104.197.42.14 "rm -rf /tmp/apiops_model && exit"
-    - scp apiops_model.zip deploy@34.123.13.63:/tmp/apiops_model.zip
+    - scp apiops_model.zip deploy@104.197.42.14:/tmp/apiops_model.zip
     - ssh deploy@104.197.42.14 "unzip -uq -d /tmp/apiops_model/ /tmp/apiops_model.zip"
     - ssh deploy@104.197.42.14 "rm -rf /var/www/apiops_model/*"
     - ssh deploy@104.197.42.14 "cd /tmp/apiops_model/apiops_model && docker-compose up && exit"
