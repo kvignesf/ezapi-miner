@@ -18,7 +18,8 @@ def get_apiops_description(all_paths, path, method):
             all_methods = p["method_definition"]
             for m in all_methods:
                 if method == m['method']:
-                    return (m.get("summary"), m.get("apiops_description"))
+                    #return (m.get("summary"), m.get("apiops_description"))
+                    return (m.get("summary"), m.get("operationId"))
     return (None, None)
 
 

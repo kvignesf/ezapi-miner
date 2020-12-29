@@ -335,6 +335,7 @@ def parse_swagger_api(filepath, filename, api_ops_id, db):
         # jsondata = json.loads(open(filepath).read().decode('utf-8-sig'))
         # jsondata = json.loads(open(filepath).read())
         jsondata = utils.deref_json(jsondata)
+        list_of_paths = []
 
         # api_ops_id = str(uuid.uuid4().hex)
         # print("api_ops_id generated ", api_ops_id)
@@ -346,6 +347,8 @@ def parse_swagger_api(filepath, filename, api_ops_id, db):
 
         all_paths = get_all_paths(jsondata)
 
+        print("all_paths", all_paths)
+
         for path in all_paths:
             path["api_ops_id"] = api_ops_id
             path["filename"] = filename
@@ -353,7 +356,7 @@ def parse_swagger_api(filepath, filename, api_ops_id, db):
 
             p = path["path"]
             methods = path["allowed_method"]
-
+            list_of_paths.append(p)
             for m in methods:
                 request_data = get_request_data(jsondata, p, m)
 
@@ -386,11 +389,12 @@ def parse_swagger_api(filepath, filename, api_ops_id, db):
 
         api_summary = get_api_summary(api_document, tags_paths)
         print(api_summary)
-
+        print("list_of_paths" , list_of_paths)
         res = {
             'success': True,
             'message': 'ok',
             'status': 200,
+            'path_info': list_of_paths,
             'data': {
                 'api_ops_id': api_ops_id,
                 'api_summary': api_summary
@@ -432,4 +436,5 @@ def parse_swagger_api(filepath, filename, api_ops_id, db):
             'message': 'Some error has occured in parsing data',
             'status': 500,
         }
+    print("res",res)
     return res
