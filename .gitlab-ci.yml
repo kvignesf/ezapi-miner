@@ -37,6 +37,4 @@ deployssh:
     - ssh deploy@104.197.42.14 "unzip -uq -d /tmp/apiops_model/ /tmp/apiops_model.zip"
     - ssh deploy@104.197.42.14 "cd /tmp/apiops_model/apiops_model && docker-compose down && exit"
     - ssh deploy@104.197.42.14 "cd /tmp/apiops_model/apiops_model && docker-compose up --build -d  && exit"
-  only:
-    - master
 
