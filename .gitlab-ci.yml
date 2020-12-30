@@ -12,8 +12,6 @@ build:
   artifacts:
     paths:
     - apiops_model.zip
-  only:
-    - master
 deployssh:
   image: alpine
   stage: deploy
