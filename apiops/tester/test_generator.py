@@ -221,7 +221,7 @@ def process_test_generator(api_ops_id, db):
                     'request_response_mapping': None,
                     'testcaseId': None,
                     'delete': False,
-                    'resource': method_tags[m]
+                    'resource': "resource"+m if method_tags[m] is None else method_tags[m]
                 }
 
                 for resp in payload_response:
