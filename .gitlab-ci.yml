@@ -32,11 +32,16 @@ deployssh:
     #- cat ~/.ssh/id_rsa.pub > ~/.ssh/authorized_keys
     - '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
 # Execute a remote command
-    - ssh deploy@104.197.42.14 "rm -rf /tmp/apiops_model && exit"
-    - scp apiops_model.zip deploy@104.197.42.14:/tmp/apiops_model.zip
-    - ssh deploy@104.197.42.14 "unzip -uq -d /tmp/apiops_model/ /tmp/apiops_model.zip"
-    - ssh deploy@104.197.42.14 "cd /tmp/apiops_model/apiops_model && docker-compose down && exit"
-    - ssh deploy@104.197.42.14 "cd /tmp/apiops_model/apiops_model && docker-compose up --build -d  && exit"
+   # - ssh deploy@104.197.42.14 "rm -rf /tmp/apiops_model && exit"
+   # - scp apiops_model.zip deploy@104.197.42.14:/tmp/apiops_model.zip
+   # - ssh deploy@104.197.42.14 "unzip -uq -d /tmp/apiops_model/ /tmp/apiops_model.zip"
+   # - ssh deploy@104.197.42.14 "cd /tmp/apiops_model/apiops_model && docker-compose down && exit"
+   # - ssh deploy@104.197.42.14 "cd /tmp/apiops_model/apiops_model && docker-compose up --build -d  && exit"
+    - ssh deploy@34.123.144.35 "rm -rf /tmp/apiops_model && exit"
+    - scp apiops_model.zip deploy@34.123.144.35:/tmp/apiops_model.zip
+    - ssh deploy@34.123.144.35 "unzip -uq -d /tmp/apiops_model/ /tmp/apiops_model.zip"
+    - ssh deploy@34.123.144.35 "cd /tmp/apiops_model/apiops_model && docker-compose down && exit"
+    - ssh deploy@34.123.144.35 "cd /tmp/apiops_model/apiops_model && docker-compose up --build -d  && exit"
   only:
     - master
 
