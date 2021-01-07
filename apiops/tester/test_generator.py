@@ -190,9 +190,9 @@ def process_test_generator(api_ops_id, db):
 
             testcase_result['api_ops_id'] = api_ops_id
             testcase_result['filename'] = filename
-            testcase_result['run1'] = None
-            testcase_result['run2'] = None
-            testcase_result['run3'] = None
+            testcase_result['run1'] = {}
+            testcase_result['run2'] = {}
+            testcase_result['run3'] = {}
 
             for m in methods:
                 method_operation_id = next(x['operationId']
@@ -221,7 +221,7 @@ def process_test_generator(api_ops_id, db):
                     'request_response_mapping': None,
                     'testcaseId': None,
                     'delete': False,
-                    'resource': method_tags[m]
+                    'resource': "resource"+m if method_tags[m] is None else method_tags[m]
                 }
 
                 for resp in payload_response:

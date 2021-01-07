@@ -402,9 +402,14 @@ def get_other_payload(request_data):
                             payload_data[key] = generated
                         # payload_data[key] = generate_random_array(val)
                     elif val_type not in ["object", "array"]:
-                        generated = generate_random_value(val)
+                        if key.lower() == "Accept".lower():
+                            generated = "*/*"
+                        elif key.lower() == "Content-Type".lower():
+                            generated = "application/json"
+                        else:
+                            generated = generate_random_value(val)
                         if generated:
-                            payload_data[key] = generated
+                            payload_data[key.lower()] = generated
                         # payload_data[key]=generate_random_value(val)
 
     return payload_data
@@ -481,7 +486,6 @@ def get_request_data(request_data, missing_required=False):
     request_query = request_params.get("query")
     request_form = request_params.get("formData")
     request_header = request_params.get("header")
-
     payload_path = {}
     payload_query = {}
     payload_form = {}
