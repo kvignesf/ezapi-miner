@@ -377,6 +377,8 @@ def process_test_generator(api_ops_id, db):
                         for iter in range(MAX_ITER):
                             payload_request, missed_found = get_request_data(
                                 request_data, missing_required=True)
+                            suffix = getCountByKey(payload_request)
+                            testdata['test_case_name'] = "Validate " + resp['status'] + " response for " + method_operation_id + " of " + filename.split('.')[0] + " API using " + str(suffix) + " datasets"
                             if missed_found:
                                 request_keys = get_all_keys(
                                     payload_request, res=[], prefix="")
@@ -470,7 +472,8 @@ def process_test_generator(api_ops_id, db):
 
                     # method not allowed
                     elif resp['status'] == '405':
-                        testdata['test_case_name'] = method_operation_id + '__P'
+                        #testdata['test_case_name'] = method_operation_id + '__P'
+                        #testdata['test_case_name'] = "Validate " + resp['status'] + " response for " + method_operation_id + " of " + filename.split('.')[0] + " API using " + " invalid verb " + cm
                         payload_request, _ = get_request_data(request_data)
                         for cm in _HTTP_COMMON_VERBS:
                             if cm not in methods:
@@ -483,7 +486,7 @@ def process_test_generator(api_ops_id, db):
                                 testdata['assertionData'] = resp['body']
                                 suffix = getCountByKey(payload_request)
                                 #testdata['test_case_name'] = "Validate_" + m + "_" + method_operation_id + "_" + resp['status'] + "_API with " + str(suffix)
-                                testdata['test_case_name'] = "Validate " + resp['status'] + " response for " + method_operation_id + " of " + filename.split('.')[0] + " API using " + str(suffix) + " datasets"
+                                testdata['test_case_name'] = "Validate " + resp['status'] + " response for " + method_operation_id + " of " + filename.split('.')[0] + " API using " + " invalid verb " + cm
 
                                 # pprint(testdata)
                                 # print("\n----------------------------\n")
