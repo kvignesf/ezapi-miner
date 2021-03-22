@@ -77,10 +77,10 @@ def extract_body_param(param):
 
     if not param_schema_type:
         if "items" in param_schema:
-            param_schema_type["type"] = "array"
+            #param_schema_type["type"] = "array"
             param_schema_type = "array"
         elif "properties" in param_schema:
-            param_schema_type["type"] = "object"
+            #param_schema_type["type"] = "object"
             param_schema_type = "object"
 
     if param_name and param_name != "body":
@@ -202,8 +202,13 @@ def get_request_data(jsondata, api_path, method_type):
         all_request_params[param] = []
 
     all_request_params["body"] = {}  # body cannot be an array
+    #print('json', jsondata)
 
     api_params = jsondata["paths"][api_path][method_type].get("parameters", [])
+    if "parameters" in jsondata["paths"][api_path]:
+        #print("..length", api_path,  len(jsondata["paths"][api_path].get("parameters", [])))
+        for apiparam in jsondata["paths"][api_path].get("parameters", []):
+            api_params.append(apiparam)
 
     # Parameters that are applicable for all the operations described under this path
     # Reference - https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#pathsObject
@@ -250,20 +255,35 @@ def get_response_data(jsondata, api_path, method_type):
             "status_code": resp,
             "description": resp_specs["description"],
             "schema": {},
-            "headers": {},
+            "headers": [],
         }
 
         if "schema" in resp_specs:
             param["schema"] = extract_response_schema(resp_specs["schema"])
+
+        if "headers" in resp_specs:
+            #param["headers"] =
+            #print("..headers length", len(resp_specs["headers"]))
+            for headerItem in resp_specs["headers"]:
+                #print("headerItem", headerItem)
+                #print("headerItemdetail", resp_specs["headers"].get(headerItem))
+                param["headers"].append({
+                    headerItem : resp_specs["headers"].get(headerItem)
+                })
+
+
 
         # if "example" in resp_specs:  # without s
         #     param["example"] = resp_specs["example"]
 
         # openapi 3.0
         if "content" in resp_specs:
+            #if "application/json" in resp_specs["content"] or "application-json" in resp_specs["content"]:
             resp_schema = resp_specs["content"].get("application/json")
-            param["schema"] = extract_response_schema(
-                resp_schema["schema"])
+            if resp_schema is None:
+                resp_schema = resp_specs["content"].get("application-json")
+            param["schema"] = extract_response_schema(resp_schema["schema"])
+
 
             # if "examples" in resp_schema:
             #     param["examples"] = resp_schema["examples"]
@@ -347,7 +367,7 @@ def parse_swagger_api(filepath, filename, api_ops_id, db):
 
         all_paths = get_all_paths(jsondata)
 
-        print("all_paths", all_paths)
+        #print("all_paths", all_paths)
 
         for path in all_paths:
             path["api_ops_id"] = api_ops_id
@@ -388,7 +408,7 @@ def parse_swagger_api(filepath, filename, api_ops_id, db):
         tags = list(set(tags_info + tags_paths))
 
         api_summary = get_api_summary(api_document, tags_paths)
-        print(api_summary)
+        #print(api_summary)
         print("list_of_paths" , list_of_paths)
         res = {
             'success': True,
