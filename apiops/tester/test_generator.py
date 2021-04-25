@@ -9,6 +9,7 @@ import copy
 import re
 from urllib.parse import urlencode
 
+
 import sys
 import os
 
@@ -140,6 +141,82 @@ def map_matched_response(request_data, response_data, matched):
 
     return response_data
 
+def getCountByKey(inputpayload):
+    tc_suffix = ""
+    elmntsNmbr = 0
+
+    for k, v in inputpayload.items():
+        if len(v) > 0:
+            #if isinstance(v,dict):
+            #    v = getCountByKey(v)
+            #print("k...", k)
+            #print("v...", v, len(v))
+            nmbrelmnts = len(v)
+            #print("..type", type(v), v.items())
+            for a, b in v.items():
+                if isinstance(b, dict):
+                    #print("a...", a)
+                    #print("b...", b, len(b))
+                    nmbrelmnts = len(b)
+
+            tc_suffix = tc_suffix + k[0]+ str(nmbrelmnts)
+            elmntsNmbr = elmntsNmbr + nmbrelmnts
+            #tc_suffix = k[0]+str(nmbrelmnts) if tc_suffix is "" else tc_suffix + "|" + k[0]+str(nmbrelmnts)
+    #print("..tc_suffix", tc_suffix)
+    #print ("...elmntsNmbr", elmntsNmbr)
+    return elmntsNmbr
+
+def gettotalElements(fullSuffString):
+    totalCnt = 0
+    for idx in range(len(fullSuffString)):
+        if not idx % 2:
+            pass
+        else:
+            totalCnt = int(totalCnt) + int(fullSuffString[idx])
+    return totalCnt
+
+
+def sumOftotalElements(fullSuffString):
+    totalCnt = 0
+    #fullSuffString.split("|").
+    for idx in range(len(fullSuffString)):
+        if not idx % 2:
+            pass
+        else:
+            totalCnt = int(totalCnt) + int(fullSuffString[idx])
+    return totalCnt
+
+def getInputAsParams(inputpayload):
+    param_suffix = ""
+    elem_suffix= ""
+    for k, v in inputpayload.items():
+        if len(v) > 0:
+            #if isinstance(v,dict):
+            #    v = getCountByKey(v)
+            #print("k...", k)
+            #print("v...", v, len(v))
+            #nmbrelmnts = len(v)
+            #print("..type", type(v), v.items())
+            for a, b in v.items():
+                if isinstance(b, dict):
+                    #print("a...", a)
+                    #print("b...", b, len(b))
+                    nmbrelmnts = len(b)
+                    param_suffix = param_suffix + "," + k + "("+str(len(b))+")"
+                else:
+                    #print(".paramin", k+"("+a+")")
+                    elem_suffix = a if elem_suffix is "" else elem_suffix + "," + a
+            param_suffix = k + "("+elem_suffix+")" if param_suffix is "" else param_suffix + "," + k + "("+elem_suffix+")"
+
+
+        else:
+            #print("param", k+"(0)")
+            param_suffix = k+"(0)" if param_suffix is "" else param_suffix + "," + k+"(0)"
+
+
+            #tc_suffix += k[0]+str(nmbrelmnts)
+    #print("..param_suffix", param_suffix)
+    return param_suffix
 
 def get_virtual_collection_data(testdata):
     try:
@@ -156,10 +233,20 @@ def get_virtual_collection_data(testdata):
             'assertionData', {})
 
         endpoint = testdata['endpoint']
+        #print(".endpoint..", endpoint)
+        if '{' in testdata['endpoint']:
+            regex = r'\{(.*?)\}'
+            text_inside_paranthesis = re.findall(regex, endpoint)
+            #print(".text_inside_paranthesis.", text_inside_paranthesis)
+            for xElm in text_inside_paranthesis:
+                endpoint = endpoint.replace("{"+xElm+"}", "{"+xElm.lower()+"}")
         pathData = testdata['inputData']['path']
         queryData = testdata['inputData']['query']
+        #print(".endpoint..", endpoint)
+        #print(".pathData..", pathData)
 
         endpoint = endpoint.format(**pathData)
+        #print(".endpoint after formating..", endpoint)
         tmp = urlencode(queryData)
         if tmp:
             endpoint += '?' + tmp
@@ -225,8 +312,14 @@ def process_test_generator(api_ops_id, db):
                 }
 
                 for resp in payload_response:
-                    if resp['status'] == '200' or resp['status'] == 'default':
+                    if resp['status'] == '200' or resp['status'] == 'default' or resp['status'] == '201' or resp['status'] == '202' or resp['status'] == '204' or resp['status'].startswith('2'):
                         testdata['test_case_name'] = method_operation_id + '__P'
+                        if isinstance(testdata["resource"], list):
+                            resourceVal = testdata["resource"][0]
+                        else:
+                            resourceVal = testdata["resource"]
+                            #testdata['test_case_name'] = "Validate_" + m + "_" + method_operation_id + "_" + testdata["resource"] + "_API with"
+                        #print("..new name", "Validate_" + m + "_" + method_operation_id + "_" + resourceVal + "_API with")
                         resp_body = next(
                             (x for x in response_schema if x['status'] == resp['status']))
                         mapped_result = map_request_response_schema(
@@ -267,12 +360,23 @@ def process_test_generator(api_ops_id, db):
                                 testdata['inputData'] = payload_request
                                 testdata['assertionData'] = mapped_resp
                                 testdata['description'] = 'ok'
+                                suffix = getCountByKey(payload_request)
+                                testdata['parameters'] = getInputAsParams(payload_request)
+                                #print("..suffix..", suffix)
+                                #cntDataSets = gettotalElements(suffix)
+                                #print("cntDataSets",cntDataSets)
+                                testcasenameSuff = " datasets" if suffix > 1 else " dataset"
+                                #testdata['test_case_name'] = "Validate_" + m + "_" + method_operation_id + "_" + resp['status'] + "_API with " + suffix
+                                testdata['test_case_name'] = "Validate " + resp['status'] + " response for " + method_operation_id + " of " + filename.split('.')[0] + " API using " + str(suffix) + testcasenameSuff
+
+
 
                                 # pprint(testdata)
                                 # print("\n----------------------------\n")
 
                                 virtual_testdata = get_virtual_collection_data(
                                     testdata)
+                                #print("..vdata..", virtual_testdata)
 
                                 config.store_document(
                                     TESTCASE_COLLECTION, testdata, db)
@@ -282,13 +386,15 @@ def process_test_generator(api_ops_id, db):
                         testdata['request_response_mapping'] = None
 
                     # missing mandatory parameter, Deceptive request (add %/ in endpoint uri)
-                    elif resp['status'] == '400':
-                        testdata['test_case_name'] = method_operation_id + '__P'
+                    elif resp['status'] == '400' or resp['status'].startswith('4'):
+                        #testdata['test_case_name'] = method_operation_id + '__P'
                         ALL_REQUEST_KEYS_SET = set()
 
                         for iter in range(MAX_ITER):
                             payload_request, missed_found = get_request_data(
                                 request_data, missing_required=True)
+                            suffix = getCountByKey(payload_request)
+                            testdata['test_case_name'] = "Validate " + resp['status'] + " response for " + method_operation_id + " of " + filename.split('.')[0] + " API using " + str(suffix) + " datasets"
                             if missed_found:
                                 request_keys = get_all_keys(
                                     payload_request, res=[], prefix="")
@@ -304,6 +410,9 @@ def process_test_generator(api_ops_id, db):
                                     testdata['inputData'] = payload_request
                                     testdata['description'] = 'missing mandatory parameter'
                                     testdata['assertionData'] = resp['body']
+                                    suffix = getCountByKey(payload_request)
+                                    #testdata['test_case_name'] = "Validate_" + m + "_" + method_operation_id + "_" + resp['status'] + "_API with " + str(suffix)
+                                    testdata['test_case_name'] = "Validate " + resp['status'] + " response for " + method_operation_id + " of " + filename.split('.')[0] + " API using " + str(suffix) + " datasets"
 
                                     # pprint(testdata)
                                     # print("\n----------------------------\n")
@@ -323,12 +432,18 @@ def process_test_generator(api_ops_id, db):
                         testdata['testcaseId'] = testcases
                         testdata['inputData'] = payload_request
                         testdata['assertionData'] = resp['body']
+                        #print(".epcreation..b4", testdata['endpoint'])
 
                         tmp = testdata['endpoint'].split('{')
                         tmp[0] += '%/'
-                        if len(tmp) > 1:
-                            tmp[0] += '{'
+                        for xItr in range(len(tmp)):
+                            if '}' in tmp[xItr]:
+                                tmp[xItr] = ''.join(('{', tmp[xItr]))
+                        #if len(tmp) > 1:
+                        #    tmp[0] += '{'
                         testdata['endpoint'] = ''.join(tmp)
+                        #print(".epcreation..after", testdata['endpoint'])
+
                         testdata['description'] = 'deceptive request'
 
                         # pprint(testdata)
@@ -353,6 +468,9 @@ def process_test_generator(api_ops_id, db):
                         testdata['testcaseId'] = testcases
                         testdata['inputData'] = payload_request
                         testdata['assertionData'] = resp['body']
+                        suffix = getCountByKey(payload_request)
+                        #testdata['test_case_name'] = "Validate_" + m + "_" + method_operation_id + "_" + resp['status'] + "_API with " + str(suffix)
+                        testdata['test_case_name'] = "Validate " + resp['status'] + " response for " + method_operation_id + " of " + filename.split('.')[0] + " API using " + str(suffix) + " datasets"
 
                         tmp = testdata['endpoint'].split('?')
                         tmp[0] += 'abc'
@@ -376,7 +494,7 @@ def process_test_generator(api_ops_id, db):
 
                     # method not allowed
                     elif resp['status'] == '405':
-                        testdata['test_case_name'] = method_operation_id + '__P'
+                        #testdata['test_case_name'] = method_operation_id + '__P'
                         payload_request, _ = get_request_data(request_data)
                         for cm in _HTTP_COMMON_VERBS:
                             if cm not in methods:
@@ -387,6 +505,9 @@ def process_test_generator(api_ops_id, db):
                                 testdata['inputData'] = payload_request
                                 testdata['description'] = 'method not allowed'
                                 testdata['assertionData'] = resp['body']
+                                suffix = getCountByKey(payload_request)
+                                #testdata['test_case_name'] = "Validate_" + m + "_" + method_operation_id + "_" + resp['status'] + "_API with " + str(suffix)
+                                testdata['test_case_name'] = "Validate " + resp['status'] + " response for " + method_operation_id + " of " + filename.split('.')[0] + " API using " + " invalid verb " + cm
 
                                 # pprint(testdata)
                                 # print("\n----------------------------\n")

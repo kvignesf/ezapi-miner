@@ -12,8 +12,6 @@ build:
   artifacts:
     paths:
     - apiops_model.zip
-  only:
-    - master
 deployssh:
   image: alpine
   stage: deploy
@@ -22,8 +20,8 @@ deployssh:
     - apk add openssh
 # Install the SSH keys
     - mkdir ~/.ssh
-    - echo "$ID_RSA" >> ~/.ssh/id_rsa
-    - echo "$ID_RSA_PUB" >> ~/.ssh/id_rsa.pub
+    - echo "$DEV_ID_RSA" >> ~/.ssh/id_rsa
+    - echo "$DEV_ID_RSA_PUB" >> ~/.ssh/id_rsa.pub
     - chmod 600 ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa.pub
 # Start the ssh daemon and add the private key
@@ -32,16 +30,9 @@ deployssh:
     #- cat ~/.ssh/id_rsa.pub > ~/.ssh/authorized_keys
     - '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
 # Execute a remote command
-   # - ssh deploy@104.197.42.14 "rm -rf /tmp/apiops_model && exit"
-   # - scp apiops_model.zip deploy@104.197.42.14:/tmp/apiops_model.zip
-   # - ssh deploy@104.197.42.14 "unzip -uq -d /tmp/apiops_model/ /tmp/apiops_model.zip"
-   # - ssh deploy@104.197.42.14 "cd /tmp/apiops_model/apiops_model && docker-compose down && exit"
-   # - ssh deploy@104.197.42.14 "cd /tmp/apiops_model/apiops_model && docker-compose up --build -d  && exit"
-    - ssh deploy@34.123.144.35 "rm -rf /tmp/apiops_model && exit"
-    - scp apiops_model.zip deploy@34.123.144.35:/tmp/apiops_model.zip
-    - ssh deploy@34.123.144.35 "unzip -uq -d /tmp/apiops_model/ /tmp/apiops_model.zip"
-    - ssh deploy@34.123.144.35 "cd /tmp/apiops_model/apiops_model && docker-compose down && exit"
-    - ssh deploy@34.123.144.35 "cd /tmp/apiops_model/apiops_model && docker-compose up --build -d  && exit"
-  only:
-    - master
+    - ssh deploy@104.197.42.14 "rm -rf /tmp/apiops_model && exit"
+    - scp apiops_model.zip deploy@104.197.42.14:/tmp/apiops_model.zip
+    - ssh deploy@104.197.42.14 "unzip -uq -d /tmp/apiops_model/ /tmp/apiops_model.zip"
+    - ssh deploy@104.197.42.14 "cd /tmp/apiops_model/apiops_model && docker-compose down && exit"
+    - ssh deploy@104.197.42.14 "cd /tmp/apiops_model/apiops_model && docker-compose up --build -d  && exit"
 
