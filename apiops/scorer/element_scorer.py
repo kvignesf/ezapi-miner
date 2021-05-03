@@ -18,7 +18,7 @@ def get_apiops_description(all_paths, path, method):
             all_methods = p["method_definition"]
             for m in all_methods:
                 if method == m['method']:
-                    #return (m.get("summary"), m.get("apiops_description"))
+                    # return (m.get("summary"), m.get("apiops_description"))
                     return (m.get("summary"), m.get("operationId"))
     return (None, None)
 
@@ -113,9 +113,13 @@ def extract_request_params(api_ops_id, paths_tag, tags, db):
         for t in tags:
             params = r['params']
             for p in params:
+                # print("---> ", p, "\n")
                 status = p['status_code']
-                if status.isdigit() and int(int(status)/100) == 2:   # 2xx status only
+                print("---> ", status)
+                # 2xx status only
+                if (status.isdigit() and int(int(status)/100) == 2) or status[0] == '2':
                     schema = p.get('schema')
+                    print(schema)
 
                     if 'type' in schema and schema['type'] == 'object' and "properties" in schema:
                         schema = schema['properties']
