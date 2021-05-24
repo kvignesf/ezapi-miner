@@ -229,6 +229,9 @@ class CrawlSchema:
 
         pt = param_array.get("type")
 
+        if not pt and "ezapi_ref" in param_array:
+            pt = "ezapi_ref"
+
         if pt and pt not in ("array", "object", "ezapi_ref"):
             tmp = {
                 "name": prev_key,
@@ -256,6 +259,9 @@ class CrawlSchema:
         if "properties" in param_object:
             for k, v in param_object["properties"].items():
                 v_type = v.get("type")
+
+                if not v_type and "ezapi_ref" in v:
+                    v_type = "ezapi_ref"
 
                 if v_type:
                     if v_type not in ("array", "object", "ezapi_ref"):
@@ -297,21 +303,29 @@ class CrawlSchema:
 
         return elems
 
-    def get_refs(self, param_object):  # level 0 only
+    def get_refs(self, param_object, schema_name):  # level 0 only
         refs = []
 
         if "properties" in param_object:
             for k, v in param_object["properties"].items():
                 v_type = v.get("type")
 
+                if not v_type and "ezapi_ref" in v:
+                    v_type = "ezapi_ref"
+
                 if v_type in ("array", "object", "ezapi_ref"):
                     tmp = {"name": k, "type": v_type}
+
+                    if v_type == "ezapi_ref":
+                        tmp["ref"] = v["ezapi_ref"]
+                    else:
+                        tmp["ref"] = schema_name + "." + k
 
                     refs.append(tmp)
 
         return refs
 
-    def extract_schema_attrs(self, param_schema):
+    def extract_schema_attrs(self, param_schema, schema_name):
         if "allOf" in param_schema:
             all_schemas = param_schema["allOf"]
 
@@ -322,7 +336,7 @@ class CrawlSchema:
             st = param_schema.get("type")
             if st == "object" and "properties" in param_schema:
                 tmp = self.extract_schema_object(param_schema)
-                refs = self.get_refs(param_schema)
+                refs = self.get_refs(param_schema, schema_name)
 
                 self.elements += tmp
                 self.refs += refs
@@ -339,7 +353,7 @@ def crawl_schema(schemas):
         schema_description = v.get("description")
 
         cs = CrawlSchema(schema_name)
-        elements, refs = cs.extract_schema_attrs(v)
+        elements, refs = cs.extract_schema_attrs(v, schema_name)
 
         if len(elements) > 0:  # filter out combination of other schemas
             schema_size, schema_depth = ss.get_schema_size(v)
