@@ -1,4 +1,4 @@
-# from api_designer import config
+from api_designer import config
 from pprint import pprint
 import re
 
@@ -203,7 +203,7 @@ def get_table_data(lines):
     return res
 
 
-def parse_ddl_file(ddl_file, api_design_id=None, ddl_filename=None, db=None):
+def parse_ddl_file(ddl_file, projectid=None, ddl_filename=None, db=None):
     file = open(ddl_file, "r+")
     filedata = file.readlines()
 
@@ -216,13 +216,9 @@ def parse_ddl_file(ddl_file, api_design_id=None, ddl_filename=None, db=None):
     for table in tables:
         table_collection = "tables"
         table_document = table
-        table_document["api_design_id"] = api_design_id
+        table_document["projectid"] = projectid
         table_document["ddl_file"] = ddl_filename
 
-        # config.store_document(table_collection, table_document, db)
+        config.store_document(table_collection, table_document, db)
 
     return {"success": True, "status": 200, "message": "ok"}
-
-
-parse_ddl_file("./../tmp/checkout_script.sql")
-# parse_ddl_file("./../tmp/mdscript.sql")

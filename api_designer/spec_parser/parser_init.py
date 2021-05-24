@@ -5,10 +5,9 @@ from api_designer.spec_parser.swagger_parser import parse_swagger
 
 import codecs
 import json
-import os, sys
 
 
-def parse_openapi_json(filepath, api_design_id, spec_filename, db):
+def parse_openapi_json(filepath, projectid, spec_filename, db):
     try:
         jsondata = json.load(codecs.open(filepath, "r", "utf-8-sig"))
     except Exception as e:
@@ -44,11 +43,11 @@ def parse_openapi_json(filepath, api_design_id, spec_filename, db):
         version = jsondata.get("openapi")
 
     if version[0] == "2":
-        res = parse_swagger(jsondata, api_design_id, spec_filename, db)
+        res = parse_swagger(jsondata, projectid, spec_filename, db)
         return res
 
     elif version[0] == "3":
-        res = parse_openapi(jsondata, api_design_id, spec_filename, db)
+        res = parse_openapi(jsondata, projectid, spec_filename, db)
         return res
 
     else:

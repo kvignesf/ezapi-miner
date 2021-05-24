@@ -1,136 +1,27 @@
-# ----------- Begin of util code -----------
-import re
+from api_designer.utils.common import *
 
 
-def is_camel_case(s):
-    return s != s.lower() and s != s.upper() and "_" not in s
+# def get_attribute_critical_score(attributes, schema_name):
+#     attribute_vocab = {}
 
+#     for at in attributes:
+#         at_split = string_split(at["name"])
+#         for word in at_split:
+#             if word not in attribute_vocab:
+#                 attribute_vocab[word] = 0
+#             attribute_vocab[word] += 1
 
-def is_under_score(s):
-    return "_" in s
+#     for idx, at in enumerate(attributes):
+#         at_score = 0
+#         at_split = string_split(at["name"])
+#         for word in at_split:
+#             at_score += attribute_vocab[word]
 
+#         at_score = round(at_score / len(at_split), 2)
 
-def camel_case_split(s):
-    try:
-        matches = re.finditer(
-            ".+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)", s
-        )
-        res = [m.group(0) for m in matches]
-        res = [x.lower() for x in res]
-        return res
-    except:
-        return [s]
+#         attributes[idx]["score"] = at_score
 
-
-def special_character_split(s):
-    res = re.split(r"[^a-zA-Z0-9]", s)
-    res = [x.lower() for x in res]
-    return res
-
-
-def string_split(s):
-    if is_camel_case(s):
-        return camel_case_split(s)
-    return special_character_split(s)
-
-
-# ----------- End of util code -----------
-
-
-def check_element(element):
-    element_type = element.get("type")
-    return element_type and element_type not in ("array", "object")
-
-
-def extract_schema_attributes(param_schema, all_off_schema=False):
-    try:
-        elements = []
-        refs = []
-
-        if "allOf" in param_schema:
-            all_schemas = param_schema["allOf"]
-
-            for s in all_schemas:
-                tmp = extract_schema_attributes(s, True)
-                elements += tmp[0]
-                refs += tmp[1]
-
-        else:
-            st = param_schema.get("type")
-
-            # Check Petstore Pet Schema
-            all_required_fields = []
-            all_required_fields = param_schema.get("required", [])
-            if all_required_fields:
-                print("all required - ", all_required_fields)
-
-            if st == "object" and "properties" in param_schema:
-                for key, value in param_schema["properties"].items():
-                    if check_element(value):
-                        elem_type = value.get("type")
-                        elem_format = value.get("format")
-                        elem_required = value.get("required", False)
-
-                        if key in all_required_fields:
-                            elem_required = True
-
-                        elements.append(
-                            {
-                                "name": key,
-                                "type": elem_type,
-                                "format": elem_format,
-                                "required": elem_required,
-                                "all_of_schema": all_off_schema,
-                            }
-                        )
-                    else:
-                        elem_type = value.get("type")
-                        elem_format = value.get("format")
-                        elem_required = value.get("required", False)
-
-                        if key in all_required_fields:
-                            elem_required = True
-
-                        refs.append(
-                            {
-                                "name": key,
-                                "type": elem_type,
-                                "format": elem_format,
-                                "required": elem_required,
-                                "all_of_schema": all_off_schema,
-                            }
-                        )
-                    # if "ezapi_ref" in value:
-                    #     refs.append(key)
-
-    except Exception as e:
-        print("**Error", param_schema)
-        print(str(e))
-
-    return elements, refs
-
-
-def get_attribute_critical_score(attributes, schema_name):
-    attribute_vocab = {}
-
-    for at in attributes:
-        at_split = string_split(at["name"])
-        for word in at_split:
-            if word not in attribute_vocab:
-                attribute_vocab[word] = 0
-            attribute_vocab[word] += 1
-
-    for idx, at in enumerate(attributes):
-        at_score = 0
-        at_split = string_split(at["name"])
-        for word in at_split:
-            at_score += attribute_vocab[word]
-
-        at_score = round(at_score / len(at_split), 2)
-
-        attributes[idx]["score"] = at_score
-
-    return attributes
+#     return attributes
 
 
 class SchemaSize:
@@ -300,7 +191,8 @@ class SchemaDeref:
 
             for s in all_schemas:
                 s_res = self.deref_schema(s)
-                res["properties"].update(s_res["properties"])
+                if "properties" in s_res:
+                    res["properties"].update(s_res["properties"])
 
         else:
             st = param_schema.get("type")
@@ -323,26 +215,143 @@ class SchemaDeref:
         return res
 
 
+class CrawlSchema:
+    def __init__(self, schema_name):
+        self.schema_name = schema_name
+        self.elements = []
+        self.refs = []
+
+    def extract_schema_array(self, param_array, level=0, parent=None, prev_key=None):
+        elems = []
+
+        if level > 3:
+            return elems
+
+        pt = param_array.get("type")
+
+        if pt and pt not in ("array", "object", "ezapi_ref"):
+            tmp = {
+                "name": prev_key,
+                "type": pt,
+                "format": param_array.get("format"),
+                "required": param_array.get("required"),
+                "level": level,
+                "parent": parent,
+            }
+            elems.append(tmp)
+
+        if pt == "object" and "properties" in param_array:
+            tmp = self.extract_schema_object(param_array, level, parent)
+            if tmp:
+                elems += tmp
+
+        return elems
+
+    def extract_schema_object(self, param_object, level=0, parent=None):
+        elems = []
+
+        if level > 3:
+            return elems
+
+        if "properties" in param_object:
+            for k, v in param_object["properties"].items():
+                v_type = v.get("type")
+
+                if v_type:
+                    if v_type not in ("array", "object", "ezapi_ref"):
+                        tmp = {
+                            "name": k,
+                            "type": v_type,
+                            "format": v.get("format"),
+                            "required": v.get("required"),
+                            "level": level,
+                            "parent": parent,
+                        }
+
+                        if tmp["parent"] == None:
+                            tmp["parent"] = self.schema_name
+
+                        elems.append(tmp)
+
+                    elif v_type == "object" and "properties" in v:
+                        new_par = ((parent or "") + "_" + k).strip("_")
+                        tmp = self.extract_schema_object(v, level + 1, new_par)
+
+                        if tmp:
+                            elems += tmp
+
+                    elif v_type == "array" and "items" in v:
+                        new_par = ((parent or "") + "_" + k).strip("_")
+
+                        tmp = self.extract_schema_array(
+                            v["items"], level + 1, new_par, k
+                        )
+
+                        if tmp:
+                            elems += tmp
+
+                    elif (
+                        v_type == "ezapi_ref"
+                    ):  # todo: Reference type not handled currently
+                        pass
+
+        return elems
+
+    def get_refs(self, param_object):  # level 0 only
+        refs = []
+
+        if "properties" in param_object:
+            for k, v in param_object["properties"].items():
+                v_type = v.get("type")
+
+                if v_type in ("array", "object", "ezapi_ref"):
+                    tmp = {"name": k, "type": v_type}
+
+                    refs.append(tmp)
+
+        return refs
+
+    def extract_schema_attrs(self, param_schema):
+        if "allOf" in param_schema:
+            all_schemas = param_schema["allOf"]
+
+            for s in all_schemas:
+                self.extract_schema_attrs(s)
+
+        else:
+            st = param_schema.get("type")
+            if st == "object" and "properties" in param_schema:
+                tmp = self.extract_schema_object(param_schema)
+                refs = self.get_refs(param_schema)
+
+                self.elements += tmp
+                self.refs += refs
+
+        return self.elements, self.refs
+
+
 def crawl_schema(schemas):
     crawled_schema = []
     ss = SchemaSize(schemas)
 
     for k, v in schemas.items():
-        desc = v.get("description")
-        attrib, refs = extract_schema_attributes(v)
+        schema_name = k
+        schema_description = v.get("description")
 
-        attrib = get_attribute_critical_score(attrib, k)
+        cs = CrawlSchema(schema_name)
+        elements, refs = cs.extract_schema_attrs(v)
 
-        if len(attrib) > 0:  # filter out combination of other schemas
-            size, depth = ss.get_schema_size(v)
+        if len(elements) > 0:  # filter out combination of other schemas
+            schema_size, schema_depth = ss.get_schema_size(v)
+
             crawled_schema.append(
                 {
-                    "name": k,
-                    "description": desc,
-                    "size": size,
-                    "max_depth": depth,
-                    "attributes": attrib,
-                    "refs": refs,
+                    "name": schema_name,
+                    "description": schema_description,
+                    "size": schema_size,
+                    "max_depth": schema_depth,
+                    "attributes": elements,
+                    "references": refs,
                 }
             )
 

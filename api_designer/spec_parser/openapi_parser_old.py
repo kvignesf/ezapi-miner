@@ -1,9 +1,7 @@
 import os, sys
-from api_designer.utils.schema_manager import crawl_schema
+from api_designer.spec_parser.schema_manager import crawl_schema
 
 from api_designer import config
-from api_designer.utils.common import *
-import os, sys
 
 _HTTP_VERBS = set(["get", "put", "post", "delete", "options", "head", "patch"])
 _PARAMETER_TYPES = set(
@@ -29,21 +27,30 @@ def extract_path_data(path_data):
 
     for path, path_spec in path_data.items():
         if path[0] == "/":
+            curr_path = {}
+            curr_path["path"] = path
+            curr_path["methods"] = []
+            curr_path["methods_definition"] = []
 
             for http_method, http_method_specs in path_spec.items():
                 if http_method in _HTTP_VERBS:
-                    curr_path = {}
-                    curr_path["endpoint"] = path
-                    curr_path["method"] = http_method
-
+                    curr_path["methods"].append(http_method)
                     method_data = {
                         key: http_method_specs[key]
                         for key in http_method_specs.keys()
-                        & {"tags", "summary", "description", "operationId"}
+                        & {
+                            "tags",
+                            "summary",
+                            "description",
+                            "operationId",
+                            "consumes",
+                            "produces",
+                        }
                     }
+                    # todo: Get apiops_description
+                    curr_path["methods_definition"].append(method_data)
 
-                    curr_path = merge_dict(curr_path, method_data)  # common.py
-                all_paths.append(curr_path)
+            all_paths.append(curr_path)
     return all_paths
 
 
@@ -169,72 +176,122 @@ def extract_response_data(path_data, path, method, components):
     return responses
 
 
-def parse_openapi(jsondata, projectid, spec_filename, db):
+def extract_component_data(component_data):
+    return component_data
+
+
+def parse_openapi(jsondata, api_design_id, spec_filename, db):
     print("Inside parsing openapi 3.0")
 
     try:
         fullspec_collection = "raw_spec"
         fullspec_document = {
             "filename": spec_filename,
-            "projectid": projectid,
+            "api_design_id": api_design_id,
             "data": jsondata,
         }
         config.store_document(fullspec_collection, fullspec_document, db)
 
+        info_data = jsondata.get("info")
+        apiinfo_collection = "api_info"
+        apiinfo_document = {
+            "filename": spec_filename,
+            "api_design_id": api_design_id,
+            "data": info_data,
+        }
+        config.store_document(apiinfo_collection, apiinfo_document, db)
+
+        servers_data = jsondata.get("servers")
+        server_collection = "servers"
+        servers_document = {
+            "filename": spec_filename,
+            "api_design_id": api_design_id,
+            "data": servers_data,
+        }
+        config.store_document(server_collection, servers_document, db)
+
         path_data = jsondata.get("paths")
         components_data = jsondata.get("components")
 
+        security_data = jsondata.get("security")
+        security_collection = "security"
+        security_document = {
+            "filename": spec_filename,
+            "api_design_id": api_design_id,
+            "data": security_data,
+        }
+        config.store_document(security_collection, security_document, db)
+
+        tags_data = jsondata.get("tags")
+        tags_collection = "tags"
+        tags_document = {
+            "filename": spec_filename,
+            "api_design_id": api_design_id,
+            "data": tags_data,
+        }
+        config.store_document(tags_collection, tags_document, db)
+
+        externalDocs_data = jsondata.get("externalDocs")
+        externalDocs_collection = "externalDocs"
+        externalDocs_document = {
+            "filename": spec_filename,
+            "api_design_id": api_design_id,
+            "data": externalDocs_data,
+        }
+        config.store_document(externalDocs_collection, externalDocs_document, db)
+
+        # v3.1
+        # jsonSchemaDialect_data = jsondata.get("jsonSchemaDialect")
+        # webhooks_data = jsondata.get("webhooks")
+
         all_paths = extract_path_data(path_data)
-        all_parameters = {}
-
-        # Extract request, response data for individual path (endpoint) wise
         for path in all_paths:
-            endpoint = path["endpoint"]
-            method = path["method"]
-
-            request_data = extract_request_data(
-                path_data, endpoint, method, components_data
-            )
-            response_data = extract_response_data(
-                path_data, endpoint, method, components_data
-            )
-
-            # Extract all parameters
-            for param in request_data["path"] + request_data["query"]:
-                for k, v in param.items():
-                    if k not in all_parameters:
-                        all_parameters[k] = v
-                        all_parameters[k]["header"] = False
-
-            for param in request_data["header"]:
-                for k, v in param.items():
-                    if k not in all_parameters:
-                        all_parameters[k] = v
-                        all_parameters[k]["header"] = True
-
-            path["requestData"] = request_data
-            path["responseData"] = response_data
-
             path_collection = "paths"
             path_document = {
                 "filename": spec_filename,
-                "projectid": projectid,
+                "api_design_id": api_design_id,
                 "data": path,
             }
             config.store_document(path_collection, path_document, db)
 
-        parameter_collection = "parameters"
-        parameter_document = {
-            "filename": spec_filename,
-            "projectid": projectid,
-            "data": all_parameters,
-        }
-        config.store_document(parameter_collection, parameter_document, db)
+        # Extract request, response data for individual path (endpoint) wise
+        for path in all_paths:
+            endpoint = path["path"]
+            methods = path["methods"]
 
+            for meth in methods:
+                request_data = extract_request_data(
+                    path_data, endpoint, meth, components_data
+                )
+                response_data = extract_response_data(
+                    path_data, endpoint, meth, components_data
+                )
+
+                request_collection = "requests"
+                request_document = {
+                    "filename": spec_filename,
+                    "api_design_id": api_design_id,
+                    "path": endpoint,
+                    "method": meth,
+                    "data": request_data,
+                }
+                config.store_document(request_collection, request_document, db)
+
+                response_collection = "responses"
+                response_document = {
+                    "filename": spec_filename,
+                    "api_design_id": api_design_id,
+                    "path": endpoint,
+                    "method": meth,
+                    "data": response_data,
+                }
+                config.store_document(response_collection, response_document, db)
+
+        component_data = extract_component_data(components_data)
         component_collection = "components"
         component_document = {
             "filename": spec_filename,
-            "projectid": projectid,
+            "api_design_id": api_design_id,
             "data": components_data,
         }
         config.store_document(component_collection, component_document, db)
@@ -246,7 +303,7 @@ def parse_openapi(jsondata, projectid, spec_filename, db):
             schema_collection = "schemas"
             schema_document = {
                 "filename": spec_filename,
-                "projectid": projectid,
+                "api_design_id": api_design_id,
                 "data": cs,
             }
             config.store_document(schema_collection, schema_document, db)
@@ -266,4 +323,5 @@ def parse_openapi(jsondata, projectid, spec_filename, db):
             "status": 500,
         }
 
+    print("Spec parser res - ", res)
     return res

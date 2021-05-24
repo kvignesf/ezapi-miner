@@ -7,8 +7,11 @@ import pymongo
 
 
 def get_db_connection(dbname, host="localhost", port=27017):
-    client = pymongo.MongoClient(host, port)
-    # client = pymongo.MongoClient("mongodb+srv://ezapimongoadmin:JRVvuh9D5V0IZxCW@cluster0.z8ggg.gcp.mongodb.net/test?authSource=admin&replicaSet=atlas-7cv8k4-shard-0&readPreference=primary&ssl=true", Connect=False)
+    # client = pymongo.MongoClient(host, port)
+    client = pymongo.MongoClient(
+        "mongodb+srv://ezapimongoadmin:JRVvuh9D5V0IZxCW@cluster0.z8ggg.gcp.mongodb.net/test?authSource=admin&replicaSet=atlas-7cv8k4-shard-0&readPreference=primary&ssl=true",
+        Connect=False,
+    )
     db = client[dbname]
     return (client, db)
 

@@ -2,53 +2,17 @@
 # This code is copyright of EZAPI LLC. For further info, reach out to rams@ezapi.ai
 # *****************************************************************
 
+import json
 import os
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
 
 from apiops.main import APIOPSModel
-from api_designer.main import APIDesignModel
+from api_designer.main import EzAPIModels
 
 app = Flask(__name__)
 CORS(app, support_credentials=True)
-
-
-def run_api_design_model(
-    spec_file, spec_filename, ddl_file, ddl_filename, api_design_id
-):
-    api_design_obj = APIDesignModel(
-        spec_file, spec_filename, ddl_file, ddl_filename, api_design_id
-    )
-    api_design_obj.get_db_instance()
-
-    spec_parser_result = api_design_obj.parse_spec_file()
-    if "success" in spec_parser_result and spec_parser_result["success"]:
-        ret = {"success": True, "status": 200, "message": "ok"}
-
-        ddl_parser_result = api_design_obj.parse_ddl_file()
-        if "success" in ddl_parser_result and ddl_parser_result["success"]:
-            # ret = {"success": True, "status": 200, "message": "ok"}
-
-            matcher_result = api_design_obj.matcher()
-            if "success" in matcher_result and matcher_result["success"]:
-
-                ret = {"success": True, "status": 200, "message": "ok"}
-
-            else:
-                ret = matcher_result
-                ret["stage"] = "matching incompleted"
-
-        else:
-            ret = ddl_parser_result
-            ret["stage"] = "ddl not parsed"
-
-    else:
-        ret = spec_parser_result
-        ret["stage"] = "spec not parsed"
-
-    api_design_obj.client.close()
-    return ret
 
 
 def run_apiops_model(filepath, filename, api_ops_id, dbname):
@@ -101,7 +65,7 @@ def run_apiops_model(filepath, filename, api_ops_id, dbname):
 
 @app.route("/")
 def home():
-    return "Hello APIOPS"
+    return "Hello EzAPI"
 
 
 @app.route("/apiops_model", methods=["POST"])
@@ -128,41 +92,97 @@ def apiops_model():
     return jsonify(res)
 
 
-@app.route("/apidesign_model", methods=["POST"])
-def apidesign_model():
-    spec_file = request.files["spec_file"]
-    ddl_file = request.files.getlist("ddl_file")
-    api_design_id = str(request.form["api_design_id"])
+@app.route("/matcher", methods=["POST"])
+def mathcer_model():
+    request_data = request.get_json()
+    projectid = str(request_data.get("projectid", ""))
 
-    if len(ddl_file) != 1:
-        return jsonify(
-            {"success": False, "status": 500, "message": "Only one DDL file supported"}
-        )
+    if projectid:
+        model = EzAPIModels(projectid)
+        model.set_db_instance()
+        ret = model.matcher()
+        model.client.close()
 
-    spec_filename = spec_file.filename
-    ddl_file = ddl_file[0]
-    ddl_filename = ddl_file.filename
+    else:
+        ret = {
+            "status": 400,
+            "success": False,
+            "message": "Some parameters are missing",
+        }
+
+    return jsonify(ret)
+
+
+@app.route("/ddl_parser", methods=["POST"])
+def ddl_parser_model():
+    ddl_file = request.files.getlist("ddl_file", None)
+    projectid = str(request.form.get("projectid", ""))
 
     if not os.path.exists("./uploads"):
         os.makedirs("./uploads")
 
-    spec_path = "./uploads/" + spec_filename
-    ddl_path = "./uploads/" + ddl_filename
+    if ddl_file and projectid:
+        if len(ddl_file) != 1:
+            ret = {
+                "status": 400,
+                "success": False,
+                "message": "Only one DDL file supported",
+            }
+        else:
+            ddl_file = ddl_file[0]
+            ddl_filename = ddl_file.filename
+            ddl_path = "./uploads/" + ddl_filename
+            ddl_file.save(ddl_path)
 
-    spec_file.save(spec_path)
-    ddl_file.save(ddl_path)
-
-    res = run_api_design_model(
-        spec_path, spec_filename, ddl_path, ddl_filename, api_design_id
-    )
+            model = EzAPIModels(projectid)
+            model.set_db_instance()
+            ret = model.parse_ddl_file(ddl_path, ddl_filename)
+            model.client.close()
+    else:
+        ret = {
+            "status": 400,
+            "success": False,
+            "message": "Some parameters are missing",
+        }
 
     try:
-        os.remove(spec_path)
         os.remove(ddl_path)
     except Exception as e:
         print("Error deleting Uploaded File")
 
-    return jsonify(res)
+    return jsonify(ret)
+
+
+@app.route("/spec_parser", methods=["POST"])
+def spec_parser_model():
+    spec_file = request.files.get("spec_file", None)
+    projectid = str(request.form.get("projectid", ""))
+
+    if not os.path.exists("./uploads"):
+        os.makedirs("./uploads")
+
+    if spec_file and projectid:
+        spec_filename = spec_file.filename
+        spec_path = "./uploads/" + spec_filename
+        spec_file.save(spec_path)
+
+        model = EzAPIModels(projectid)
+        model.set_db_instance()
+        ret = model.parse_spec_file(spec_path, spec_filename)
+        model.client.close()
+    else:
+        ret = {
+            "status": 400,
+            "success": False,
+            "message": "Some parameters are missing",
+        }
+
+    try:
+        os.remove(spec_path)
+    except Exception as e:
+        print("Error deleting Uploaded File")
+
+    return jsonify(ret)
 
 
 if __name__ == "__main__":

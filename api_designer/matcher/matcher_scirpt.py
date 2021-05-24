@@ -1,7 +1,7 @@
+import csv
+
 from api_designer import config
 from api_designer.utils.common import *
-
-match_collection = "matcher"
 
 
 def name_matching(name1, name2):  # snake case and wordlist
@@ -98,7 +98,10 @@ def match_attributes(schema_name, schema_attributes, table_name, table_attribute
     return filtered_matches
 
 
-def solve_matching(schemas_data, table_data, projectid, db):
+def solve_matching(schemas_data, table_data):
+    combined_csv = open("match_combined.csv", "w")
+    combined_csv_write = csv.writer(combined_csv)
+
     all_attribute_match = []
 
     schema_names = [x["name"] for x in schemas_data]
@@ -149,47 +152,37 @@ def solve_matching(schemas_data, table_data, projectid, db):
 
     matched_score = sorted(matched_score, reverse=True)
 
-    best_attr_considered = []
+    attr_considered = []
 
     for m in matched_score:
+        print(m)
         tmp = []
 
-        match_document = {
-            "projectid": projectid,
-            "schema": m[3],
-            "table": m[4],
-            "name_match_score": m[1],
-            "attributes_match_score": m[2],
-            "final_score": m[0],
-            "attributes": [],
-        }
-
+        attr_score = 0
         if m[0] >= 1:
             for aam in all_attribute_match:
-                if m[3] == aam[0] and m[4] == aam[1]:
+                schema_attr_to_write = (
+                    aam[0] + "_" + aam[3]
+                )  # schema_name + "_" + attribute_name
 
-                    tmp_attribute = {
-                        "schema_attribute": aam[3],
-                        "table_attribute": aam[4],
-                        "match_score": aam[2],
-                        "match_level": aam[5],
-                        "match_type": None,
-                    }
+                # Best Match
+                if (
+                    schema_attr_to_write not in attr_considered
+                    and m[3] == aam[0]
+                    and m[4] == aam[1]
+                ):
+                    attr_score += aam[2] * aam[2]  # attribute score
+                    attr_considered.append(schema_attr_to_write)
+                    # combined_csv_write.writerow(aam + m)
 
-                    # format - schema_table
-                    schema_attr_to_write = aam[0] + "_" + aam[3]
+                    tmp.append(aam + ["best"])
 
-                    # Best Match
-                    if schema_attr_to_write not in best_attr_considered:
-                        best_attr_considered.append(schema_attr_to_write)
-                        tmp_attribute["match_type"] = "best"
+                elif m[3] == aam[0] and m[4] == aam[1]:
+                    tmp.append(aam + ["other"])
 
-                    else:
-                        tmp_attribute["match_type"] = "other"
-
-                    match_document["attributes"].append(tmp_attribute)
-
-        config.store_document(match_collection, match_document, db)
+        for t in tmp:
+            row = [m[3], m[4], m[1], attr_score] + t
+            combined_csv_write.writerow(row)
 
 
 def spec_ddl_matcher(projectid, db):
@@ -200,5 +193,5 @@ def spec_ddl_matcher(projectid, db):
     tables_data = db.tables.find({"projectid": projectid})
     tables_data = list(tables_data)
 
-    solve_matching(schemas_data, tables_data, projectid, db)
+    solve_matching(schemas_data, tables_data)
     return {"success": True, "message": "ok", "status": 200}
