@@ -252,7 +252,6 @@ def solve_matching(schemas_data, table_data, projectid, db):
         if m[0] >= 1:
             for aam in all_attribute_match:
                 if m[3] == aam[0] and m[4] == aam[1]:
-
                     tmp_attribute = {
                         "schema_attribute": aam[3],
                         "table_attribute": aam[4],
@@ -279,6 +278,7 @@ def solve_matching(schemas_data, table_data, projectid, db):
     all_documents = scale_score_values(all_documents)
     all_documents = flag_score_thresholds(all_documents)
 
+    all_documents = [x for x in all_documents if len(x["attributes"]) > 0]
     config.store_bulk_document(match_collection, all_documents, db)
 
     # for doc in all_documents:
