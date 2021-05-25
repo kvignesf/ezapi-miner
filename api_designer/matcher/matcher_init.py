@@ -1,3 +1,4 @@
+import enum
 from api_designer import config
 from api_designer.utils.common import *
 
@@ -98,6 +99,80 @@ def match_attributes(schema_name, schema_attributes, table_name, table_attribute
     return filtered_matches
 
 
+def scale_score_values(all_documents):
+    attribute_score = [t["attributes_match_score"] for t in all_documents]
+    name_score = [t["name_match_score"] for t in all_documents]
+
+    maxm_as = max(attribute_score)
+    minm_as = min(attribute_score)
+    maxm_ns = max(name_score)
+    minm_ns = min(name_score)
+
+    for index, doc in enumerate(all_documents):
+        all_documents[index]["attributes_match_score"] = (
+            doc["attributes_match_score"] - minm_as
+        ) / (maxm_as - minm_as)
+        all_documents[index]["name_match_score"] = (
+            doc["name_match_score"] - minm_ns
+        ) / (maxm_ns - minm_ns)
+        all_documents[index]["final_score"] = (
+            all_documents[index]["attributes_match_score"]
+            + all_documents[index]["name_match_score"]
+        ) / 2.0
+
+    # Scale final_score b/w 0 and 1
+    final_scores = [t["final_score"] for t in all_documents]
+    minm_fs = min(final_scores)
+    maxm_fs = max(final_scores)
+
+    for index, doc in enumerate(all_documents):
+        all_documents[index]["final_score"] = (doc["final_score"] - minm_fs) / (
+            maxm_fs - minm_fs
+        )
+
+    return all_documents
+
+
+def flag_score_thresholds(all_documents):
+    full_attributes_taken = set()
+    schemas_taken = set()
+
+    for i, doc in enumerate(all_documents):
+        for j, attr in enumerate(doc["attributes"]):
+            if attr["match_score"] >= 0.8 and doc["final_score"] >= 0.8:
+                attr_to_consider = doc["schema"] + "_" + attr["schema_attribute"]
+
+                if attr_to_consider not in full_attributes_taken:
+                    all_documents[i]["attributes"][j]["match_type"] = "Full"
+                    full_attributes_taken.add(
+                        doc["schema"] + "_" + attr["schema_attribute"]
+                    )
+                else:
+                    all_documents[i]["attributes"][j]["match_type"] = "Partial"
+
+                schemas_taken.add(doc["schema"])
+
+            elif (attr["match_score"] >= 0.8 or doc["final_score"] >= 0.8) or (
+                attr["match_level"] == 3
+                and attr["match_score"] >= 0.66
+                and doc["final_score"] >= 0.25
+            ):
+                all_documents[i]["attributes"][j]["match_type"] = "Partial"
+                schemas_taken.add(doc["schema"])
+            else:
+                all_documents[i]["attributes"][j]["match_type"] = None
+
+    for i, doc in enumerate(all_documents):
+        if doc["final_score"] >= 0.8:
+            all_documents[i]["match_type"] = "Full"
+        elif doc["schema"] in schemas_taken:
+            all_documents[i]["match_type"] = "Partial"
+        else:
+            all_documents[i]["match_type"] = None
+
+    return all_documents
+
+
 def solve_matching(schemas_data, table_data, projectid, db):
     all_attribute_match = []
 
@@ -151,6 +226,7 @@ def solve_matching(schemas_data, table_data, projectid, db):
 
     best_attr_considered = []
 
+    all_documents = []
     for m in matched_score:
         tmp = []
 
@@ -176,20 +252,57 @@ def solve_matching(schemas_data, table_data, projectid, db):
                         "match_type": None,
                     }
 
-                    # format - schema_table
-                    schema_attr_to_write = aam[0] + "_" + aam[3]
+                    # # format - schema_table
+                    # schema_attr_to_write = aam[0] + "_" + aam[3]
 
-                    # Best Match
-                    if schema_attr_to_write not in best_attr_considered:
-                        best_attr_considered.append(schema_attr_to_write)
-                        tmp_attribute["match_type"] = "best"
+                    # # Best Match
+                    # if schema_attr_to_write not in best_attr_considered:
+                    #     best_attr_considered.append(schema_attr_to_write)
+                    #     tmp_attribute["match_type"] = "best"
 
-                    else:
-                        tmp_attribute["match_type"] = "other"
+                    # else:
+                    #     tmp_attribute["match_type"] = "other"
 
                     match_document["attributes"].append(tmp_attribute)
 
-        config.store_document(match_collection, match_document, db)
+        all_documents.append(match_document)
+
+    all_documents = scale_score_values(all_documents)
+    all_documents = flag_score_thresholds(all_documents)
+
+    config.store_bulk_document(match_collection, all_documents, db)
+
+    # for doc in all_documents:
+    #     config.store_document(match_collection, doc, db)
+
+    """
+    # ---------- CSV Generation Part ----------
+    import csv
+
+    combined_csv = open("match_combined.csv", "w")
+    combined_csv_write = csv.writer(combined_csv)
+
+    for doc in all_documents:
+        row = [
+            doc["schema"],
+            doc["table"],
+            doc["name_match_score"],
+            doc["attributes_match_score"],
+            doc["final_score"],
+            doc["match_type"],
+        ]
+
+        for attr in doc["attributes"]:
+            tmp = row + [
+                attr["schema_attribute"],
+                attr["table_attribute"],
+                attr["match_score"],
+                attr["match_level"],
+                attr["match_type"],
+            ]
+            combined_csv_write.writerow(tmp)
+    # ---------- CSV Part Ended ----------
+    """
 
 
 def spec_ddl_matcher(projectid, db):
