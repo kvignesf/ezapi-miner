@@ -16,3 +16,9 @@ def store_document(collection, document, db):
     document_copy = copy.deepcopy(document)
     db_collection = db[collection]
     db_collection.insert_one(document_copy)
+
+
+def store_bulk_document(collection, document_list, db):
+    document_list_copy = copy.deepcopy(document_list)
+    db_collection = db[collection]
+    db_collection.insert_many(document_list_copy)
