@@ -109,6 +109,13 @@ def scale_score_values(all_documents):
     minm_ns = min(name_score)
 
     for index, doc in enumerate(all_documents):
+        all_documents[index]["attributes_match_score_og"] = all_documents[index][
+            "attributes_match_score"
+        ]
+        all_documents[index]["name_match_score_og"] = all_documents[index][
+            "name_match_score"
+        ]
+
         all_documents[index]["attributes_match_score"] = (
             doc["attributes_match_score"] - minm_as
         ) / (maxm_as - minm_as)
@@ -155,7 +162,7 @@ def flag_score_thresholds(all_documents):
             elif (attr["match_score"] >= 0.8 or doc["final_score"] >= 0.8) or (
                 attr["match_level"] == 3
                 and attr["match_score"] >= 0.66
-                and doc["final_score"] >= 0.25
+                and doc["final_score"] >= 0.24
             ):
                 all_documents[i]["attributes"][j]["match_type"] = "Partial"
                 schemas_taken.add(doc["schema"])
@@ -238,6 +245,8 @@ def solve_matching(schemas_data, table_data, projectid, db):
             "attributes_match_score": m[2],
             "final_score": m[0],
             "attributes": [],
+            "name_match_score_og": None,
+            "attributes_match_score_og": None,
         }
 
         if m[0] >= 1:
@@ -286,6 +295,8 @@ def solve_matching(schemas_data, table_data, projectid, db):
         row = [
             doc["schema"],
             doc["table"],
+            doc["name_match_score_og"],
+            doc["attributes_match_score_og"],
             doc["name_match_score"],
             doc["attributes_match_score"],
             doc["final_score"],

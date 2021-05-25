@@ -221,3 +221,5 @@ venv/
 uploads/
 .DS_Store
 data/
+*.csv
+*.xlsx
