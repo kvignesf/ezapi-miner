@@ -262,8 +262,23 @@ def spec_ddl_matcher(projectid, db):
     # ---------- CSV Generation Part ----------
     # import csv
 
+    # csv_headers = [
+    #     "Schema",
+    #     "Table",
+    #     "Name Score",
+    #     "Attributes Score",
+    #     "Final Score",
+    #     "Match Type (Schema)",
+    #     "Schema Attribute",
+    #     "Table Attribute",
+    #     "Match Score",
+    #     "Match Level",
+    #     "Match Type (Attribute)",
+    # ]
+
     # combined_csv = open("match_combined_new.csv", "w")
     # combined_csv_write = csv.writer(combined_csv)
+    # combined_csv_write.writerow(csv_headers)
 
     # for doc in all_documents:
     #     row = [
