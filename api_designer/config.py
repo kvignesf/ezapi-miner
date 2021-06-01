@@ -3,7 +3,7 @@ import pymongo
 
 
 def get_db_connection(dbname="apidesign", host="localhost", port=27017):
-    client = pymongo.MongoClient(host, port)
+    # client = pymongo.MongoClient(host, port)
     client = pymongo.MongoClient(
         "mongodb://root:JRVvuh9D5V0IZxCW@34.66.45.162:27017/?authSource=admin",
         Connect=False,

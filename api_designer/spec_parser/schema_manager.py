@@ -1,5 +1,5 @@
 from api_designer.utils.common import *
-
+from pprint import pprint
 
 # def get_attribute_critical_score(attributes, schema_name):
 #     attribute_vocab = {}
@@ -215,17 +215,13 @@ class SchemaDeref:
         return res
 
 
-class CrawlSchema:
+class SchemaCrawler:
     def __init__(self, schema_name):
         self.schema_name = schema_name
         self.elements = []
-        self.refs = []
 
     def extract_schema_array(self, param_array, level=0, parent=None, prev_key=None):
         elems = []
-
-        if level > 3:
-            return elems
 
         pt = param_array.get("type")
 
@@ -240,21 +236,34 @@ class CrawlSchema:
                 "required": param_array.get("required"),
                 "level": level,
                 "parent": parent,
+                "is_child": True,
             }
             elems.append(tmp)
 
-        if pt == "object" and "properties" in param_array:
+        elif pt == "object" and "properties" in param_array:
             tmp = self.extract_schema_object(param_array, level, parent)
             if tmp:
                 elems += tmp
+
+        elif pt == "ezapi_ref":
+            ref = param_array["ezapi_ref"].split("/")[-1]
+            refPath = param_array["ezapi_ref"]
+
+            tmp = {
+                "name": prev_key,
+                "type": pt,
+                "level": level,
+                "parent": parent,
+                "is_child": False,
+                "ref": ref,
+                "refPath": refPath,
+            }
+            elems.append(tmp)
 
         return elems
 
     def extract_schema_object(self, param_object, level=0, parent=None):
         elems = []
-
-        if level > 3:
-            return elems
 
         if "properties" in param_object:
             for k, v in param_object["properties"].items():
@@ -264,7 +273,22 @@ class CrawlSchema:
                     v_type = "ezapi_ref"
 
                 if v_type:
-                    if v_type not in ("array", "object", "ezapi_ref"):
+                    if v_type == "ezapi_ref":
+                        ref = v["ezapi_ref"].split("/")[-1]
+                        refPath = v["ezapi_ref"]
+
+                        tmp = {
+                            "name": k,
+                            "type": v_type,
+                            "level": level,
+                            "parent": parent,
+                            "is_child": False,
+                            "ref": ref,
+                            "refPath": refPath,
+                        }
+                        elems.append(tmp)
+
+                    elif v_type not in ("array", "object", "ezapi_ref"):
                         tmp = {
                             "name": k,
                             "type": v_type,
@@ -272,60 +296,61 @@ class CrawlSchema:
                             "required": v.get("required"),
                             "level": level,
                             "parent": parent,
+                            "is_child": True,
                         }
-
-                        if tmp["parent"] == None:
-                            tmp["parent"] = self.schema_name
-
                         elems.append(tmp)
 
                     elif v_type == "object" and "properties" in v:
-                        new_par = ((parent or "") + "_" + k).strip("_")
-                        tmp = self.extract_schema_object(v, level + 1, new_par)
+                        tmp = {
+                            "name": k,
+                            "type": v_type,
+                            "format": v.get("format"),
+                            "required": v.get("required"),
+                            "level": level,
+                            "parent": parent,
+                            "is_child": False,
+                        }
+                        elems.append(tmp)
 
-                        if tmp:
-                            elems += tmp
+                        new_par = ((parent or "") + "." + k).strip(".")
+                        res = self.extract_schema_object(v, level + 1, new_par)
+                        if res:
+                            elems += res
 
                     elif v_type == "array" and "items" in v:
-                        new_par = ((parent or "") + "_" + k).strip("_")
+                        further = True
+                        further_type = None
 
-                        tmp = self.extract_schema_array(
-                            v["items"], level + 1, new_par, k
-                        )
+                        if "type" in v["items"] and v["items"]["type"] not in (
+                            "object",
+                            "array",
+                        ):
+                            further = False
+                            further_type = v["items"]["type"]
 
-                        if tmp:
-                            elems += tmp
+                        tmp = {
+                            "name": k,
+                            "type": v_type,
+                            "format": v.get("format"),
+                            "required": v.get("required"),
+                            "level": level,
+                            "parent": parent,
+                            "is_child": not further,
+                            "sub_type": further_type,
+                        }
+                        elems.append(tmp)
 
-                    elif (
-                        v_type == "ezapi_ref"
-                    ):  # todo: Reference type not handled currently
-                        pass
+                        if further:
+                            new_par = ((parent or "") + "." + k).strip(".")
+                            res = self.extract_schema_array(
+                                v["items"], level + 1, new_par, k
+                            )
+                            if res:
+                                elems += res
 
-        return elems
+            return elems
 
-    def get_refs(self, param_object, schema_name):  # level 0 only
-        refs = []
-
-        if "properties" in param_object:
-            for k, v in param_object["properties"].items():
-                v_type = v.get("type")
-
-                if not v_type and "ezapi_ref" in v:
-                    v_type = "ezapi_ref"
-
-                if v_type in ("array", "object", "ezapi_ref"):
-                    tmp = {"name": k, "type": v_type}
-
-                    if v_type == "ezapi_ref":
-                        tmp["ref"] = v["ezapi_ref"]
-                    else:
-                        tmp["ref"] = schema_name + "." + k
-
-                    refs.append(tmp)
-
-        return refs
-
-    def extract_schema_attrs(self, param_schema, schema_name):
+    def extract_schema_attrs(self, param_schema):
         if "allOf" in param_schema:
             all_schemas = param_schema["allOf"]
 
@@ -335,13 +360,11 @@ class CrawlSchema:
         else:
             st = param_schema.get("type")
             if st == "object" and "properties" in param_schema:
-                tmp = self.extract_schema_object(param_schema)
-                refs = self.get_refs(param_schema, schema_name)
+                res = self.extract_schema_object(param_schema)
 
-                self.elements += tmp
-                self.refs += refs
+                self.elements += res
 
-        return self.elements, self.refs
+        return self.elements
 
 
 def crawl_schema(schemas):
@@ -352,10 +375,14 @@ def crawl_schema(schemas):
         schema_name = k
         schema_description = v.get("description")
 
-        cs = CrawlSchema(schema_name)
-        elements, refs = cs.extract_schema_attrs(v, schema_name)
+        cs = SchemaCrawler(schema_name)
+        elements = cs.extract_schema_attrs(v)
 
-        if len(elements) > 0:  # filter out combination of other schemas
+        original_elements = [
+            x for x in elements if x["type"] != "ezapi_ref" and x["level"] == 0
+        ]
+
+        if len(original_elements) > 0:  # filter out combination of other schemas
             schema_size, schema_depth = ss.get_schema_size(v)
 
             crawled_schema.append(
@@ -365,7 +392,6 @@ def crawl_schema(schemas):
                     "size": schema_size,
                     "max_depth": schema_depth,
                     "attributes": elements,
-                    "references": refs,
                 }
             )
 

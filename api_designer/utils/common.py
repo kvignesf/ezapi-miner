@@ -6,7 +6,55 @@ import time
 
 from itertools import groupby
 
+# import spacy
+# nlp = spacy.load("en_core_web_sm")
+
 match_difctionary = {"insured": "claimant", "sex": "gender", "relationship": "roles"}
+
+
+# import enchant
+# d = enchant.Dict("en_US")
+# d.check("Hello")
+
+import splitter
+
+
+def word_split(word):
+    try:
+        word = word.lower()
+        res = splitter.split(word)
+        if not res:
+            return [word]
+        else:
+            is_valid_split = True
+
+            for x in res:
+                if len(x) == 1 or not x.islower():
+                    is_valid_split = False
+
+            if is_valid_split:
+                return res
+            else:
+                return [word]
+    except:
+        return [word]
+
+
+# def get_root_words(wordlist):
+#     try:
+#         rootwords = []
+#         tokens = nlp(" ".join(wordlist))
+#         for tok in tokens:
+#             rootwords.append(tok.lemma_)
+#         return rootwords
+#     except:
+#         return wordlist
+
+
+def average_list(lst):
+    if len(lst) > 0:
+        return sum(lst) / len(lst)
+    return None
 
 
 def is_camel_case(s):
@@ -40,15 +88,41 @@ def special_character_split(s):
     return res
 
 
-def string_split(s):
+def string_split_new(s):
+    ret = None
     if is_camel_case(s):
-        return camel_case_split(s)
-    return special_character_split(s)
+        ret = camel_case_split(s)
+    ret = special_character_split(s)
+
+    # word splitting
+    ret2 = []
+    for r in ret:
+        tmp = word_split(r)
+        if tmp:
+            ret2 += tmp
+        else:
+            ret2 += r
+
+    # if len(ret) != len(ret2):
+    #     print("  After splitter - ", s, ret, ret2)
+    return ret2
 
 
+def string_split(s):
+    ret = None
+    if is_camel_case(s):
+        ret = camel_case_split(s)
+    ret = special_character_split(s)
+
+    return ret
+
+
+# todo: print all abreviation matches and improve the logic
 def check_abbreviation(word1, word2):
+    abbr_score = 0
+
     if len(word1) < 3 or len(word2) < 3:
-        return False
+        return abbr_score
 
     if (
         not is_snake_case(word1)
@@ -62,9 +136,16 @@ def check_abbreviation(word1, word2):
         pattern = ".*".join(word2.lower())
         res2 = re.match("^" + pattern, word1.lower())
 
-        return res1 is not None or res2 is not None
+        if res1 or res2:
+            abbr_score += 0.6
 
-    return False
+            if word1[0] == word2[0] and word1[-1] == word2[-1]:
+                abbr_score += 0.15
+
+    return abbr_score
+
+    # if check_abbreviation(word1, word2) and (len(word1) + len(word2) >= 10):
+    #     return min(0.75, (total_len - 2) / total_len)
 
 
 def osaDistance(s1, s2, transposition=True):
@@ -129,11 +210,9 @@ def word_match(word1, word2):
     if len(word1) > 4 and len(word2) > 4 and osaDistance(word1, word2) <= 1:
         return (total_len - 1) / total_len
 
-    if check_abbreviation(word1, word2) and (len(word1) + len(word2) >= 10):
-        return min(0.75, (total_len - 2) / total_len)
-
-    # Root word match
-    # Similarity match
+    abbr_score = check_abbreviation(word1, word2)
+    if abbr_score > 0:
+        return abbr_score
 
     return 0
 
@@ -159,7 +238,64 @@ def get_common_word(items):
     return common
 
 
-# todo: multiple prefix, suffix support
+# Input - list of words
+# Output - Joint string (snake-cased), (splitted word) list
+def transform_naming(wordlist, remove=True):
+    num_words = len(wordlist)
+
+    prefix_suffix_exist = True
+    prefix_list = []
+    suffix_list = []
+
+    ret = []
+
+    for i in range(num_words):
+        ss = string_split_new(wordlist[i])
+        ret.append(ss)
+
+        if len(ss) >= 2:
+            prefix_list.append(ss[0])
+            suffix_list.append(ss[-1])
+        else:
+            prefix_suffix_exist = False
+
+    prefix = None
+    suffix = None
+
+    if prefix_suffix_exist:  # More than 70%
+        prefix = get_common_word(prefix_list)
+        suffix = get_common_word(suffix_list)
+
+    if remove:
+        for i, r in enumerate(ret):
+            if prefix and suffix and r[0] == prefix and r[1] == suffix:
+                tmp = r[1:-1]
+            elif prefix and r[0] == prefix:
+                tmp = r[1:]
+            elif suffix and r[-1] == suffix:
+                tmp = r[:-1]
+            else:
+                tmp = r
+
+            ret[i] = ("_".join(r), tmp)
+
+            # root_words = get_root_words(tmp)
+            # root_words = tmp
+            # transformed_wordlist = list(zip(tmp, root_words))
+            # ret[i] = ("_".join(r), transformed_wordlist)
+    else:
+        for i, r in enumerate(ret):
+
+            ret[i] = ("_".join(r), r)
+
+            # root_words = get_root_words(r)
+            # root_words = r
+            # transformed_wordlist = list(zip(r, root_words))
+            # ret[i] = ("_".join(r), transformed_wordlist)
+
+    return ret
+
+
 def separate_prefix_suffix(
     wordlist, remove=True
 ):  # returns snake-case string and wordlist
@@ -172,7 +308,7 @@ def separate_prefix_suffix(
     ret = []
 
     for i in range(num_words):
-        ss = string_split(wordlist[i])
+        ss = string_split_new(wordlist[i])
         ret.append(ss)
 
         if len(ss) >= 2:

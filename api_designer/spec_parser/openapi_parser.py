@@ -1,6 +1,6 @@
 import os, sys
-from api_designer.utils.schema_manager import crawl_schema
 
+from api_designer.spec_parser.schema_manager import crawl_schema
 from api_designer import config
 from api_designer.utils.common import *
 import os, sys
