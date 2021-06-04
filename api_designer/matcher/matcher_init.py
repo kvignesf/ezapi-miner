@@ -166,6 +166,7 @@ def filter_matches(all_documents):
 
 
 def solve_matching(schemas_data, tables_data, projectid):
+    print("Matching Started ", round(time.time(), 1))
     slen = [len(x["name2"][1]) for x in schemas_data]
     tlen = [len(x["name2"][1]) for x in tables_data]
 
@@ -178,7 +179,6 @@ def solve_matching(schemas_data, tables_data, projectid):
 
     for sd in schemas_data:
         for td in tables_data:
-            print("*Matching - ", sd["name"], td["table"], time.time())
             sd_name = sd["name2"]
             td_name = td["name2"]
 
@@ -241,64 +241,74 @@ def solve_matching(schemas_data, tables_data, projectid):
 
     all_documents = filter_matches(all_documents)
     all_documents = [x for x in all_documents if len(x["attributes"]) > 0]
+    print("Matching Completed ", round(time.time(), 1))
     return all_documents
 
 
 def spec_ddl_matcher(projectid, db):
+    print("Request Receievd ", round(time.time(), 1))
     schemas_data = db.schemas.find({"projectid": projectid})
+    print("Schemas Data Fetched ", round(time.time(), 1))
     schemas_data = list(schemas_data)
     schemas_data = [s["data"] for s in schemas_data]
 
     tables_data = db.tables.find({"projectid": projectid})
+    print("Tables Data Fetched ", round(time.time(), 1))
     tables_data = list(tables_data)
 
     schemas_data = transform_schema_data(schemas_data)
+    print("Schemas Data Transformed ", round(time.time(), 1))
     tables_data = transform_tables_data(tables_data)
+    print("Tables Data Transformed ", round(time.time(), 1))
 
     all_documents = solve_matching(schemas_data, tables_data, projectid)
 
+    print("Inserting into DB ", round(time.time(), 1))
     config.store_bulk_document(match_collection, all_documents, db)
 
     # ---------- CSV Generation Part ----------
-    # import csv
+    """
+    import csv
 
-    # csv_headers = [
-    #     "Schema",
-    #     "Table",
-    #     "Name Score",
-    #     "Attributes Score",
-    #     "Final Score",
-    #     "Match Type (Schema)",
-    #     "Schema Attribute",
-    #     "Table Attribute",
-    #     "Match Score",
-    #     "Match Level",
-    #     "Match Type (Attribute)",
-    # ]
+    csv_headers = [
+        "Schema",
+        "Table",
+        "Name Score",
+        "Attributes Score",
+        "Final Score",
+        "Match Type (Schema)",
+        "Schema Attribute",
+        "Table Attribute",
+        "Match Score",
+        "Match Level",
+        "Match Type (Attribute)",
+    ]
 
-    # combined_csv = open("match_combined_new.csv", "w")
-    # combined_csv_write = csv.writer(combined_csv)
-    # combined_csv_write.writerow(csv_headers)
+    combined_csv = open("match_combined_new.csv", "w")
+    combined_csv_write = csv.writer(combined_csv)
+    combined_csv_write.writerow(csv_headers)
 
-    # for doc in all_documents:
-    #     row = [
-    #         doc["schema"],
-    #         doc["table"],
-    #         doc["name_match_score"],
-    #         doc["attributes_match_score"],
-    #         doc["final_score"],
-    #         doc["match_type"],
-    #     ]
+    for doc in all_documents:
+        row = [
+            doc["schema"],
+            doc["table"],
+            doc["name_match_score"],
+            doc["attributes_match_score"],
+            doc["final_score"],
+            doc["match_type"],
+        ]
 
-    #     for attr in doc["attributes"]:
-    #         tmp = row + [
-    #             attr["schema_attribute"],
-    #             attr["table_attribute"],
-    #             attr["match_score"],
-    #             attr["match_level"],
-    #             attr["match_type"],
-    #         ]
-    #         combined_csv_write.writerow(tmp)
+        for attr in doc["attributes"]:
+            tmp = row + [
+                attr["schema_attribute"],
+                attr["table_attribute"],
+                attr["match_score"],
+                attr["match_level"],
+                attr["match_type"],
+            ]
+            combined_csv_write.writerow(tmp)
     # ---------- CSV Part Ended ----------
+    """
 
+    print("Response", round(time.time(), 1))
     return {"success": True, "message": "ok", "status": 200}
