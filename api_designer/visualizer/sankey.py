@@ -1,11 +1,12 @@
 from api_designer import config
+from api_designer.visualizer.element_scoring import enhance_attributes
 
 
 def get_response_status(all_paths, path, method):
     res = []
 
     for p in all_paths:
-        if p["endpoint"] == path and p["method"] == methood:
+        if p["endpoint"] == path and p["method"] == method:
             responseData = p["responseData"]
 
             for resp in responseData:
@@ -15,10 +16,12 @@ def get_response_status(all_paths, path, method):
     return res
 
 
-def process_sankey_visualizer(api_design_id, db):  # tags can be multiple
-    try:
-        all_elements = db.elements.find({"api_design_id": api_design_id})
-        all_paths = db.paths.find({"api_ops_id": api_design_id})
+def process_sankey_visualizer(projectid, db):  # tags can be multiple
+    # try:
+    score_result = enhance_attributes(projectid, db)
+    if score_result:
+        all_elements = db.elements.find({"projectid": projectid})
+        all_paths = db.paths.find({"projectid": projectid})
 
         all_elements = list(all_elements)[0]
         all_paths = list(all_paths)
@@ -64,8 +67,8 @@ def process_sankey_visualizer(api_design_id, db):  # tags can be multiple
                     )
 
                     for spec in elem_spec:
-                        spec_summary = spec["summary"]
-                        spec_description = spec["description"]
+                        spec_summary = spec["summary"] or "summary"
+                        spec_description = spec["description"] or "desc"
                         spec_method = spec["method"]
                         spec_path = spec["endpoint"]
 
@@ -86,7 +89,7 @@ def process_sankey_visualizer(api_design_id, db):  # tags can be multiple
 
                         # business function -> element
                         graph_data[elem_tag]["LINKS"].append(
-                            {"source": bfunction_name, "target": elem_name, "value": 3}
+                            {"source": bfunction_name, "target": elem_name, "value": 3,}
                         )
 
                         # endpoint
@@ -179,17 +182,27 @@ def process_sankey_visualizer(api_design_id, db):  # tags can be multiple
             )
 
         sankey_collection = "sankey"
-        sankey_document = {"api_design_id": api_design_id, "data": sankey_data}
+        sankey_document = {
+            "projectid": projectid,
+            "api_ops_id": projectid,
+            "data": sankey_data,
+        }
         config.store_document(sankey_collection, sankey_document, db)
 
         res = {"status": 200, "success": True, "message": "ok"}
-
-    except Exception as e:
+    else:
         res = {
             "status": 500,
-            "errorType": type(e).__name__,
-            "error": str(e),
-            "message": "Some error has occured in visualizing data",
             "success": False,
+            "message": "Failed in elements scoring",
         }
+
+    # except Exception as e:
+    #     res = {
+    #         "status": 500,
+    #         "errorType": type(e).__name__,
+    #         "error": str(e),
+    #         "message": "Some error has occured in visualizing data",
+    #         "success": False,
+    #     }
     return res
