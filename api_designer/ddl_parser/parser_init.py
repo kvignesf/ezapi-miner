@@ -56,7 +56,6 @@ def remove_prefix(text, prefix):
 
 
 def extract_table_data(text):
-    print("Extracting table data - ", text)
     schema_name = None
     table_name = None
 
