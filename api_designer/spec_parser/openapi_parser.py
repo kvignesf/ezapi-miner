@@ -1,5 +1,7 @@
 import os, sys
 
+from requests.api import request
+
 from api_designer.utils.schema_manager import crawl_schema
 from api_designer import config
 from api_designer.utils.common import *
@@ -14,12 +16,14 @@ _SCHEMA_FIELDS = [
     "enum",
     "default",
     "pattern",
+    "example",
     "maximum",
     "minimum",
     "minLength",
     "maxLength",
     "minItems",
     "maxItems",
+    "allowEmptyValue",
 ]
 _PARAMETER_TYPES = set(["path", "query", "header", "cookie", "body", "formData"])
 
@@ -29,7 +33,6 @@ def extract_path_data(path_data):
 
     for path, path_spec in path_data.items():
         if path[0] == "/":
-
             for http_method, http_method_specs in path_spec.items():
                 if http_method in _HTTP_VERBS:
                     curr_path = {}
@@ -37,30 +40,30 @@ def extract_path_data(path_data):
                     curr_path["method"] = http_method
 
                     method_data = {
-                        key: http_method_specs[key]
+                        key: http_method_specs.get(key)
                         for key in http_method_specs.keys()
                         & {"tags", "summary", "description", "operationId"}
                     }
 
+                    if "operationId" not in method_data:
+                        method_data["operationId"] = http_method + " " + path
+
                     curr_path = merge_dict(curr_path, method_data)  # common.py
-                all_paths.append(curr_path)
+                    all_paths.append(curr_path)
     return all_paths
 
 
 def extract_param_data(param, components):
     if "ezapi_ref" in param:
-        try:
-            param_ref = param["ezapi_ref"]
+        param_ref = param["ezapi_ref"]
 
-            # Ignore '#', 'components' prefix
-            param_ref = param_ref.split("/")[2:]
+        # Ignore ('#', 'components') prefix
+        # example - #/components/parameters/aflac-processing-style
+        param_ref = param_ref.split("/")[2:]
 
-            param = components
-            for pr in param_ref:
-                param = param[pr]
-        except Exception as e:
-            print("*Error - Parameter dereference - ", str(e))
-            param = None
+        param = components
+        for pr in param_ref:
+            param = param[pr]
 
     param_data = {}
     param_name = param["name"]  # required field
@@ -79,11 +82,20 @@ def extract_param_data(param, components):
         if f in param_schema:
             param_data[param_name][f] = param_schema.get(f)
 
-    if "type" in param_schema and param_schema["type"] == "array":
-        pass  # todo
+    if "explode" in param:
+        param_data[param_name]["explode"] = param["explode"]  # query - form
 
-    elif "type" in param_schema and param_schema["type"] == "object":
-        pass  # todo
+    # In case of explode = True
+    # Reference - petstore /findByTags /findByStatus
+    if (
+        "type" in param_schema
+        and param_schema["type"] == "array"
+        and "items" in param_schema
+    ):
+        param_data[param_name]["items"] = param_schema.get("items")
+
+    # elif "type" in param_schema and param_schema["type"] == "object":
+    #     pass  # todo
 
     return param_in, param_data
 
@@ -91,6 +103,10 @@ def extract_param_data(param, components):
 def extract_body_content(body_content):
     # check for 'type' or 'ezapi_ref' for dereferencing
     return body_content["schema"]
+
+
+def extract_form_content(form_content):
+    return form_content["schema"]
 
 
 def extract_request_body(request_body, components):
@@ -102,16 +118,27 @@ def extract_request_body(request_body, components):
         for br in body_ref:
             request_body = request_body[br]
 
-    body_content = request_body["content"]
-    if "application/json" in body_content:
-        body_content = body_content["application/json"]
-    elif "application/x-www-form-urlencoded" in body_content:
-        body_content = body_content["application/x-www-form-urlencoded"]
-    elif "application/octet-stream" in body_content:
-        body_content = body_content["application/octet-stream"]
+    content = request_body["content"]
 
-    body_content = extract_body_content(body_content)
-    return body_content
+    body_content = None
+    form_content = None
+
+    if "application/json" in content:
+        body_content = content["application/json"]
+    elif "application/x-www-form-urlencoded" in content:
+        body_content = content["application/x-www-form-urlencoded"]
+    elif "application/octet-stream" in content:
+        form_content = content["application/octet-stream"]
+
+    if body_content:
+        body_content = extract_body_content(body_content)
+    elif form_content:
+        form_content = extract_form_content(form_content)
+
+    body_content = body_content or []
+    form_content = form_content or []
+
+    return body_content, form_content
 
 
 def extract_request_data(path_data, path, method, components):
@@ -122,6 +149,9 @@ def extract_request_data(path_data, path, method, components):
     parameters = path_data[path][method].get("parameters", [])
     request_body = path_data[path][method].get("requestBody")
 
+    common_parameters = path_data[path].get("parameters", [])
+    parameters += common_parameters
+
     # A parameter data can be in path, query, header, formData, or cookie
     for param in parameters:
         param_in, param_data = extract_param_data(param, components)
@@ -130,7 +160,10 @@ def extract_request_data(path_data, path, method, components):
             all_request_params[param_in].append(param_data)
 
     if request_body:
-        all_request_params["body"] = extract_request_body(
+        (
+            all_request_params["body"],
+            all_request_params["formData"],
+        ) = extract_request_body(
             request_body, components
         )  # may contains ezapi_ref
 
@@ -160,7 +193,7 @@ def extract_response_data(path_data, path, method, components):
         }
 
         if obj["content"]:
-            obj["content"] = obj["content"].get("application/json")
+            obj["content"] = obj["content"].get("application-json")
 
             if obj["content"]:
                 obj["content"] = obj["content"].get("schema")
@@ -198,6 +231,8 @@ def parse_openapi(jsondata, projectid, spec_filename, db):
             response_data = extract_response_data(
                 path_data, endpoint, method, components_data
             )
+
+            print(endpoint, method, request_data["path"])
 
             # Extract all parameters
             for param in request_data["path"] + request_data["query"]:
