@@ -264,10 +264,9 @@ def spec_ddl_matcher(projectid, db):
     all_documents = solve_matching(schemas_data, tables_data, projectid)
 
     print("Inserting into DB ", round(time.time(), 1))
-    config.store_bulk_document(match_collection, all_documents, db)
+    # config.store_bulk_document(match_collection, all_documents, db)
 
     # ---------- CSV Generation Part ----------
-    """
     import csv
 
     csv_headers = [
@@ -308,7 +307,6 @@ def spec_ddl_matcher(projectid, db):
             ]
             combined_csv_write.writerow(tmp)
     # ---------- CSV Part Ended ----------
-    """
 
     print("Response", round(time.time(), 1))
     return {"success": True, "message": "ok", "status": 200}

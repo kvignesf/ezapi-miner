@@ -9,7 +9,7 @@ from itertools import groupby
 # import spacy
 # nlp = spacy.load("en_core_web_sm")
 
-match_difctionary = {"insured": "claimant", "sex": "gender", "relationship": "roles"}
+match_dictionary = {"insured": "claimant", "sex": "gender", "relationship": "roles"}
 
 
 # import enchant
@@ -202,8 +202,8 @@ def word_match(word1, word2):
     if word1 == word2:
         return 1
 
-    if (word1 in match_difctionary and match_difctionary[word1] == word2) or (
-        word2 in match_difctionary and match_difctionary[word2] == word1
+    if (word1 in match_dictionary and match_dictionary[word1] == word2) or (
+        word2 in match_dictionary and match_dictionary[word2] == word1
     ):
         return 1
 
@@ -277,7 +277,7 @@ def transform_naming(wordlist, remove=True):
             else:
                 tmp = r
 
-            ret[i] = ("_".join(r), tmp)
+            ret[i] = ("_".join(tmp), tmp)
 
             # root_words = get_root_words(tmp)
             # root_words = tmp
