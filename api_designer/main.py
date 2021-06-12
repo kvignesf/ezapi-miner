@@ -3,6 +3,9 @@ from api_designer import config
 from api_designer.spec_parser.parser_init import parse_openapi_json
 from api_designer.ddl_parser.parser_init import parse_ddl_file
 from api_designer.matcher.matcher_init import spec_ddl_matcher
+from api_designer.spec_generator.generator_init import generate_spec
+from api_designer.artefacts.artefacts_init import generate_artefacts
+from api_designer.visualizer.sankey import process_sankey_visualizer
 
 
 class EzAPIModels:
@@ -24,4 +27,16 @@ class EzAPIModels:
 
     def matcher(self):
         ret = spec_ddl_matcher(self.projectid, self.db)
+        return ret
+
+    def spec_generator(self):
+        ret = generate_spec(self.projectid, self.db)
+        return ret
+
+    def artefacts_geerator(self):
+        ret = generate_artefacts(self.projectid, self.db)
+        return ret
+
+    def sankey_generator(self):
+        ret = process_sankey_visualizer(self.projectid, self.db)
         return ret

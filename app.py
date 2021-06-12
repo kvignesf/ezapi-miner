@@ -8,59 +8,10 @@ import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
 
-from apiops.main import APIOPSModel
 from api_designer.main import EzAPIModels
 
 app = Flask(__name__)
 CORS(app, support_credentials=True)
-
-
-def run_apiops_model(filepath, filename, api_ops_id, dbname):
-    apiops_obj = APIOPSModel(filepath, filename, api_ops_id, dbname)
-    apiops_obj.get_db_instance()
-
-    parser_result = apiops_obj.parse_swagger_specs()
-    if "success" in parser_result and parser_result["success"]:
-
-        scorer_result = apiops_obj.score_request_elements()
-        if "success" in scorer_result and scorer_result["success"]:
-
-            visualizer_result = apiops_obj.prepare_sankey_data()
-            if "success" in visualizer_result and visualizer_result["success"]:
-
-                tester_result = apiops_obj.generate_test_data()
-                if "success" in tester_result and tester_result["success"]:
-
-                    ret = {
-                        "success": True,
-                        "status": 200,
-                        "message": "ok",
-                        "stage": "tester",
-                        "data": {
-                            "api_ops_id": api_ops_id,
-                            "test_count": tester_result["data"]["testcases_count"],
-                            "api_summary": parser_result["data"]["api_summary"],
-                        },
-                    }
-
-                else:
-                    ret = tester_result
-                    ret["stage"] = "visualizer"
-
-            else:
-                ret = visualizer_result
-                ret["stage"] = "scorer"
-
-        else:
-            ret = scorer_result
-            ret["stage"] = "parser"
-
-    else:
-        ret = parser_result
-        ret["stage"] = "not scored"
-
-    apiops_obj.client.close()
-    return ret
 
 
 @app.route("/")
@@ -68,28 +19,26 @@ def home():
     return "Hello EzAPI"
 
 
-@app.route("/apiops_model", methods=["POST"])
-def apiops_model():
-    f = request.files["file"]
-    filename = f.filename
+@app.route("/specgen", methods=["POST"])
+def specgen_model():
+    print("Received")
+    request_data = request.get_json()
+    projectid = str(request_data.get("projectid", ""))
 
-    dbname = str(request.form["dbname"])
-    api_ops_id = str(request.form["api_ops_id"])
+    if projectid:
+        model = EzAPIModels(projectid)
+        model.set_db_instance()
+        ret = model.spec_generator()
+        model.client.close()
 
-    if not os.path.exists("./uploads"):
-        os.makedirs("./uploads")
+    else:
+        ret = {
+            "status": 400,
+            "success": False,
+            "message": "Some parameters are missing",
+        }
 
-    filepath = "./uploads/" + filename
-    f.save(filepath)
-
-    res = run_apiops_model(filepath, filename, api_ops_id, dbname)
-
-    try:
-        os.remove(filepath)
-    except Exception as e:
-        print("Error deleting Uploaded File")
-
-    return jsonify(res)
+    return jsonify(ret)
 
 
 @app.route("/matcher", methods=["POST"])
@@ -181,6 +130,69 @@ def spec_parser_model():
         os.remove(spec_path)
     except Exception as e:
         print("Error deleting Uploaded File")
+
+    return jsonify(ret)
+
+
+@app.route("/spec_generator", methods=["POST"])
+def spec_generator_model():
+    request_data = request.get_json()
+    projectid = str(request_data.get("projectid", ""))
+
+    if projectid:
+        model = EzAPIModels(projectid)
+        model.set_db_instance()
+        ret = model.spec_generator()
+        model.client.close()
+
+    else:
+        ret = {
+            "status": 400,
+            "success": False,
+            "message": "Some parameters are missing",
+        }
+
+    return jsonify(ret)
+
+
+@app.route("/artefacts", methods=["POST"])
+def artefacts_model():
+    request_data = request.get_json()
+    projectid = str(request_data.get("projectid", ""))
+
+    if projectid:
+        model = EzAPIModels(projectid)
+        model.set_db_instance()
+        ret = model.artefacts_geerator()
+        model.client.close()
+
+    else:
+        ret = {
+            "status": 400,
+            "success": False,
+            "message": "Some parameters are missing",
+        }
+
+    return jsonify(ret)
+
+
+@app.route("/sankey", methods=["POST"])
+def sankey_model():
+    request_data = request.get_json()
+    projectid = str(request_data.get("projectid", ""))
+
+    if projectid:
+        model = EzAPIModels(projectid)
+        model.set_db_instance()
+        ret = model.sankey_generator()
+        model.client.close()
+
+    else:
+        ret = {
+            "status": 400,
+            "success": False,
+            "message": "Some parameters are missing",
+        }
 
     return jsonify(ret)
 
