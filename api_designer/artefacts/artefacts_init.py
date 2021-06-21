@@ -191,6 +191,9 @@ class GenerateData:
         return ret
 
     def generate_request_data(self, request_data):
+        if "body" not in request_data:
+            request_data["body"] = {}
+
         payload = {
             "path": self.generate_param_data(request_data["path"]),
             "query": self.generate_param_data(request_data["query"]),
@@ -282,7 +285,12 @@ def get_virtual_collection_data(testdata):
 
 
 def generate_artefacts(projectid, db):
-    paths = db.paths.find({"projectid": projectid})
+    is_already_exist = db.testcases.find({"projectid": projectid})
+    is_already_exist = list(is_already_exist)
+    if is_already_exist and len(is_already_exist) > 0:
+        return {"success": False, "message": "Already Exist", "status": 500}
+
+    paths = db.operationdatas.find({"projectid": projectid})
     components = db.components.find_one({"projectid": projectid})
 
     paths = [x["data"] for x in paths]
