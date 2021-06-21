@@ -203,8 +203,6 @@ def extract_response_data(path_data, path, method, components):
 
 
 def parse_openapi(jsondata, projectid, spec_filename, db):
-    print("Inside parsing openapi 3.0")
-
     try:
         fullspec_collection = "raw_spec"
         fullspec_document = {
@@ -231,8 +229,6 @@ def parse_openapi(jsondata, projectid, spec_filename, db):
             response_data = extract_response_data(
                 path_data, endpoint, method, components_data
             )
-
-            print(endpoint, method, request_data["path"])
 
             # Extract all parameters
             for param in request_data["path"] + request_data["query"]:
