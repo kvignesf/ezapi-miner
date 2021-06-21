@@ -1,0 +1,25 @@
+image: node:14.14.0-alpine3.12
+include:
+  project: 'ezapi_poc/infra_poc'
+  file: 
+    - 'sast-whitesource-python.yaml'
+    - 'buildpython.yml'
+    - 'deploytestpython.yml'
+stages:
+  - whitesource-test
+  - build
+  - deploy
+whitesource-test:
+  stage: whitesource-test
+  image: ubuntu:20.04
+  extends: .sast-whitesource  
+build:
+  stage: build
+  extends: .build
+deploy:
+  stage: deploy
+  image: alpine 
+  extends: .deploy-test1
+  only: 
+    - refactoredv3
+
