@@ -1,4 +1,5 @@
 from api_designer import config
+from api_designer.ddl_parser import dtmapper
 from pprint import pprint
 import re
 
@@ -89,6 +90,9 @@ def extract_column_values(text):
         column_values["name"] = name
         column_values["datatype"] = dt
         column_values["valueconstraint"] = "null"
+
+        openapi_type = dtmapper.convert_sql_server_dtype(dt)
+        column_values["openapi"] = openapi_type
 
         if "identity(1,1)" in text:
             column_values["serial"] = True
