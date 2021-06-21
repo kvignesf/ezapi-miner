@@ -285,69 +285,76 @@ def get_virtual_collection_data(testdata):
 
 
 def generate_artefacts(projectid, db):
-    is_already_exist = db.testcases.find({"projectid": projectid})
-    is_already_exist = list(is_already_exist)
-    if is_already_exist and len(is_already_exist) > 0:
-        return {"success": False, "message": "Already Exist", "status": 500}
+    print("Inside Artefacts Generator")
+    try:
+        is_already_exist = db.testcases.find({"projectid": projectid})
+        is_already_exist = list(is_already_exist)
+        if is_already_exist and len(is_already_exist) > 0:
+            return {"success": False, "message": "Already Exist", "status": 500}
 
-    paths = db.operationdatas.find({"projectid": projectid})
-    components = db.components.find_one({"projectid": projectid})
+        paths = db.operationdatas.find({"projectid": projectid})
+        components = db.components.find_one({"projectid": projectid})
 
-    paths = [x["data"] for x in paths]
-    components = components["data"]
-    schemas = components["schemas"]
+        paths = [x["data"] for x in paths]
+        components = components["data"]
+        schemas = components["schemas"]
 
-    gd = GenerateData(schemas)
+        gd = GenerateData(schemas)
 
-    all_testcases = []
-    test_count = 0
+        all_testcases = []
+        test_count = 0
 
-    for path in paths:
-        testdata = {
-            "projectid": projectid,
-            "api_ops_id": projectid,
-            "endpoint": path.get("endpoint"),
-            "method": path.get("method"),
-            "resource": path.get("tags", []),
-            "operation_id": path.get("operationId"),
-            "test_case_name": path.get("operationId") + "__P",
-            "description": "ok",
-            "test_case_type": "F",
-            "delete": False,
-            "inputData": gd.generate_request_data(path["requestData"]),
-            "status": None,
-            "assertionData": None,
-            "testcaseId": None,
-        }
+        for path in paths:
+            testdata = {
+                "projectid": projectid,
+                "api_ops_id": projectid,
+                "endpoint": path.get("endpoint"),
+                "method": path.get("method"),
+                "resource": path.get("tags", []),
+                "operation_id": path.get("operationId"),
+                "test_case_name": path.get("operationId") + "__P",
+                "description": "ok",
+                "test_case_type": "F",
+                "delete": False,
+                "inputData": gd.generate_request_data(path["requestData"]),
+                "status": None,
+                "assertionData": None,
+                "testcaseId": None,
+            }
 
-        for resp in path["responseData"]:
-            testdata["status"] = resp["status_code"]
-            testdata["assertionData"] = gd.generate_body_data(resp["content"])
-            testdata["testcaseId"] = "test" + str(1 + test_count)
+            for resp in path["responseData"]:
+                testdata["status"] = resp["status_code"]
+                testdata["assertionData"] = gd.generate_body_data(resp["content"])
+                testdata["testcaseId"] = "test" + str(1 + test_count)
 
-            test_copy = testdata.copy()
+                test_copy = testdata.copy()
 
-            if resp["status_code"] == "default" or resp["status_code"].startswith("2"):
-                test_copy = match_request_response_data(test_copy)
+                if resp["status_code"] == "default" or resp["status_code"].startswith(
+                    "2"
+                ):
+                    test_copy = match_request_response_data(test_copy)
 
-            elif resp["status_code"] == "404":  # not found
-                tmp = test_copy["endpoint"].split("/")
-                for i, t in enumerate(tmp):
-                    tmp[i] = "abc" + tmp[i]
-                    break
-                test_copy["endpoint"] = "/".join(tmp)
-                test_copy["description"] = "uri not found"
+                elif resp["status_code"] == "404":  # not found
+                    tmp = test_copy["endpoint"].split("/")
+                    for i, t in enumerate(tmp):
+                        tmp[i] = "abc" + tmp[i]
+                        break
+                    test_copy["endpoint"] = "/".join(tmp)
+                    test_copy["description"] = "uri not found"
 
-            elif resp["status_code"] == "405":  # method not allowed
-                test_copy["method"] = "head"
-                test_copy["description"] = "method not allowed"
+                elif resp["status_code"] == "405":  # method not allowed
+                    test_copy["method"] = "head"
+                    test_copy["description"] = "method not allowed"
 
-            all_testcases.append(test_copy)
-            test_count += 1
+                all_testcases.append(test_copy)
+                test_count += 1
 
-    virtual_tests = [get_virtual_collection_data(x) for x in all_testcases]
+        virtual_tests = [get_virtual_collection_data(x) for x in all_testcases]
 
-    config.store_bulk_document(TESTCASE_COLLECTION, all_testcases, db)
-    config.store_bulk_document(VIRTUAL_COLLECTION, virtual_tests, db)
+        config.store_bulk_document(TESTCASE_COLLECTION, all_testcases, db)
+        config.store_bulk_document(VIRTUAL_COLLECTION, virtual_tests, db)
 
-    return {"success": True, "message": "ok", "status": 200}
+        return {"success": True, "message": "ok", "status": 200}
+    except Exception as e:
+        print("Artefacts Generator Error - ", str(e))
+        return {"success": False, "message": str(e), "status": 500}

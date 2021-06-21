@@ -426,35 +426,40 @@ class SpecGenerator:
 
 
 def generate_spec(projectid, db):
+    print("Inside Spec Generator")
     is_already_exist = db.genspec.find_one({"projectid": projectid})
     if is_already_exist:
         return {"success": False, "message": "Already Exist", "status": 500}
 
-    SG = SpecGenerator(projectid, db)
-    SG.generate_path()
-    SG.generate_schemas()
-    spec_data = SG.write_spec()
+    try:
+        SG = SpecGenerator(projectid, db)
+        SG.generate_path()
+        SG.generate_schemas()
+        spec_data = SG.write_spec()
 
-    spec_document = {"projectid": projectid, "data": spec_data}
+        spec_document = {"projectid": projectid, "data": spec_data}
 
-    config.store_document(SPEC_COLLECTION, spec_document, db)
+        config.store_document(SPEC_COLLECTION, spec_document, db)
 
-    import json
+        """
+        import json
 
-    spec_data = json.dumps(spec_data)
-    spec_data = spec_data.replace("ezapi_ref", "$ref")
-    spec_data = json.loads(spec_data)
+        spec_data = json.dumps(spec_data)
+        spec_data = spec_data.replace("ezapi_ref", "$ref")
+        spec_data = json.loads(spec_data)
 
-    import json
+        # Serializing json
+        json_object = json.dumps(spec_data, indent=4)
 
-    # Serializing json
-    json_object = json.dumps(spec_data, indent=4)
+        # Writing to sample.json
+        with open("gen_spec_" + projectid + ".json", "w") as outfile:
+            outfile.write(json_object)
+        """
 
-    # Writing to sample.json
-    with open("gen_spec_" + projectid + ".json", "w") as outfile:
-        outfile.write(json_object)
-
-    return {"success": True, "status": 200, "message": "ok"}
+        return {"success": True, "status": 200, "message": "ok"}
+    except Exception as e:
+        print("Spec Generator Error - ", str(e))
+        return {"success": False, "status": 500, "message": str(e)}
 
 
 """
