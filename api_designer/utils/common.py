@@ -5,6 +5,7 @@ import re
 import time
 
 from itertools import groupby
+import wordninja
 
 # import spacy
 # nlp = spacy.load("en_core_web_sm")
@@ -12,17 +13,11 @@ from itertools import groupby
 match_dictionary = {"insured": "claimant", "sex": "gender", "relationship": "roles"}
 
 
-# import enchant
-# d = enchant.Dict("en_US")
-# d.check("Hello")
-
-import splitter
-
-
 def word_split(word):
     try:
         word = word.lower()
-        res = splitter.split(word)
+        res = wordninja.split(word)
+
         if not res:
             return [word]
         else:
