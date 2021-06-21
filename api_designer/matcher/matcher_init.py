@@ -266,6 +266,7 @@ def spec_ddl_matcher(projectid, db):
     print("Inserting into DB ", round(time.time(), 1))
     config.store_bulk_document(match_collection, all_documents, db)
 
+    """
     # ---------- CSV Generation Part ----------
     import csv
 
@@ -307,6 +308,7 @@ def spec_ddl_matcher(projectid, db):
             ]
             combined_csv_write.writerow(tmp)
     # ---------- CSV Part Ended ----------
+    """
 
     print("Response", round(time.time(), 1))
     return {"success": True, "message": "ok", "status": 200}
