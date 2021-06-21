@@ -24,7 +24,7 @@ def deref_body_data(body, schemas):
 
 def enhance_attributes(projectid, db, filename=None):
     try:
-        paths = db.paths.find({"projectid": projectid})
+        paths = db.operationdatas.find({"projectid": projectid})
         components = db.components.find({"projectid": projectid})
 
         components = list(components)[0]["data"]
@@ -47,7 +47,7 @@ def enhance_attributes(projectid, db, filename=None):
                 + path_request_data["header"]
             )
 
-            if path_request_data["body"]:
+            if "body" in path_request_data and path_request_data["body"]:
                 body_data = deref_body_data(path_request_data["body"], all_schemas)
                 path_param_data += [body_data]
 

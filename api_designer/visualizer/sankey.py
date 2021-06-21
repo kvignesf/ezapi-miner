@@ -17,11 +17,15 @@ def get_response_status(all_paths, path, method):
 
 
 def process_sankey_visualizer(projectid, db):  # tags can be multiple
+    is_already_exist = db.sankey.find_one({"projectid": projectid})
+    if is_already_exist:
+        return {"success": False, "message": "Already Exist", "status": 500}
+
     # try:
     score_result = enhance_attributes(projectid, db)
     if score_result:
         all_elements = db.elements.find({"projectid": projectid})
-        all_paths = db.paths.find({"projectid": projectid})
+        all_paths = db.operationdatas.find({"projectid": projectid})
 
         all_elements = list(all_elements)[0]
         all_paths = list(all_paths)
