@@ -101,7 +101,7 @@ class SpecGenerator:
         self.db = db
 
         self.spec_orig = db.raw_spec.find_one({"projectid": projectid})
-        self.path_orig = db.paths.find({"projectid": projectid})
+        self.path_orig = db.operationdatas.find({"projectid": projectid})
         self.component_orig = db.components.find_one({"projectid": projectid})
 
         self.path_orig = [x["data"] for x in self.path_orig]
@@ -426,6 +426,10 @@ class SpecGenerator:
 
 
 def generate_spec(projectid, db):
+    is_already_exist = db.genspec.find_one({"projectid": projectid})
+    if is_already_exist:
+        return {"success": False, "message": "Already Exist", "status": 500}
+
     SG = SpecGenerator(projectid, db)
     SG.generate_path()
     SG.generate_schemas()
