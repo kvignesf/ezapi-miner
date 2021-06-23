@@ -27,6 +27,11 @@ def enhance_attributes(projectid, db, filename=None):
         paths = db.operationdatas.find({"projectid": projectid})
         components = db.components.find({"projectid": projectid})
 
+        paths = list(paths)
+
+        if not paths:
+            return False, "project data not found"
+
         components = list(components)[0]["data"]
         all_schemas = components.get("schemas")  # An object
 
@@ -88,11 +93,11 @@ def enhance_attributes(projectid, db, filename=None):
         }
         config.store_document(element_collction, element_document, db)
 
-        return True
+        return True, "ok"
 
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         print("Element Scoring Error - ", exc_type, fname, exc_tb.tb_lineno, str(e))
 
-        return False
+        return False, str(e)

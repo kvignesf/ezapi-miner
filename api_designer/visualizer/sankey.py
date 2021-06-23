@@ -17,13 +17,11 @@ def get_response_status(all_paths, path, method):
 
 
 def process_sankey_visualizer(projectid, db):  # tags can be multiple
-    print("Inside Sankey")
-    is_already_exist = db.sankey.find_one({"projectid": projectid})
-    if is_already_exist:
-        return {"success": False, "message": "Already Exist", "status": 500}
+    db.elements.remove({"projectid": projectid})
+    db.sankey.remove({"projectid": projectid})
 
     try:
-        score_result = enhance_attributes(projectid, db)
+        score_result, score_message = enhance_attributes(projectid, db)
         if score_result:
             all_elements = db.elements.find({"projectid": projectid})
             all_paths = db.operationdatas.find({"projectid": projectid})
@@ -202,11 +200,7 @@ def process_sankey_visualizer(projectid, db):  # tags can be multiple
 
             res = {"status": 200, "success": True, "message": "ok"}
         else:
-            res = {
-                "status": 500,
-                "success": False,
-                "message": "Failed in elements scoring",
-            }
+            res = {"status": 500, "success": False, "message": score_message}
 
     except Exception as e:
         print("Sankey Error - ", str(e))

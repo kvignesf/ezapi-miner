@@ -426,19 +426,19 @@ class SpecGenerator:
 
 
 def generate_spec(projectid, db):
-    print("Inside Spec Generator")
-    is_already_exist = db.genspec.find_one({"projectid": projectid})
-    if is_already_exist:
-        return {"success": False, "message": "Already Exist", "status": 500}
+    db.genspec.remove({"projectid": projectid})
 
     try:
         SG = SpecGenerator(projectid, db)
+
+        if not SG.path_orig:
+            return {"success": False, "status": 404, "message": "project data not found"}
+
         SG.generate_path()
         SG.generate_schemas()
         spec_data = SG.write_spec()
 
         spec_document = {"projectid": projectid, "data": spec_data}
-
         config.store_document(SPEC_COLLECTION, spec_document, db)
 
         """

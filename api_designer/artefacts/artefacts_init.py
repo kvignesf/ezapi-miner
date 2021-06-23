@@ -287,13 +287,21 @@ def get_virtual_collection_data(testdata):
 def generate_artefacts(projectid, db):
     print("Inside Artefacts Generator")
     try:
-        is_already_exist = db.testcases.find({"projectid": projectid})
-        is_already_exist = list(is_already_exist)
-        if is_already_exist and len(is_already_exist) > 0:
-            return {"success": False, "message": "Already Exist", "status": 500}
+        # Remove esisting testcases
+        db.testcases.remove({"projectid": projectid})
+        db.virtual.remove({"projectid": projectid})
 
         paths = db.operationdatas.find({"projectid": projectid})
         components = db.components.find_one({"projectid": projectid})
+
+        paths = list(paths)
+
+        if not paths:
+            return {
+                "success": False,
+                "message": "project data not found",
+                "status": 404,
+            }
 
         paths = [x["data"] for x in paths]
         components = components["data"]
