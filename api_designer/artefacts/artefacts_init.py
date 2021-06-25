@@ -16,6 +16,7 @@ MAX_ITEMS = 3
 
 TESTCASE_COLLECTION = "testcases"
 VIRTUAL_COLLECTION = "virtual"
+TESTRESULT_COLLECTION = "test_result"
 
 
 class SchemaDeref:
@@ -301,9 +302,18 @@ def generate_artefacts(projectid, db):
         # Remove esisting testcases
         db.testcases.remove({"projectid": projectid})
         db.virtual.remove({"projectid": projectid})
+        db.test_result.remove({"projectid": projectid})
 
         paths = db.operationdatas.find({"projectid": projectid})
         components = db.components.find_one({"projectid": projectid})
+
+        testcase_result = {
+            "api_ops_id": projectid,
+            "projectid": projectid,
+            "run1": {},
+            "run2": {},
+            "run3": {},
+        }
 
         paths = list(paths)
 
@@ -386,6 +396,7 @@ def generate_artefacts(projectid, db):
 
         config.store_bulk_document(TESTCASE_COLLECTION, all_testcases, db)
         config.store_bulk_document(VIRTUAL_COLLECTION, virtual_tests, db)
+        config.store_document(TESTRESULT_COLLECTION, testcase_result, db)
 
         return {"success": True, "message": "ok", "status": 200}
     except Exception as e:
