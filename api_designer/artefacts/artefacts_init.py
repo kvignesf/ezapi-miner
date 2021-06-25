@@ -1,5 +1,6 @@
 from pprint import pprint
 import random
+import os, sys
 
 from api_designer.artefacts.ezfaker import generate_field_data
 from api_designer.utils.common import *
@@ -264,23 +265,33 @@ def get_virtual_collection_data(testdata):
     }
 
     virtual_service_data["responseBody"] = testdata.get("assertionData", {})
-
     endpoint = testdata["endpoint"]
 
-    if "{" in testdata["endpoint"]:
-        regex = r"\{(.*?)\}"
-        text_inside_paranthesis = re.findall(regex, endpoint)
-        for xElm in text_inside_paranthesis:
-            endpoint = endpoint.replace("{" + xElm + "}", "{" + xElm.lower() + "}")
-    pathData = testdata["inputData"]["path"]
-    queryData = testdata["inputData"]["query"]
+    # update path parameter
+    path_parameters = testdata["inputData"]["path"]
+    if path_parameters:
+        endpoint = endpoint.format(**path_parameters)
 
-    endpoint = endpoint.format(**pathData)
-    tmp = urlencode(queryData)
-    if tmp:
-        endpoint += "?" + tmp
+    # update query parameter
+    query_parameters = testdata["inputData"]["query"]
+    if query_parameters:
+        endpoint = endpoint + "?" + urlencode(query_parameters)
+
+    # if "{" in testdata["endpoint"]:
+    #     regex = r"\{(.*?)\}"
+    #     text_inside_paranthesis = re.findall(regex, endpoint)
+    #     for xElm in text_inside_paranthesis:
+    #         endpoint = endpoint.replace("{" + xElm + "}", "{" + xElm.lower() + "}")
+
+    # pathData = testdata["inputData"]["path"]
+    # queryData = testdata["inputData"]["query"]
+
+    # endpoint = endpoint.format(**pathData)
+    # tmp = urlencode(queryData)
+    # if tmp:
+    #     endpoint += "?" + tmp
+
     virtual_service_data["endpoint"] = endpoint
-
     return virtual_service_data
 
 
@@ -336,11 +347,22 @@ def generate_artefacts(projectid, db):
                 testdata["testcaseId"] = "test" + str(1 + test_count)
 
                 test_copy = testdata.copy()
+                generated = False
 
                 if resp["status_code"] == "default" or resp["status_code"].startswith(
                     "2"
                 ):
                     test_copy = match_request_response_data(test_copy)
+                    generated = True
+
+                elif resp["status_code"] == "400":
+                    tmp = test_copy["endpoint"].split("/")
+                    for i, t in enumerate(tmp):
+                        tmp[i] = "%/" + tmp[i]
+                        break
+                    test_copy["endpoint"] = "/".join(tmp)
+                    test_copy["description"] = "Deceptive request"
+                    generated = True
 
                 elif resp["status_code"] == "404":  # not found
                     tmp = test_copy["endpoint"].split("/")
@@ -349,13 +371,16 @@ def generate_artefacts(projectid, db):
                         break
                     test_copy["endpoint"] = "/".join(tmp)
                     test_copy["description"] = "uri not found"
+                    generated = True
 
                 elif resp["status_code"] == "405":  # method not allowed
                     test_copy["method"] = "head"
                     test_copy["description"] = "method not allowed"
+                    generated = True
 
-                all_testcases.append(test_copy)
-                test_count += 1
+                if generated:
+                    all_testcases.append(test_copy)
+                    test_count += 1
 
         virtual_tests = [get_virtual_collection_data(x) for x in all_testcases]
 
@@ -364,5 +389,9 @@ def generate_artefacts(projectid, db):
 
         return {"success": True, "message": "ok", "status": 200}
     except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        print("Artefacts Error - ", exc_type, fname, exc_tb.tb_lineno, str(e))
+
         print("Artefacts Generator Error - ", str(e))
         return {"success": False, "message": str(e), "status": 500}
