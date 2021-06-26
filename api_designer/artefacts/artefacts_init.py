@@ -304,6 +304,13 @@ def generate_artefacts(projectid, db):
         db.virtual.remove({"projectid": projectid})
         db.test_result.remove({"projectid": projectid})
 
+        project_data = db.projects.find_one({"projectId": projectid})
+        try:
+            filename = project_data.get("apiSpec")
+            filename = filename[0]["name"]
+        except:
+            filename = None
+
         paths = db.operationdatas.find({"projectid": projectid})
         components = db.components.find_one({"projectid": projectid})
 
@@ -337,6 +344,7 @@ def generate_artefacts(projectid, db):
             testdata = {
                 "projectid": projectid,
                 "api_ops_id": projectid,
+                "filename": filename,
                 "endpoint": path.get("endpoint"),
                 "method": path.get("method"),
                 "resource": path.get("tags", []),
@@ -353,7 +361,9 @@ def generate_artefacts(projectid, db):
 
             for resp in path["responseData"]:
                 testdata["status"] = resp["status_code"]
-                testdata["assertionData"] = gd.generate_body_data(resp["content"])
+                testdata["assertionData"] = (
+                    gd.generate_body_data(resp["content"]) if "content" in resp else {}
+                )
                 testdata["testcaseId"] = "test" + str(1 + test_count)
 
                 test_copy = testdata.copy()
