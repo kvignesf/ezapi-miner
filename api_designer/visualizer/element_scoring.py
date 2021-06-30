@@ -1,5 +1,6 @@
 from api_designer import config
 from api_designer.utils.schema_manager import SchemaDeref
+from pprint import pprint
 
 import os, sys
 
@@ -22,18 +23,23 @@ def deref_body_data(body, schemas):
     return res
 
 
-def enhance_attributes(projectid, db, filename=None):
+def deref_table_body_data(body):
+    return body
+
+
+def enhance_attributes(projectid, db, project_type, filename=None):
     try:
         paths = db.operationdatas.find({"projectid": projectid})
-        components = db.components.find({"projectid": projectid})
-
         paths = list(paths)
-
         if not paths:
             return False, "project data not found"
 
-        components = list(components)[0]["data"]
-        all_schemas = components.get("schemas")  # An object
+        if project_type == "db":
+            pass
+        else:
+            components = db.components.find({"projectid": projectid})
+            components = list(components)[0]["data"]
+            all_schemas = components.get("schemas")  # An object
 
         tag_wise_attributes = {}
 
@@ -52,9 +58,15 @@ def enhance_attributes(projectid, db, filename=None):
                 + path_request_data["header"]
             )
 
-            if "body" in path_request_data and path_request_data["body"]:
-                body_data = deref_body_data(path_request_data["body"], all_schemas)
-                path_param_data += [body_data]
+            if project_type == "db":
+                if "body" in path_request_data and path_request_data["body"]:
+                    body_data = deref_table_body_data(path_request_data["body"])
+                    path_param_data += [body_data]
+            else:
+                if "body" in path_request_data and path_request_data["body"]:
+                    body_data = deref_body_data(path_request_data["body"], all_schemas)
+                    print(body_data)
+                    path_param_data += [body_data]
 
             tags = path_data.get("tags", ["API Model"])
             for t in tags:
@@ -91,6 +103,7 @@ def enhance_attributes(projectid, db, filename=None):
             "api_ops_id": projectid,
             "data": tag_wise_attributes,
         }
+        pprint(tag_wise_attributes)
         config.store_document(element_collction, element_document, db)
 
         return True, "ok"

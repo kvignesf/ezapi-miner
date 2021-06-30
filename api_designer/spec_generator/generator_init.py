@@ -1,4 +1,5 @@
 from api_designer import config
+from api_designer.spec_generator import generate_db_only
 
 PATH_DESCRIPTION_KEYS = ["tags", "summary", "description", "operationId"]
 PARAMETER_KEY = "parameters"
@@ -428,11 +429,28 @@ class SpecGenerator:
 def generate_spec(projectid, db):
     db.genspec.remove({"projectid": projectid})
 
+    project_data = db.projects.find_one({"projectId": projectid})
+    project_type = project_data.get("projectType", None)
+
+    if not project_data or not project_type:
+        return {
+            "success": False,
+            "status": 404,
+            "message": "project data or project type not found",
+        }
+
+    if project_type == "db":
+        return generate_db_only.generate_spec(projectid, db)
+
     try:
         SG = SpecGenerator(projectid, db)
 
         if not SG.path_orig:
-            return {"success": False, "status": 404, "message": "project data not found"}
+            return {
+                "success": False,
+                "status": 404,
+                "message": "operation data not found",
+            }
 
         SG.generate_path()
         SG.generate_schemas()
@@ -441,59 +459,7 @@ def generate_spec(projectid, db):
         spec_document = {"projectid": projectid, "data": spec_data}
         config.store_document(SPEC_COLLECTION, spec_document, db)
 
-        """
-        import json
-
-        spec_data = json.dumps(spec_data)
-        spec_data = spec_data.replace("ezapi_ref", "$ref")
-        spec_data = json.loads(spec_data)
-
-        # Serializing json
-        json_object = json.dumps(spec_data, indent=4)
-
-        # Writing to sample.json
-        with open("gen_spec_" + projectid + ".json", "w") as outfile:
-            outfile.write(json_object)
-        """
-
         return {"success": True, "status": 200, "message": "ok"}
     except Exception as e:
         print("Spec Generator Error - ", str(e))
         return {"success": False, "status": 500, "message": str(e)}
-
-
-"""
-import pymongo
-
-
-def get_db_connection(dbname="apidesign", host="localhost", port=27017):
-    client = pymongo.MongoClient(host, port)
-    db = client[dbname]
-    return (client, db)
-
-
-client, db = get_db_connection()
-
-SG = SpecGenerator("test33", db)
-SG.generate_path()
-SG.generate_schemas()
-spec = SG.write_spec()
-spec = SpecGenerator.clean_empty(spec)
-
-
-# 31 - claims
-# 32 - asd
-# 33 - claims3.8
-# 34 - petstore
-# 35 - petstore
-
-
-import json
-
-# Serializing json
-json_object = json.dumps(spec, indent=4)
-
-# Writing to sample.json
-with open("claims3.8.json", "w") as outfile:
-    outfile.write(json_object)
-"""

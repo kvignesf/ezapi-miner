@@ -20,8 +20,18 @@ def process_sankey_visualizer(projectid, db):  # tags can be multiple
     db.elements.remove({"projectid": projectid})
     db.sankey.remove({"projectid": projectid})
 
+    project_data = db.projects.find_one({"projectId": projectid})
+    project_type = project_data.get("projectType", None)
+
+    if not project_data or not project_type:
+        return {
+            "success": False,
+            "status": 404,
+            "message": "project data or project type not found",
+        }
+
     try:
-        score_result, score_message = enhance_attributes(projectid, db)
+        score_result, score_message = enhance_attributes(projectid, db, project_type)
         if score_result:
             all_elements = db.elements.find({"projectid": projectid})
             all_paths = db.operationdatas.find({"projectid": projectid})

@@ -2,6 +2,7 @@ from pprint import pprint
 import random
 import os, sys
 
+# from api_designer.artefacts import generate_db_only
 from api_designer.artefacts.ezfaker import generate_field_data
 from api_designer.utils.common import *
 from api_designer import config
@@ -207,6 +208,76 @@ class GenerateData:
         return payload
 
 
+class GenerateTableData:
+    def __init__(self):
+        pass
+
+    def generate_ref_data(self, param_ref):
+        selected_columns = param_ref.get("selectedColumns", [])
+        ret = {}
+        for s in selected_columns:
+            sname = s["name"]
+            ret[sname] = generate_field_data(s, sname)
+
+        return ret
+
+    def generate_object_data(self, param_object):
+        ret = {}
+        for k, v in param_object["properties"].items():
+            v_type = v.get("type")
+
+            if v_type == "object" and "properties" in v:
+                ret[k] = self.generate_object_data(v)
+            elif v_type in DATA_TYPE_LIST:
+                ret[k] = generate_field_data(v, k)
+            elif v_type == "ezapi_table":
+                ret[k] = self.generate_ref_data(v)
+
+        return ret
+
+    def generate_param_data(self, param_list):
+        ret = {}
+        for param in param_list:
+            for k, v in param.items():
+                param_type = v.get("type")
+
+                if param_type == "object" and "properties" in v:
+                    ret[k] = self.generate_object_data(v)
+                elif param_type in DATA_TYPE_LIST:
+                    ret[k] = generate_field_data(v, k)
+                elif param_type == "ezapi_table":
+                    ret[k] = self.generate_ref_data(v)
+
+        return ret
+
+    def generate_body_data(self, body):
+        ret = {}
+        if not body:
+            return ret
+        body_type = body.get("type")
+
+        if body_type == "object" and "properties" in body:
+            ret = self.generate_object_data(body)
+        elif body_type == "ezapi_table":
+            ret = self.generate_ref_data(body)
+
+        return ret
+
+    def generate_request_data(self, request_data):
+        if "body" not in request_data:
+            request_data["body"] = {}
+
+        payload = {
+            "path": self.generate_param_data(request_data["path"]),
+            "query": self.generate_param_data(request_data["query"]),
+            "header": self.generate_param_data(request_data["header"]),
+            # "form": generate_param_data(request_data["formData"]),
+            "form": {},
+            "body": self.generate_body_data(request_data["body"]),
+        }
+        return payload
+
+
 def is_name_matched(name1, name2):
     name1 = sorted(string_split(name1))
     name2 = sorted(string_split(name2))
@@ -311,17 +382,23 @@ def generate_artefacts(projectid, db):
         except:
             filename = None
 
+        project_data = db.projects.find_one({"projectId": projectid})
+        project_type = project_data.get("projectType", None)
+
+        if not project_data or not project_type:
+            return {
+                "success": False,
+                "status": 404,
+                "message": "project data or project type not found",
+            }
+
+        try:
+            filename = project_data.get("apiSpec")
+            filename = filename[0]["name"]
+        except:
+            filename = None
+
         paths = db.operationdatas.find({"projectid": projectid})
-        components = db.components.find_one({"projectid": projectid})
-
-        testcase_result = {
-            "api_ops_id": projectid,
-            "projectid": projectid,
-            "run1": {},
-            "run2": {},
-            "run3": {},
-        }
-
         paths = list(paths)
 
         if not paths:
@@ -330,12 +407,23 @@ def generate_artefacts(projectid, db):
                 "message": "project data not found",
                 "status": 404,
             }
-
         paths = [x["data"] for x in paths]
-        components = components["data"]
-        schemas = components["schemas"]
 
-        gd = GenerateData(schemas)
+        if project_type == "db":
+            gd = GenerateTableData()
+        else:
+            components = db.components.find_one({"projectid": projectid})
+            components = components["data"]
+            schemas = components["schemas"]
+            gd = GenerateData(schemas)
+
+        testcase_result = {
+            "api_ops_id": projectid,
+            "projectid": projectid,
+            "run1": {},
+            "run2": {},
+            "run3": {},
+        }
 
         all_testcases = []
         test_count = 0
