@@ -96,6 +96,28 @@ class SchemaDeref:
         return self.node_schemas
 
 
+# required - should be an array of property names required within an object schema
+def filter_content_fields(content):
+    if not content:
+        return content
+
+    content_type = content["type"]
+    if content_type in ["string", "number", "integer", "boolean"]:
+        content = {
+            k: v
+            for k, v in content.items()
+            if k in PARAMETER_SCHEMA_KEYS + ["description"] and v
+        }
+    elif content_type == "object":
+        for k, v in content["properties"].items():
+            content["properties"][k] = filter_content_fields(v)
+    elif content_type == "ezapi_ref":
+        content = {
+            k: v for k, v in content.items() if k in ["description", "ezapi_ref"] and v
+        }
+    return content
+
+
 class SpecGenerator:
     def __init__(self, projectid, db):
         self.projectid = projectid
@@ -364,7 +386,10 @@ class SpecGenerator:
                             if k == "content":
                                 resp_dict[k] = {}
                                 resp_dict[k]["application-json"] = {}
-                                resp_dict[k]["application-json"]["schema"] = resp[k]
+                                # resp_dict[k]["application-json"]["schema"] = resp[k]
+                                resp_dict[k]["application-json"][
+                                    "schema"
+                                ] = SpecGenerator.filter_content_fields(resp[k])
                             else:
                                 resp_dict[k] = resp[k]
 
@@ -393,6 +418,34 @@ class SpecGenerator:
                 del res[endpoint][method][BODY_KEY]
         self.paths = res
 
+    # required - should be an array of property names required within an object schema
+    @staticmethod
+    def filter_content_fields(content):
+        if not content:
+            return content
+
+        content_type = content["type"]
+        if content_type in ["string", "number", "integer", "boolean"]:
+            content = {
+                k: v
+                for k, v in content.items()
+                if k in PARAMETER_SCHEMA_KEYS + ["description"] and v
+            }
+            return content
+        elif content_type == "object":
+            for k, v in content["properties"].items():
+                content["properties"][k] = filter_content_fields(v)
+            return content
+        elif content_type == "ezapi_ref":
+            content = {
+                k: v
+                for k, v in content.items()
+                if k in ["description", "ezapi_ref"] and v
+            }
+
+    def filter_response_content(self):
+        pass
+
     def write_spec(self):
         self.spec = {
             "openapi": "3.0.0",
@@ -412,18 +465,6 @@ class SpecGenerator:
             },
         }
         return self.spec
-
-    @staticmethod
-    def clean_empty(d):
-        if isinstance(d, dict):
-            return {
-                k: v
-                for k, v in ((k, SpecGenerator.clean_empty(v)) for k, v in d.items())
-                if v
-            }
-        if isinstance(d, list):
-            return [v for v in map(SpecGenerator.clean_empty, d) if v]
-        return d
 
 
 def generate_spec(projectid, db):
