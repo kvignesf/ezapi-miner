@@ -252,4 +252,7 @@ def generate_spec(projectid, db):
     SG.generate_path()
     spec_data = SG.write_spec()
 
+    spec_document = {"projectid": projectid, "data": spec_data}
+    config.store_document(SPEC_COLLECTION, spec_document, db)
+
     return {"success": True, "status": 200, "data": spec_data}
