@@ -1,5 +1,6 @@
 from api_designer import config
 from api_designer.spec_generator import generate_db_only
+from pprint import pprint
 
 PATH_DESCRIPTION_KEYS = ["tags", "summary", "description", "operationId"]
 PARAMETER_KEY = "parameters"
@@ -390,6 +391,15 @@ class SpecGenerator:
                                 resp_dict[k]["application-json"][
                                     "schema"
                                 ] = SpecGenerator.filter_content_fields(resp[k])
+                            elif k == "headers":
+                                resp_dict[k] = {}
+                                for _header in resp["headers"]:
+                                    for _header_key, _header_data in _header.items():
+                                        resp_dict[k][_header_key] = {
+                                            "schema": SpecGenerator.filter_content_fields(
+                                                _header_data
+                                            )
+                                        }
                             else:
                                 resp_dict[k] = resp[k]
 
@@ -442,6 +452,7 @@ class SpecGenerator:
                 for k, v in content.items()
                 if k in ["description", "ezapi_ref"] and v
             }
+            return content
 
     def filter_response_content(self):
         pass
