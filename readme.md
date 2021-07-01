@@ -113,7 +113,7 @@ collections -
 ### Other Files - 
 ```python
 - config.py - Config file for database connection and storing mechanism
-- main.py - Main file which imports all submodules and creates APIOPSModel class
+- main.py - Main file which imports all submodules and creates EzAPIModels object
 - /utils/common.py - Common library for the application
 - /utils/schema_manager.py - Common library for schema related function (e.g. size of a schema, dereferencing a schema)
 ```
@@ -124,4 +124,4 @@ collections -
 * **virtual** - Similar to testcases with required only fields
 
 ## Project Flow - 
-![alt text](api_designer.png "EzAPI Intelligent Miner"
+![alt text](api_designer.png "EzAPI Intelligent Miner")
