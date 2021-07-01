@@ -1,3 +1,8 @@
+# **********copyright info*****************************************
+# This code is copyright of EZAPI LLC. For further info, reach out to rams@ezapi.ai
+# *****************************************************************
+
+
 _OPENAPI_FORMAT_MAPPER = {
     "int32": "integer",
     "int64": "integer",

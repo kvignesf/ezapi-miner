@@ -1,3 +1,8 @@
+# **********copyright info*****************************************
+# This code is copyright of EZAPI LLC. For further info, reach out to rams@ezapi.ai
+# *****************************************************************
+
+
 from pprint import pprint
 from api_designer import config
 

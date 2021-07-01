@@ -1,3 +1,8 @@
+# **********copyright info*****************************************
+# This code is copyright of EZAPI LLC. For further info, reach out to rams@ezapi.ai
+# *****************************************************************
+
+
 from api_designer import config
 
 from api_designer.spec_parser.parser_init import parse_openapi_json

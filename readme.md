@@ -1,88 +1,127 @@
-# APIOPS 
 
-APIOPS is an awesome api visualization and automated testing tool built on top of OpenAPI specification with Python, Flask, MongoDB and a lot of love!
+# EzAPI Intelligent Miner
+
+This Project is a core module for designing APIs through the EzAPI platform. It's built on top of OpenAPI specification with Python, Flask, MongoDB, and with a lot of love!
 
 ## Prerequisites
 
 1. Python 3.7.x or higher
 2. MongoDB
-3. Enchant - A spelling library developed in C (Enchant)
 
+## Project Setup
 
-
-## Initial Setup
-
-Note: These instructions are for macOS and Linux. 
-
-You may need to open multiple bash/command line/terminal windows to run all the commands listed below.
+Note: These instructions are for macOS and Linux.
 
 1. Install virtualenv if not installed:
-    
-        python -m pip install --user virtualenv
 
-2. Set up a virtualenv:
+```bash
+python -m pip install --user virtualenv
+```
 
-        python -m virtualenv venv
-        source ./venv/bin/activate
-        pip install -r REQUIREMENTS.txt
+2. Setup a virtualenv:
 
-3. Set up the database:
+```bash
+python -m virtualenv venv
+source ./venv/bin/activate
+pip install -r REQUIREMENTS.txt
+```
 
-        mongo
+3. MongoDB if running locally 
+4. Start the Flask server
+```bash
+python app.py
+```
 
-4. Start Flask server:
-    
-        python app.py
-
-    Open your browser and browse to [http://127.0.0.1:5000](http://127.0.0.1:5000). You will see a default homepage
+Open the browser and go to [http://127.0.0.1:5000/](http://127.0.0.1:5000/). You'll see a default homepage
 
 ## Design Principal
+The entire EzAPI Intelligent Miner consists of 4 components - 
 
-The entire APIOPS Model has 4 components - 
-1. parser
-2. scorer 
-3. visualiser
-4. tester
+1. Parser
+2. Matcher
+3. API visualizer and Spec Generation
+4. Artefacts Generation
 
-### parser -
-parser is used for parsing the original swagger file. It accepts a swagger json file as an input and store the parsed data into following collections - 
+### Parser - 
+*The parser is used for parsing an input file into a structured format, which can be further used for all the processing. There are Spec and DDL Parser exists.*
 
-* apiinfo - API information and Details of all the tags
-* paths - All Path related Information
-* requests - All request related (endpoint, params, ...) information
-* responses - All response related (status, body, ...) information
+###### 1. Spec Parser - Parsing an original OpenAPI/Swagger JSON file and storing the data into numerous collections 
 
-### scorer -
-scorer is used to extract root level elements which further can be used to visualise the sankey diagram. Also this module scores these elements based on their occurrence and required status. It stores the information into following collections - 
+```python
+- /spec_parser/parser_init.py - The init module for the parser, which checks the spec version and calls the specific parser
+- /spec_parser/openapi_parser.py - Parser for OpenAPI v3.0.0 or above
+- /spec_parser/swagger_parser.py - Parser for Swagger v2.x
+```
 
-* elements - All root level (no nested) elements. This collection is designed as list of elements inside the tags (resources)
-* scorer - Score of above elements
+###### 2. DDL Parser - Parsing a SQL DDL file (SQL Server for now) and persisting into DB 
 
-### visualizer -
-This module consider elements collection and prepare a sankey data format which can be further utilized to display the API visualization. It also consider endpoints, tags, response code while preparing the data format. Finally, stores this information into following collections - 
+```python
+- /ddl_parser/parser_init.py - The init module for the DDL parser, which parses all the tables, columns, and data types
+- /ddl_parser/dtmapper.py - Maps the column Data Type into OpenAPI Data Type and Format
+```
 
-* sankey - Store sanket graph data in the form of nodes and links between nodes.
+collections - 
+* **raw_spec** - Raw Spec Data
+* **paths** - Path Data for a Spec including both request and response structure
+* **components** ​- Components Data from Spec
+* **parameters** - Extracting all the parameters only
+* **schemas** - Extracting Direct Schemas with their size
+* **tables** - Parsed Tables and Columns Data
 
 
-### tester -
-This module generate testcase data for all the endpoints and corresponding response status code. Following files have different functionality - 
+### Matcher
+*The matcher is a mapping from Spec Schema to Tables and their attributes. It returns all the attributes that are matching and their percentage score. Which can be further used for automatic code generation*
 
-1. test_generator.py - The main file for generating testdata
-2. payload.py - To generate payload data for a given JSON format
-3. payload_format.py - To generate the payload schema of a given JSON format
-4. reverseRegex.py - To generate text data matching a particular regex pattern
+```python
+- /matcher/matcher_init.py - The matching module
+```
 
-This modules creates following collections - 
+collections - 
+* **matcher** - Matched data b/w Spec and Table Attributes
 
-* testcases - List of all testcases and corresponding input data and assertion data
-* virtual - Similar to testcases, but only required to data to make an actual HTTP call
-* test_result - An empty collection for future purpose
+### API visualizer and Spec Generation
+*This application is used to visualize a Sankey diagram of user-designed APIs and generating the corresponding OpenAPI 3.0.0 specification*
 
-## Other Files
+###### 1. Visualizer - Extracting request elements and visualizing them into the Sankey network flow
 
-1. config.py - Config file for database connection and storing mechanism
-2. main.py - Main file which import all submodules and create APIOPSModel class
-3. utils.py - Utility library for the application
+```python
+- /visualizer/element_scoring.py - Extracting level 0 request parameters and body attributes
+- /visualizer/sankey.py - Store Sankey graph data in the form of nodes and links between nodes.
+```
 
-## Flow Diagram - 
-![alt text](APIOPS.png "APIOPS Model")
+###### 2. Spec Generation - Generating the OpenAPI spec
+
+```python
+- /spec_generator/generator_init.py - The init module for Spec generator and spec generation for spec-based project flow
+- /spec_generator/generate_db_only.py - Spec generation for DB only flow
+```
+
+collections - 
+* **elements** - Extracted Level 0 elements
+* **sankey** - Sankey Flow JSON structure
+* **genspec** - Generated OpenAPI Specification
+
+### Artefacts Generation
+*This module generates testcase data for all the endpoints and the corresponding response status code*
+
+```python
+- /artefacts/artefacts_init.py - The init module for testcase generation
+- /artefacts/ezfaker.py - Generating the payload data, built on top of python faker library
+- /artefacts/reverse_regex.py - To generate text data matching a particular regex pattern
+```
+
+### Other Files - 
+```python
+- config.py - Config file for database connection and storing mechanism
+- main.py - Main file which imports all submodules and creates APIOPSModel class
+- /utils/common.py - Common library for the application
+- /utils/schema_manager.py - Common library for schema related function (e.g. size of a schema, dereferencing a schema)
+```
+
+collections - 
+* **testcases** - List of all testcases
+* **test_result** - Test results for future refernece
+* **virtual** - Similar to testcases with required only fields
+
+## Project Flow - 
+![alt text](api_designer.png "EzAPI Intelligent Miner"

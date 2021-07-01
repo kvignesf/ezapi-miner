@@ -1,3 +1,8 @@
+# **********copyright info*****************************************
+# This code is copyright of EZAPI LLC. For further info, reach out to rams@ezapi.ai
+# *****************************************************************
+
+
 from api_designer import config
 from api_designer.ddl_parser import dtmapper
 from pprint import pprint

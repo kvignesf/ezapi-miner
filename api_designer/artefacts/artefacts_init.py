@@ -1,3 +1,7 @@
+# **********copyright info*****************************************
+# This code is copyright of EZAPI LLC. For further info, reach out to rams@ezapi.ai
+# *****************************************************************
+
 from pprint import pprint
 import random
 import os, sys
@@ -464,6 +468,7 @@ def generate_artefacts(projectid, db):
                     generated = True
 
                 elif resp["status_code"] == "400":
+                    # Deceptive Request
                     tmp = test_copy["endpoint"].split("/")
                     for i, t in enumerate(tmp):
                         tmp[i] = "%/" + tmp[i]
@@ -471,6 +476,9 @@ def generate_artefacts(projectid, db):
                     test_copy["endpoint"] = "/".join(tmp)
                     test_copy["description"] = "Deceptive request"
                     generated = True
+
+                    # Bad Request (Missing Parameter)
+                    # todo
 
                 elif resp["status_code"] == "404":  # not found
                     tmp = test_copy["endpoint"].split("/")
