@@ -4,7 +4,7 @@ include:
   file: 
     - 'sast-whitesource-python.yaml'
     - 'buildpython.yml'
-    - 'deploytestpython.yml'
+    - 'deploy-python-refactoredv3.yaml'
 stages:
   - whitesource-test
   - build
@@ -19,7 +19,7 @@ build:
 deploy:
   stage: deploy
   image: alpine 
-  extends: .deploy-test1
+  extends: .deploy-refactoredv3
   only: 
     - refactoredv3
 
