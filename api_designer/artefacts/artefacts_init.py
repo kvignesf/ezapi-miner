@@ -371,6 +371,22 @@ def get_virtual_collection_data(testdata):
     return virtual_service_data
 
 
+def getCountByKey(input_payload):
+    tc_suffix = ""
+    elmntsNmbr = 0
+
+    for k, v in input_payload.items():
+        if len(v) > 0:
+            nmbrelmnts = len(v)
+            for a, b in v.items():
+                if isinstance(b, dict):
+                    nmbrelmnts = len(b)
+
+            tc_suffix = tc_suffix + k[0] + str(nmbrelmnts)
+            elmntsNmbr = elmntsNmbr + nmbrelmnts
+    return elmntsNmbr
+
+
 def generate_artefacts(projectid, db):
     print("Inside Artefacts Generator")
     try:
@@ -495,6 +511,19 @@ def generate_artefacts(projectid, db):
                     generated = True
 
                 if generated:
+                    suffix = getCountByKey(testdata["inputData"])
+                    suffix_end = " datasets" if suffix > 1 else " dataset"
+                    test_copy["test_case_name"] = (
+                        "Validate "
+                        + resp["status_code"]
+                        + " response for "
+                        + path.get("operationId")
+                        + " of "
+                        + filename.split(".")[0]
+                        + " API using "
+                        + str(suffix)
+                        + suffix_end
+                    )
                     all_testcases.append(test_copy)
                     test_count += 1
 
