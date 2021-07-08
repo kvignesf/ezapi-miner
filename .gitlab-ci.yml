@@ -13,6 +13,8 @@ whitesource-test:
   stage: whitesource-test
   image: ubuntu:20.04
   extends: .sast-whitesource  
+  only:
+    - master
 build:
   stage: build
   extends: .build
