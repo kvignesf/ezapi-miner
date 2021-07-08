@@ -161,7 +161,7 @@ class GenerateTemplate:
 
 def generate_jdl_file(projectid, db):
     project_data = db.projects.find_one({"projectId": projectid})
-    operation_data = db.operaationdatas.find({"projectid": projectid})
+    operation_data = db.operationdatas.find({"projectid": projectid})
     table_data = db.tables.find({"projectid": projectid})
 
     project_type = project_data.get("projectType", None)
