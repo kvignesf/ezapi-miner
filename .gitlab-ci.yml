@@ -4,7 +4,7 @@ include:
   file: 
     - 'sast-whitesource-python.yaml'
     - 'buildpython.yml'
-    - 'deploytestpython.yml'
+    - 'deploy-python-refactoredv3.yaml'
 stages:
   - whitesource-test
   - build
@@ -13,13 +13,15 @@ whitesource-test:
   stage: whitesource-test
   image: ubuntu:20.04
   extends: .sast-whitesource  
+  only:
+    - master
 build:
   stage: build
   extends: .build
 deploy:
   stage: deploy
   image: alpine 
-  extends: .deploy-test1
+  extends: .deploy-refactoredv3
   only: 
     - refactoredv3
 
