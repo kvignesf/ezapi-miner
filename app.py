@@ -175,5 +175,23 @@ def sankey_model():
     return json_response(ret, status=ret["status"])
 
 
+@app.route("/codegen", methods=["POST"])
+def codegen_model():
+    print("Codegen Received")
+    request_data = request.get_json()
+    projectid = str(request_data.get("projectid", ""))
+
+    if projectid:
+        model = EzAPIModels(projectid)
+        model.set_db_instance()
+        ret = model.jdl_generator()
+        model.client.close()
+
+    else:
+        ret = bad_request({"success": False, "message": "Some parameters are missing"})
+
+    return json_response(ret, status=ret["status"])
+
+
 if __name__ == "__main__":
     app.run(debug=True)

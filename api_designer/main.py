@@ -11,6 +11,7 @@ from api_designer.matcher.matcher_init import spec_ddl_matcher
 from api_designer.spec_generator.generator_init import generate_spec
 from api_designer.artefacts.artefacts_init import generate_artefacts
 from api_designer.visualizer.sankey import process_sankey_visualizer
+from api_designer.codegen.jdl_init import generate_jdl_file
 
 
 class EzAPIModels:
@@ -44,4 +45,8 @@ class EzAPIModels:
 
     def sankey_generator(self):
         ret = process_sankey_visualizer(self.projectid, self.db)
+        return ret
+
+    def jdl_generator(self):
+        ret = generate_jdl_file(self.projectid, self.db)
         return ret
