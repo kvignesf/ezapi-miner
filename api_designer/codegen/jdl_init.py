@@ -2,12 +2,17 @@
 # This code is copyright of EZAPI LLC. For further info, reach out to rams@ezapi.ai
 # *****************************************************************
 
-import pathlib
-from api_designer.codegen.entity_init import extract_entity_tables
+from pprint import pprint
+
 from pathlib import Path
-import pymongo
-import re
-import subprocess
+import json, re, shutil, subprocess
+import requests
+
+from api_designer.codegen.entity_init import extract_entity_tables
+from api_designer.utils.schema_manager import SchemaDeref
+
+POJO_URL = "http://test-1-python.ezapi.ai:8098/gendtopojos"
+# POJO_URL = "http://localhost:8098/gendtopojos"
 
 
 def convert_to_camel_case(s):
@@ -17,14 +22,7 @@ def convert_to_camel_case(s):
     return res
 
 
-# def get_db_connection(dbname="ezapi", host="localhost", port=27017):
-#     # client = pymongo.MongoClient(host, port)
-#     client = pymongo.MongoClient(
-#         "mongodb://root:JRVvuh9D5V0IZxCW@34.66.45.162:27017/?authSource=admin",
-#         Connect=False,
-#     )
-#     db = client[dbname]
-#     return (client, db)
+DIRECT_KEYS = set(["type", "format", "enum"])
 
 
 class GenerateTemplate:
@@ -47,7 +45,7 @@ class GenerateTemplate:
             "buildTool": "maven",
         }
 
-        self.infile = "./template.jdl"
+        self.infile = infile
         self.outfile = None
         self.project_data = None
         self.project_type = None
@@ -153,15 +151,77 @@ class GenerateTemplate:
 
     def generate_code(self):
         cmd1 = "cd " + self.outfile.rsplit("/", 1)[0]
-        cmd2 = "jhipster jdl " + self.outfile
+        cmd2 = "jhipster jdl --force " + self.outfile
         cmd = cmd1 + "; " + cmd2
 
         subprocess.run(cmd, shell=True)
 
 
+class GenerateSchemas:
+    def __init__(self, operation_data, project_data, schemas=None):
+        self.operation_data = operation_data
+        self.project_data = project_data
+        self.schemas = schemas
+
+    def get_schema_data(self, schema_body):
+        SD = SchemaDeref(self.schemas)
+        return SD.deref_schema(schema_body)
+
+    def get_table_data(self, table_body):
+        pass
+
+    def get_operation_schema(self):
+        pojo_schemas = []
+        tmp = 0
+
+        for od in self.operation_data:
+            path_data = od["data"]
+            tmp += 1
+            request_body = path_data["requestData"].get("body", {})
+            response_data = path_data["responseData"]
+            endpoint = path_data["endpoint"]
+
+            if request_body:
+                pojo_schemas.append(
+                    {
+                        "projectid": self.project_data["projectId"],
+                        "name": path_data["method"]
+                        + "Request"
+                        + str(convert_to_camel_case(endpoint)),
+                        "path": self.get_schema_data(request_body),
+                    }
+                )
+
+            for resp in response_data:
+                response_body = resp.get("content", {})
+                if resp["status_code"][0] == "2" and response_body:  # 2xx
+                    pojo_schemas.append(
+                        {
+                            "projectid": self.project_data["projectId"],
+                            "name": path_data["method"]
+                            + "Response"
+                            + str(convert_to_camel_case(endpoint)),
+                            "path": self.get_schema_data(response_body),
+                        }
+                    )
+
+        try:
+            for ps in pojo_schemas:
+                headers = {
+                    "Content-type": "application/json",
+                    "Accept": "application/json",
+                }
+                requests.post(POJO_URL, headers=headers, data=json.dumps(ps))
+        except Exception as e:
+            return False, "Unable to Generate POJO Files, " + str(e)
+
+        return True, "Ok"
+
+
 def generate_jdl_file(projectid, db):
     project_data = db.projects.find_one({"projectId": projectid})
     operation_data = db.operationdatas.find({"projectid": projectid})
+    operation_data = list(operation_data)
     table_data = db.tables.find({"projectid": projectid})
 
     project_type = project_data.get("projectType", None)
@@ -174,11 +234,15 @@ def generate_jdl_file(projectid, db):
             "message": "Project type not supported for code generation",
         }
 
+    dirpath = Path("/mnt/codegen/" + projectid)
+    if dirpath.exists() and dirpath.is_dir():
+        shutil.rmtree(dirpath)
+
     Path("/mnt/codegen/" + projectid).mkdir(parents=True, exist_ok=True)
 
     gt.project_data = project_data
     gt.project_type = project_type
-    gt.operation_data = list(operation_data)
+    gt.operation_data = operation_data
     gt.table_data = list(table_data)
     gt.outfile = "/mnt/codegen/" + projectid + "/" + projectid + ".jdl"
 
@@ -192,6 +256,12 @@ def generate_jdl_file(projectid, db):
 
     gt.generate_jdl()
     gt.generate_code()
+
+    GS = GenerateSchemas(operation_data, project_data, schemas_data)
+    ret, message = GS.get_operation_schema()
+
+    if not ret:
+        return {"success": False, "status": 500, "message": message}
 
     db.projects.update_one({"projectId": projectid}, {"$set": {"codegen": True}})
 

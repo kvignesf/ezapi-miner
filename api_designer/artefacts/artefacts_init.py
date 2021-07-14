@@ -511,19 +511,20 @@ def generate_artefacts(projectid, db):
                     generated = True
 
                 if generated:
-                    suffix = getCountByKey(testdata["inputData"])
-                    suffix_end = " datasets" if suffix > 1 else " dataset"
-                    test_copy["test_case_name"] = (
-                        "Validate "
-                        + resp["status_code"]
-                        + " response for "
-                        + path.get("operationId")
-                        + " of "
-                        + filename.split(".")[0]
-                        + " API using "
-                        + str(suffix)
-                        + suffix_end
-                    )
+                    if filename:
+                        suffix = getCountByKey(testdata["inputData"])
+                        suffix_end = " datasets" if suffix > 1 else " dataset"
+                        test_copy["test_case_name"] = (
+                            "Validate "
+                            + resp["status_code"]
+                            + " response for "
+                            + path.get("operationId")
+                            + " of "
+                            + filename.split(".")[0]
+                            + " API using "
+                            + str(suffix)
+                            + suffix_end
+                        )
                     all_testcases.append(test_copy)
                     test_count += 1
 
