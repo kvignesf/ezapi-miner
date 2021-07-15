@@ -565,7 +565,11 @@ def generate_artefacts(projectid, db):
                     all_testcases.append(test_copy)
                     test_count += 1
 
-        virtual_tests = [get_virtual_collection_data(x) for x in all_testcases]
+        virtual_tests = [
+            get_virtual_collection_data(x)
+            for x in all_testcases
+            if x["status"][0] == "2"
+        ]
 
         config.store_bulk_document(TESTCASE_COLLECTION, all_testcases, db)
         config.store_bulk_document(VIRTUAL_COLLECTION, virtual_tests, db)
