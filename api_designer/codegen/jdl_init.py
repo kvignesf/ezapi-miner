@@ -11,8 +11,8 @@ import requests
 from api_designer.codegen.entity_init import extract_entity_tables
 from api_designer.utils.schema_manager import SchemaDeref
 
-# POJO_URL = "http://test-1-python.ezapi.ai:8098/gendtopojos"
-POJO_URL = "http://localhost:8098/gendtopojos"
+POJO_URL = "http://test-1-python.ezapi.ai:8098/gendtopojos"
+# POJO_URL = "http://localhost:8098/gendtopojos"
 
 
 def convert_to_camel_case(s):
@@ -283,13 +283,13 @@ def generate_jdl_file(projectid, db):
     if dirpath.exists() and dirpath.is_dir():
         shutil.rmtree(dirpath)
 
-    Path("/Users/shbham/mnt/codegen/" + projectid).mkdir(parents=True, exist_ok=True)
+    Path("/mnt/codegen/" + projectid).mkdir(parents=True, exist_ok=True)
 
     gt.project_data = project_data
     gt.project_type = project_type
     gt.operation_data = operation_data
     gt.table_data = list(table_data)
-    gt.outfile = "/Users/shbham/mnt/codegen/" + projectid + "/" + projectid + ".jdl"
+    gt.outfile = "/mnt/codegen/" + projectid + "/" + projectid + ".jdl"
 
     schemas_data = None
     if project_type == "both":
@@ -304,7 +304,7 @@ def generate_jdl_file(projectid, db):
     gt.generate_code()
 
     # Remove node_modules
-    node_modules_path = Path("/Users/shbham/mnt/codegen/" + projectid + "/node_modules")
+    node_modules_path = Path("/mnt/codegen/" + projectid + "/node_modules")
     if node_modules_path.exists() and node_modules_path.is_dir():
         shutil.rmtree(node_modules_path)
 
