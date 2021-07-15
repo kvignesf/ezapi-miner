@@ -14,8 +14,8 @@ from api_designer.utils.schema_manager import SchemaDeref
 POJO_URL = "http://test-1-python.ezapi.ai:8098/gendtopojos"
 # POJO_URL = "http://localhost:8098/gendtopojos"
 
-# USER_ROOT_DIR = "/Users/shbham"
 USER_ROOT_DIR = ""
+# USER_ROOT_DIR = "/Users/shbham"
 
 
 def convert_to_camel_case(s):

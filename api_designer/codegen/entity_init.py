@@ -32,9 +32,9 @@ def get_jdl_type(openapi_tf):
         jdl_type = "Boolean"
     elif otype == "integer":
         if oformat == "int32":
-            jdl_type = "Integer"
+            jdl_type = "String"  # quick fix
         elif oformat == "int64":
-            jdl_type = "Long"
+            jdl_type = "String"  # quick fix
         else:
             jdl_type = "Long"
     elif otype == "number":
@@ -87,6 +87,13 @@ def extract_dtype_id(entity_tables, table_data):
                 "custom_name": convert_to_camel_case(entity),
                 "columns": {},
             }
+
+            # quick fix
+            if ret[entity]["custom_name"] and ret[entity]["custom_name"].endswith(
+                "Detail"
+            ):
+                ret[entity]["custom_name"] += "s"
+
             for attr in entity_attr:
                 if attr in table_dict[entity]:
                     column_data = table_dict[entity][attr]
@@ -274,7 +281,8 @@ def extract_entity_tables(
             resp_content = resp.get("content", {})
 
             for rh in resp_headers:
-                EntityObj.extract_field_data(rh)
+                for _, rhv in rh.items():
+                    EntityObj.extract_field_data(rhv)
 
             if resp_content:
                 EntityObj.extract_body_data(resp_content)
