@@ -11,8 +11,8 @@ import requests
 from api_designer.codegen.entity_init import extract_entity_tables
 from api_designer.utils.schema_manager import SchemaDeref
 
-POJO_URL = "http://test-1-python.ezapi.ai:8098/gendtopojos"
-# POJO_URL = "http://localhost:8098/gendtopojos"
+# POJO_URL = "http://test-1-python.ezapi.ai:8098/gendtopojos"
+POJO_URL = "http://localhost:8098/gendtopojos"
 
 
 def convert_to_camel_case(s):
@@ -161,14 +161,53 @@ class GenerateSchemas:
     def __init__(self, operation_data, project_data, schemas=None):
         self.operation_data = operation_data
         self.project_data = project_data
+        self.project_type = project_data.get("project_type")
         self.schemas = schemas
 
     def get_schema_data(self, schema_body):
         SD = SchemaDeref(self.schemas)
         return SD.deref_schema(schema_body)
 
-    def get_table_data(self, table_body):
-        pass
+    def get_field_data(self, data):
+        return {x: data[x] for x in DIRECT_KEYS if x in data}
+
+    def get_table_data(self, data):
+        ret = {}
+        selected_columns = data.get("selectedColumns", [])
+        for s in selected_columns:
+            sk = s["name"]
+            sv = self.get_field_data(s)
+            ret[sk] = sv
+
+        return ret
+
+    def get_table_objects(self, data):
+        ret = {}
+
+        if "properties" in data:
+            for k, v in data["properties"].items():
+                vtype = v.get("type")
+                ret[k] = {}
+
+                if v["type"] == "ezapi_table":
+                    ret[k] = self.get_table_data(v)
+                elif v["type"] in ["string", "number", "integer"]:
+                    ret[k] = self.get_field_data(v)
+
+        return ret
+
+    def get_table_body(self, table_body):
+        ret = {}
+        body_type = table_body.get("type")
+
+        if body_type == "object":
+            ret = self.get_table_objects(table_body)
+        elif body_type == "ezapi_table":
+            ret = self.get_table_data(table_body)
+        elif body_type in ["string", "number", "integer"]:
+            ret = self.get_field_data(table_body)
+
+        return ret
 
     def get_operation_schema(self):
         pojo_schemas = []
@@ -182,28 +221,34 @@ class GenerateSchemas:
             endpoint = path_data["endpoint"]
 
             if request_body:
-                pojo_schemas.append(
-                    {
-                        "projectid": self.project_data["projectId"],
-                        "name": path_data["method"]
-                        + "Request"
-                        + str(convert_to_camel_case(endpoint)),
-                        "path": self.get_schema_data(request_body),
-                    }
+                tmp_dict = {
+                    "projectid": self.project_data["projectId"],
+                    "name": path_data["method"]
+                    + "Request"
+                    + str(convert_to_camel_case(endpoint)),
+                }
+                tmp_dict["path"] = (
+                    self.get_schema_data(request_body)
+                    if self.project_type == "both"
+                    else self.get_table_body(request_body)
                 )
+                pojo_schemas.append(tmp_dict)
 
             for resp in response_data:
                 response_body = resp.get("content", {})
                 if resp["status_code"][0] == "2" and response_body:  # 2xx
-                    pojo_schemas.append(
-                        {
-                            "projectid": self.project_data["projectId"],
-                            "name": path_data["method"]
-                            + "Response"
-                            + str(convert_to_camel_case(endpoint)),
-                            "path": self.get_schema_data(response_body),
-                        }
+                    tmp_dict = {
+                        "projectid": self.project_data["projectId"],
+                        "name": path_data["method"]
+                        + "Response"
+                        + str(convert_to_camel_case(endpoint)),
+                    }
+                    tmp_dict["path"] = (
+                        self.get_schema_data(response_body)
+                        if self.project_type == "both"
+                        else self.get_table_body(response_body)
                     )
+                    pojo_schemas.append(tmp_dict)
 
         try:
             for ps in pojo_schemas:
@@ -234,18 +279,19 @@ def generate_jdl_file(projectid, db):
             "message": "Project type not supported for code generation",
         }
 
-    dirpath = Path("/mnt/codegen/" + projectid)
+    dirpath = Path("/Users/shbham/mnt/codegen/" + projectid)
     if dirpath.exists() and dirpath.is_dir():
         shutil.rmtree(dirpath)
 
-    Path("/mnt/codegen/" + projectid).mkdir(parents=True, exist_ok=True)
+    Path("/Users/shbham/mnt/codegen/" + projectid).mkdir(parents=True, exist_ok=True)
 
     gt.project_data = project_data
     gt.project_type = project_type
     gt.operation_data = operation_data
     gt.table_data = list(table_data)
-    gt.outfile = "/mnt/codegen/" + projectid + "/" + projectid + ".jdl"
+    gt.outfile = "/Users/shbham/mnt/codegen/" + projectid + "/" + projectid + ".jdl"
 
+    schemas_data = None
     if project_type == "both":
         schemas_data = db.components.find_one({"projectid": projectid})
         schemas_data = schemas_data.get("data").get("schemas", {})
@@ -256,6 +302,11 @@ def generate_jdl_file(projectid, db):
 
     gt.generate_jdl()
     gt.generate_code()
+
+    # Remove node_modules
+    node_modules_path = Path("/Users/shbham/mnt/codegen/" + projectid + "/node_modules")
+    if node_modules_path.exists() and node_modules_path.is_dir():
+        shutil.rmtree(node_modules_path)
 
     GS = GenerateSchemas(operation_data, project_data, schemas_data)
     ret, message = GS.get_operation_schema()

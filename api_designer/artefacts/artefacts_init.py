@@ -4,6 +4,7 @@
 
 from pprint import pprint
 import random
+import string
 import os, sys
 
 # from api_designer.artefacts import generate_db_only
@@ -112,8 +113,12 @@ class SchemaDeref:
 
 
 class GenerateData:
-    def __init__(self, schemas):
+    def __init__(self, schemas, is_response=False):
         self.schemas = schemas
+        self.is_response = is_response
+
+    def set_response_flag(self, is_response):
+        self.is_response = is_response
 
     def generate_ref_data(self, param_ref):
         ref_schema = param_ref["ezapi_ref"]
@@ -127,21 +132,34 @@ class GenerateData:
     def generate_object_data(self, param_object):
         ret = {}
         for k, v in param_object["properties"].items():
+            is_required = v.get("required", True)
+            toss_required = is_required or self.is_response
+            toss = 1 if toss_required else random.randint(0, 1)
+
             v_type = v.get("type")
 
-            if v_type == "object" and "properties" in v:
-                ret[k] = self.generate_object_data(v)
-            elif v_type == "array" and "items" in v:
-                ret[k] = self.generate_array_data(v, k)
-            elif v_type in DATA_TYPE_LIST:
-                ret[k] = generate_field_data(v, k)
-            elif "ezapi_ref" in v:
-                ret[k] = self.generate_ref_data(v)
+            if toss:
+                generated = None
+                if v_type == "object" and "properties" in v:
+                    generated = self.generate_object_data(v)
+                elif v_type == "array" and "items" in v:
+                    generated = self.generate_array_data(v, k)
+                elif v_type in DATA_TYPE_LIST:
+                    generated = generate_field_data(v, k)
+                elif "ezapi_ref" in v:
+                    generated = self.generate_ref_data(v)
+
+                if generated:
+                    ret[k] = generated
 
         return ret
 
     def generate_array_data(self, param_array, key=None):
         ret = []
+
+        is_required = param_array.get("required", True)
+        toss_required = is_required or self.is_response
+        toss = 1 if toss_required else random.randint(0, 1)
 
         v = param_array["items"]
         v_type = v.get("type")
@@ -150,15 +168,16 @@ class GenerateData:
         max_items = v.get("maxItems", MAX_ITEMS)
         arr_len = random.randint(min_items, max_items)
 
-        for _ in range(arr_len):
-            if v_type == "object" and "properties" in v:
-                ret.append(self.generate_object_data(v))
-            elif v_type == "array" and "properties" in v:
-                ret.append(self.generate_array_data(v))
-            elif v_type in DATA_TYPE_LIST:
-                ret.append(generate_field_data(v, key))
-            elif "ezapi_ref" in v:
-                ret.append(self.generate_ref_data(v))
+        if toss:
+            for _ in range(arr_len):
+                if v_type == "object" and "properties" in v:
+                    ret.append(self.generate_object_data(v))
+                elif v_type == "array" and "properties" in v:
+                    ret.append(self.generate_array_data(v))
+                elif v_type in DATA_TYPE_LIST:
+                    ret.append(generate_field_data(v, key))
+                elif "ezapi_ref" in v:
+                    ret.append(self.generate_ref_data(v))
 
         # avoid duplicate entries
         ret = [i for n, i in enumerate(ret) if i not in ret[:n]]
@@ -213,8 +232,11 @@ class GenerateData:
 
 
 class GenerateTableData:
-    def __init__(self):
-        pass
+    def __init__(self, is_response=False):
+        self.is_response = is_response
+
+    def set_response_flag(self, is_response):
+        self.is_response = is_response
 
     def generate_ref_data(self, param_ref):
         selected_columns = param_ref.get("selectedColumns", [])
@@ -280,6 +302,18 @@ class GenerateTableData:
             "body": self.generate_body_data(request_data["body"]),
         }
         return payload
+
+
+def misspell_single_letter(text):
+    if not text:
+        return text
+    text = list(text)
+    for s in string.ascii_letters:
+        if s in text:
+            idx = text.index(s)
+            text[idx] = "a" if text[idx] != "a" else "e"
+            break
+    return "".join(text)
 
 
 def is_name_matched(name1, name2):
@@ -467,6 +501,8 @@ def generate_artefacts(projectid, db):
                 "testcaseId": None,
             }
 
+            gd.set_response_flag(True)
+
             for resp in path["responseData"]:
                 testdata["status"] = resp["status_code"]
                 testdata["assertionData"] = (
@@ -498,11 +534,12 @@ def generate_artefacts(projectid, db):
 
                 elif resp["status_code"] == "404":  # not found
                     tmp = test_copy["endpoint"].split("/")
-                    for i, t in enumerate(tmp):
-                        tmp[i] = "abc" + tmp[i]
-                        break
+                    tmp[0] = misspell_single_letter(tmp[0])
+                    # for i, t in enumerate(tmp):
+                    #     tmp[i] = "abc" + tmp[i]
+                    #     break
                     test_copy["endpoint"] = "/".join(tmp)
-                    test_copy["description"] = "uri not found"
+                    test_copy["description"] = "misspelled uri, not found"
                     generated = True
 
                 elif resp["status_code"] == "405":  # method not allowed

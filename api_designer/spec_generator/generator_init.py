@@ -463,10 +463,12 @@ class SpecGenerator:
         pass
 
     def write_spec(self):
+        project_name = self.project_data.get("projectName", "API Project")
+
         self.spec = {
             "openapi": "3.0.0",
             "info": {
-                "title": "API Project",
+                "title": project_name,
                 "description": "EzAPI Generated Spec - OpenAPI 3.0",
                 "version": "0.0.1",
             },
@@ -497,10 +499,11 @@ def generate_spec(projectid, db):
         }
 
     if project_type == "db":
-        return generate_db_only.generate_spec(projectid, db)
+        return generate_db_only.generate_spec(project_data, projectid, db)
 
     try:
         SG = SpecGenerator(projectid, db)
+        SG.project_data = project_data
 
         if not SG.path_orig:
             return {

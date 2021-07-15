@@ -231,10 +231,12 @@ class SpecGenerator:
         self.paths = res
 
     def write_spec(self):
+        project_name = self.project_data.get("projectName", "API Project")
+
         self.spec = {
             "openapi": "3.0.0",
             "info": {
-                "title": "API Project",
+                "title": project_name,
                 "description": "EzAPI Generated Spec - OpenAPI 3.0",
                 "version": "0.0.1",
             },
@@ -244,20 +246,26 @@ class SpecGenerator:
         return self.spec
 
 
-def generate_spec(projectid, db):
-    SG = SpecGenerator(projectid, db)
+def generate_spec(project_data, projectid, db):
+    try:
+        SG = SpecGenerator(projectid, db)
+        SG.project_data = project_data
 
-    if not SG.operations:
-        return {
-            "success": False,
-            "status": 404,
-            "message": "operation data not found",
-        }
+        if not SG.operations:
+            return {
+                "success": False,
+                "status": 404,
+                "message": "operation data not found",
+            }
 
-    SG.generate_path()
-    spec_data = SG.write_spec()
+        SG.generate_path()
+        spec_data = SG.write_spec()
 
-    spec_document = {"projectid": projectid, "data": spec_data}
-    config.store_document(SPEC_COLLECTION, spec_document, db)
+        spec_document = {"projectid": projectid, "data": spec_data}
+        config.store_document(SPEC_COLLECTION, spec_document, db)
 
-    return {"success": True, "status": 200, "data": spec_data}
+        return {"success": True, "status": 200, "message": "ok"}
+    except Exception as e:
+        print("Spec Generator Error - ", str(e))
+        return {"success": False, "status": 500, "message": str(e)}
+
