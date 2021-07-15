@@ -279,7 +279,7 @@ def generate_jdl_file(projectid, db):
             "message": "Project type not supported for code generation",
         }
 
-    dirpath = Path("/Users/shbham/mnt/codegen/" + projectid)
+    dirpath = Path("/mnt/codegen/" + projectid)
     if dirpath.exists() and dirpath.is_dir():
         shutil.rmtree(dirpath)
 
