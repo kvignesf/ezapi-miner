@@ -174,28 +174,32 @@ class GenerateSchemas:
     def get_field_data(self, data):
         return {x: data[x] for x in DIRECT_KEYS if x in data}
 
-    def get_table_data(self, data):
+    def get_table_data(self, data, add_parent=False):
         ret = {}
+        table_name = data["name"]
         selected_columns = data.get("selectedColumns", [])
         for s in selected_columns:
             sk = s["name"]
             sv = self.get_field_data(s)
             ret[sk] = sv
 
+        if add_parent:
+            ret = {"type": "object", "properties": ret}
+
         return ret
 
     def get_table_objects(self, data):
-        ret = {}
+        ret = {"type": "object", "properties": {}}
 
         if "properties" in data:
             for k, v in data["properties"].items():
                 vtype = v.get("type")
-                ret[k] = {}
+                ret["properties"][k] = {}
 
-                if v["type"] == "ezapi_table":
-                    ret[k] = self.get_table_data(v)
-                elif v["type"] in ["string", "number", "integer"]:
-                    ret[k] = self.get_field_data(v)
+                if vtype == "ezapi_table":
+                    ret["properties"][k] = self.get_table_data(v)
+                elif vtype in ["string", "number", "integer"]:
+                    ret["properties"][k] = self.get_field_data(v)
 
         return ret
 
@@ -206,7 +210,7 @@ class GenerateSchemas:
         if body_type == "object":
             ret = self.get_table_objects(table_body)
         elif body_type == "ezapi_table":
-            ret = self.get_table_data(table_body)
+            ret = self.get_table_data(table_body, add_parent=True)
         elif body_type in ["string", "number", "integer"]:
             ret = self.get_field_data(table_body)
 
@@ -253,6 +257,8 @@ class GenerateSchemas:
                         else self.get_table_body(response_body)
                     )
                     pojo_schemas.append(tmp_dict)
+
+        pprint(pojo_schemas)
 
         try:
             for ps in pojo_schemas:

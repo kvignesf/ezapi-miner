@@ -50,6 +50,14 @@ def get_jdl_type(openapi_tf):
     return jdl_type
 
 
+"""
+claim.claim_status -> {
+    tabel: tbl_clm_claim_master
+    column: claim-status
+}
+"""
+
+
 def transform_matcher(matcher_data):
     matcher_dict = {}
 
