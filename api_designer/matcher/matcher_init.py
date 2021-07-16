@@ -58,6 +58,14 @@ def transform_tables_data(tables_data):
     return tables_data
 
 
+"""
+Example - 
+
+name1 - (claim_number, [claim, number])
+name2 - (claim_num, [claim, num])
+"""
+
+
 def name_matching(name1, name2):  # snake case and wordlist
     direct_match_score = word_match(name1[0], name2[0])
     split_match_score = 0
@@ -194,6 +202,7 @@ def solve_matching(schemas_data, tables_data, projectid):
             sd_attributes = [x for x in sd_attributes if x["is_child"]]  # changed
 
             nm_score = name_matching(sd_name, td_name)
+
             attribute_score = match_attributes(
                 sd_name[0], sd_attributes, td_name[0], td_attributes
             )

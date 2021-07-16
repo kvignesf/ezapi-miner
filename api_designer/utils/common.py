@@ -148,6 +148,12 @@ def check_abbreviation(word1, word2):
     #     return min(0.75, (total_len - 2) / total_len)
 
 
+# changes required to convert one string to another
+# Example1 - claim -> cleim (1 change, a -> e)
+# Example2 - claim -> cliam (1 chane, transpose ai -> ia)
+# Example3 - claim -> clim (1 change, insert a)
+
+
 def osaDistance(s1, s2, transposition=True):
     s1 = s1.lower()
     s2 = s2.lower()
@@ -238,8 +244,44 @@ def get_common_word(items):
     return common
 
 
+"""
 # Input - list of words
 # Output - Joint string (snake-cased), (splitted word) list
+
+
+# Example 1
+--> Input
+[
+    claim-number
+    clim-status
+    operationId
+]
+
+-> output
+[
+    (claim_number, [claim, number]),
+    (claim_status, [claim, status]),
+    (operation_id, [operation, id]),
+]
+
+
+# Example 2
+--> Input
+[
+    col_claim_number
+    col_claim_status
+    col_claim_detail
+]
+
+--> output
+[
+    (claim_number, [claim, number]),
+    (claim_status, [claim, status]),
+    (claim_detail, [claim, detail])
+]
+"""
+
+
 def transform_naming(wordlist, remove=True):
     num_words = len(wordlist)
 
