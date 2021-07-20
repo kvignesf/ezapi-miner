@@ -341,7 +341,9 @@ class SpecGenerator:
                                     break
 
                             if not is_schema_exist:
-                                self.schemas[generated_schema_name] = body_data
+                                self.schemas[
+                                    generated_schema_name
+                                ] = SpecGenerator.prepare_body_data(body_data)
 
                             tmp["content"]["application/json"]["schema"][
                                 "ezapi_ref"
@@ -432,6 +434,30 @@ class SpecGenerator:
             if not res[endpoint][method][BODY_KEY]:
                 del res[endpoint][method][BODY_KEY]
         self.paths = res
+
+    @staticmethod
+    def prepare_body_data(body_data):
+        ret = {}
+
+        transform_body_data = {
+            k: v
+            for k, v in body_data.items()
+            if k in PARAMETER_SCHEMA_KEYS + ["description", "required"] and v
+        }
+
+        if (
+            "type" in body_data
+            and body_data["type"] in ["string", "number", "integer", "boolean"]
+            and "name" in body_data
+        ):
+            ret = {
+                "type": "object",
+                "properties": {body_data["name"]: transform_body_data},
+            }
+        else:
+            ret = transform_body_data
+
+        return ret
 
     # required - should be an array of property names required within an object schema
     @staticmethod
