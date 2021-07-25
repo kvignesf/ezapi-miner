@@ -27,6 +27,6 @@ deploy-test:
 deploy-stage:
   stage: deploy
   image: alpine 
-  extends: .deploy-python-devinstance-stage.yaml
+  extends: .deploy-python-devinstance-stage
   only: 
     - stage
