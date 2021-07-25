@@ -19,13 +19,13 @@ build:
   stage: build
   extends: .build
 deploy-test:
-  stage: deploy
+  stage: deploy-test
   image: alpine 
   extends: .deploy-refactoredv3
   only: 
     - refactoredv3
 deploy-stage:
-  stage: deploy
+  stage: deploy-stage
   image: alpine 
   extends: .deploy-python-devinstance-stage
   only: 
