@@ -1,0 +1,20 @@
+application {
+  config {
+    baseName <baseName>
+    packageName <packageName>
+    enableTranslation <enableTranslation>
+    languages <languages>
+	applicationType <applicationType>
+	authenticationType <authenticationType>
+	databaseType <databaseType>
+	prodDatabaseType <prodDatabaseType>
+	devDatabaseType <devDatabaseType>
+	skipClient <skipClient>
+	testFrameworks <testFrameworks>
+	serviceDiscoveryType <serviceDiscoveryType>
+	serverPort <serverPort>
+	reactive <reactive>
+	buildTool <buildTool>
+  }  
+  entities *
+}
