@@ -12,6 +12,7 @@ from api_designer.main import EzAPIModels
 
 from werkzeug import Request, Response
 from werkzeug import exceptions as exc
+from decouple import config
 
 
 def json_response(data, status=200):

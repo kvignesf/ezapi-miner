@@ -5,12 +5,17 @@
 
 import copy
 import pymongo
+from decouple import config
 
 
 def get_db_connection(dbname="ezapi", host="localhost", port=27017):
     # client = pymongo.MongoClient(host, port)
+    # client = pymongo.MongoClient(
+    #     "mongodb://root:JRVvuh9D5V0IZxCW@34.66.45.162:27017/?authSource=admin",
+    #     Connect=False,
+    # )
     client = pymongo.MongoClient(
-        "mongodb://root:JRVvuh9D5V0IZxCW@34.66.45.162:27017/?authSource=admin",
+        config('dbconfig'),
         Connect=False,
     )
     db = client[dbname]

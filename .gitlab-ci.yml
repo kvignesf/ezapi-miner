@@ -1,4 +1,11 @@
 image: node:14.14.0-alpine3.12
+before_script:
+  - 'echo \dbconfig\ = \"$test_db_instance\">> .env.test'
+  - cat .env.test
+  - 'echo \dbconfig\ = \"$stage_db_instance\">> .env.stage'
+  - cat .env.stage
+  - 'echo \dbconfig\ = \"$prod_db_instance\">> .env.prod'
+  - cat .env.prod
 include:
   project: 'ezapi_poc/infra_poc'
   file: 
@@ -14,7 +21,7 @@ stages:
 whitesource-test:
   stage: whitesource-test
   image: ubuntu:20.04
-  extends: .sast-whitesource  
+  extends: .sast-whitesource
   only:
     - refactoredv3
 build:
