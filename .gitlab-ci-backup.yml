@@ -1,0 +1,38 @@
+image: node:14.14.0-alpine3.12
+stages:
+  - build
+  - deploy
+build:
+  stage: build
+  script:
+    - apk add zip
+    - npm install
+    - ls -la ../apiops_model
+    - zip apiops_model.zip -r ../apiops_model
+  artifacts:
+    paths:
+    - apiops_model.zip
+deployssh:
+  image: alpine
+  stage: deploy
+  script:
+    - apk update
+    - apk add openssh
+# Install the SSH keys
+    - mkdir ~/.ssh
+    - echo "$DEV_ID_RSA" >> ~/.ssh/id_rsa
+    - echo "$DEV_ID_RSA_PUB" >> ~/.ssh/id_rsa.pub
+    - chmod 600 ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa.pub
+# Start the ssh daemon and add the private key
+    - eval $(ssh-agent -s)
+    - ssh-add ~/.ssh/id_rsa
+    #- cat ~/.ssh/id_rsa.pub > ~/.ssh/authorized_keys
+    - '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
+# Execute a remote command
+    - ssh deploy@104.197.42.14 "rm -rf /tmp/apiops_model && exit"
+    - scp apiops_model.zip deploy@104.197.42.14:/tmp/apiops_model.zip
+    - ssh deploy@104.197.42.14 "unzip -uq -d /tmp/apiops_model/ /tmp/apiops_model.zip"
+    - ssh deploy@104.197.42.14 "cd /tmp/apiops_model/apiops_model && docker-compose down && exit"
+    - ssh deploy@104.197.42.14 "cd /tmp/apiops_model/apiops_model && docker-compose up --build -d  && exit"
+
