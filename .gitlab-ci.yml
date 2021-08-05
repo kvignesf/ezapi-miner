@@ -1,10 +1,13 @@
 image: node:14.14.0-alpine3.12
 before_script:
   - 'echo \dbconfig\ = \"$test_db_instance\">> .env.test'
+  - 'echo \pojogenurl\ = \"$test_pojogen_url\">> .env.test'
   - cat .env.test
   - 'echo \dbconfig\ = \"$stage_db_instance\">> .env.stage'
+  - 'echo \pojogenurl\ = \"$stage_pojogen_url\">> .env.stage'
   - cat .env.stage
   - 'echo \dbconfig\ = \"$prod_db_instance\">> .env.prod'
+  - 'echo \pojogenurl\ = \"$prod_pojogen_url\">> .env.prod'
   - cat .env.prod
 include:
   project: 'ezapi_poc/infra_poc'
@@ -13,11 +16,13 @@ include:
     - 'buildpython.yml'
     - 'deploy-python-refactoredv3.yaml'
     - 'deploy-python-devinstance-stage.yaml'
+    - 'deploy-python-demo-master.yaml'
 stages:
   - whitesource-test
   - build
   - deploy-test
   - deploy-stage
+  - deploy-master
 whitesource-test:
   stage: whitesource-test
   image: ubuntu:20.04
@@ -39,3 +44,9 @@ deploy-stage:
   extends: .deploy-python-devinstance-stage
   only: 
     - stage
+deploy-master:
+  stage: deploy-master
+  image: alpine 
+  extends: .deploy-python-demo-master
+  only: 
+    - master

@@ -10,8 +10,11 @@ import requests
 
 from api_designer.codegen.entity_init import extract_entity_tables
 from api_designer.utils.schema_manager import SchemaDeref
+from decouple import config
 
-POJO_URL = "http://test-1-python.ezapi.ai:8098/gendtopojos"
+
+POJO_URL = config('pojogenurl')
+#POJO_URL = "http://test-1-python.ezapi.ai:8098/gendtopojos"
 # POJO_URL = "http://localhost:8098/gendtopojos"
 
 USER_ROOT_DIR = ""
