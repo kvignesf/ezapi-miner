@@ -11,6 +11,11 @@ import re
 constraint = re.compile("\[(\w+)\] +(asc|desc)")
 
 # Reference - https://www.w3schools.com/sql/sql_datatypes.asp
+
+DATA_TYPES_NUMERIC_POSTGRES = [
+    "smallint",
+    "integer"
+]
 _DATA_TYPES_NUMERIC = [
     "bit",
     "tinyint",
@@ -182,12 +187,17 @@ def get_alter_table_data(text):
 
 def get_table_data(lines):
     res = []
+    print("lines", lines)
     for line in lines:
+        print("line1", line)
         line = line.replace("\n", " ")
+        print("line2", line)
         line = re.sub("\t", " ", line)
+        print("line3", line)
         line = re.sub(" +", " ", line)
+        print("line4", line)
         line = line.strip()
-
+        print("line5", line)
         if line.startswith("create table"):  # table found
             tmp = line.split("(", 1)
 
@@ -213,14 +223,83 @@ def get_table_data(lines):
 
 def parse_ddl_file(ddl_file, projectid=None, ddl_filename=None, db=None):
     file = open(ddl_file, "r+")
-    filedata = file.readlines()
+    print('file', file)
 
+    filedata = file.readlines()
+    print('filedata', filedata)
     filedata = "".join(filedata)
     filedata = filedata.lower()
     filedata = filedata.split("\ngo\n")
+    print('filedata', filedata)
 
     tables = get_table_data(filedata)
+    print('tables', tables)
+    for table in tables:
+        table_collection = "tables"
+        table_document = table
+        table_document["projectid"] = projectid
+        table_document["ddl_file"] = ddl_filename
 
+        config.store_document(table_collection, table_document, db)
+
+    return {"success": True, "status": 200, "message": "ok"}
+
+
+def get_db_table_data(lines):
+    res = []
+    print("lines", lines)
+    for line in lines:
+        print("line1", line)
+        line = line.replace("\n\n\n", " ")
+        print("line2", line)
+        line = re.sub("\t", " ", line)
+        print("line3", line)
+        line = re.sub(" +", " ", line)
+        print("line4", line)
+        line = line.strip()
+        print("line5", line)
+        if line.startswith("create table"):  # table found
+            if line.__contains__(";"):
+                tmp = line.split(";")[0].split("(", 1)
+            else:
+                tmp = line.split("(", 1)
+
+            if len(tmp) != 2:
+                continue
+
+            table_data = extract_table_data(tmp[0])
+            column_data = extract_column_data(tmp[1])
+
+            res.append(
+                {
+                    "schema": table_data[0],
+                    "table": table_data[1],
+                    "attributes": column_data,
+                }
+            )
+
+        # if line.startswith("alter table"):
+        #     get_alter_table_data(line)
+
+    return res
+
+
+def parse_db_ddl_file(ddl_file, projectid=None, ddl_filename=None, db_type=None, db=None):
+    file = open(ddl_file, "r+")
+    print('file', file)
+    print('dbType', db_type)
+    filedata = file.readlines()
+    print('filedata', filedata)
+    filedata = "".join(filedata)
+    filedata = filedata.lower()
+    if db_type == "postgres":
+        filedata = filedata.split("--")
+    else:
+        filedata = filedata.split("\ngo\n")
+    print('filedata', filedata)
+
+    tables = get_db_table_data(filedata)
+    print('tables', tables)
     for table in tables:
         table_collection = "tables"
         table_document = table

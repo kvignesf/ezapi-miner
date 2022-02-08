@@ -194,5 +194,40 @@ def codegen_model():
     return json_response(ret, status=ret["status"])
 
 
+@app.route("/db_ddl_parser", methods=["POST"])
+def db_ddl_parser_model():
+    print("DDL Parser Received")
+    ddl_file = request.files.getlist("ddl_file", None)
+    projectid = str(request.form.get("projectid", ""))
+    dbType = str(request.form.get("dbtype", ""))
+
+    if not os.path.exists("./uploads"):
+        os.makedirs("./uploads")
+
+    if ddl_file and projectid and dbType:
+        if len(ddl_file) != 1:
+            ret = bad_request(
+                {"success": False, "message": "Some parameters are missing"}
+            )
+        else:
+            ddl_file = ddl_file[0]
+            ddl_filename = ddl_file.filename
+            ddl_path = "./uploads/" + ddl_filename
+            ddl_file.save(ddl_path)
+
+            model = EzAPIModels(projectid)
+            model.set_db_instance()
+            ret = model.parse_db_ddl_file(ddl_path, ddl_filename, dbType)
+            model.client.close()
+    else:
+        ret = bad_request({"success": False, "message": "Some parameters are missing"})
+
+    try:
+        os.remove(ddl_path)
+    except Exception as e:
+        print("Error deleting Uploaded File")
+
+    return json_response(ret, status=ret["status"])
+
 if __name__ == "__main__":
     app.run(debug=True)
