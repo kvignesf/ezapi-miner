@@ -6,6 +6,7 @@
 
 from api_designer import config
 from api_designer.ddl_parser import dtmapper
+from multipledispatch import dispatch
 from pprint import pprint
 import re
 
@@ -67,7 +68,23 @@ def remove_prefix(text, prefix):
         text = text.strip()
     return text
 
+@dispatch(str)
+def extract_table_data(text):
+    schema_name = None
+    table_name = None
 
+    text = remove_prefix(text, "create table")
+    text = text.split(".")  # separate schema and table
+
+    if len(text) == 1:
+        table_name = re.sub("[\[\]]", "", text[0])
+
+    elif len(text) == 2:
+        schema_name = re.sub("[\[\]]", "", text[0])
+        table_name = re.sub("[\[\]]", "", text[1])
+    return schema_name, table_name
+
+@dispatch(str, str)
 def extract_table_data(text, db_type):
     schema_name = None
     table_name = None
@@ -85,6 +102,7 @@ def extract_table_data(text, db_type):
         schema_name = re.sub("[\[\]]", "", text[0])
         table_name = re.sub("[\[\]]", "", text[1])
     return schema_name, table_name
+
 
 
 def extract_column_values(text):
