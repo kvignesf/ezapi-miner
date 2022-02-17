@@ -121,6 +121,7 @@ def extract_mysql_column_values(text):
     text = re.sub("[\[\]]", "", text)
     text = text.strip(" ,\n")
     text = text.split(" ")
+    print("text after stripping:", text)
     
     column_values = {}
     if len(text) >= 2:
