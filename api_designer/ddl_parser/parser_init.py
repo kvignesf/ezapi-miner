@@ -359,7 +359,7 @@ def parse_ddl_file(ddl_file, projectid=None, ddl_filename=None, db=None):
     print('filedata', filedata)
 
     tables = get_table_data(filedata)
-    print('tables', tables)
+    #print('tables', tables)
     for table in tables:
         table_collection = "tables"
         table_document = table

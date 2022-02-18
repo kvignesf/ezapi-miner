@@ -238,6 +238,7 @@ def db_ddl_generator_model():
     username = str(request.form.get("username", ""))
     password = str(request.form.get("password", ""))
     database = str(request.form.get("database", ""))
+    #dbtype = str(request.form.get("dbtype", ""))
 
     if not os.path.exists("./uploads"):
         os.makedirs("./uploads")
