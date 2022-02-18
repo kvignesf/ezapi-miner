@@ -10,4 +10,4 @@ Werkzeug==1.0.1
 wordninja==2.0.0
 python-decouple==3.4
 multipledispatch==0.6.0
-pycryptodomex=3.14.1
+pycryptodomex==3.14.1
