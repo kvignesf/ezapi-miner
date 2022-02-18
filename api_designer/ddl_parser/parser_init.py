@@ -8,7 +8,9 @@ from api_designer import config
 from api_designer.ddl_parser import dtmapper
 from multipledispatch import dispatch
 from pprint import pprint
-import re
+import re,subprocess,time
+
+from api_designer.utils.decrypter import _decrypt
 
 constraint = re.compile("\[(\w+)\] +(asc|desc)")
 
@@ -350,7 +352,7 @@ def parse_ddl_file(ddl_file, projectid=None, ddl_filename=None, db=None):
     file = open(ddl_file, "r+")
 
     filedata = file.readlines()
-    print('filedata', filedata)
+    #print('filedata', filedata)
     filedata = "".join(filedata)
     filedata = filedata.lower()
     filedata = filedata.split("\ngo\n")
@@ -432,3 +434,52 @@ def parse_db_ddl_file(ddl_file, projectid=None, ddl_filename=None, db_type=None,
         config.store_document(table_collection, table_document, db)
 
     return {"success": True, "status": 200, "message": "ok"}
+
+def gen_db_ddl_file(serverAddr, username, password, database, projectid, dbinstance):
+    passkey='ezapidbpwdhandshake'
+    errlist = ['fail','Error','Exception']
+    errResponseMsg = ""
+    fileName = projectid + "_" + database + "_" + str(current_milli_time()) + ".sql"
+    totalfilePath = "./uploads/gen_ddls/" + fileName;
+    print("fileName", fileName, type("% s" % fileName))
+
+    decryptedpassword = _decrypt(bytes(password, 'utf-8'), "", passkey)
+    if (decryptedpassword == 'invalidencryption'):
+        ret = {"success": False, "status": 420, "message": "invalid encryption"}
+    else:
+        print("decryptedpassword",decryptedpassword)
+        ddlgencmd = "mssql-scripter -S " + serverAddr + " -d " + database + " -U " + username + " -P " + bytes.decode(decryptedpassword) + " -f ./uploads/gen_ddls/" + fileName
+
+        returnVal = subprocess.run(ddlgencmd, shell=True, capture_output=True)
+        print("returnVal", returnVal.stdout.splitlines())
+        if any(x in str(returnVal).split(",")[2] for x in errlist):
+            retStatusCd = -1
+            errResponseMsg = getErrMsg(returnVal.stdout.splitlines())
+        else:
+            print((str(returnVal).split(",")[1]).split("=")[1].replace(")", ""))
+            retStatusCd = (str(returnVal).split(",")[1]).split("=")[1].replace(")", "")
+        if (retStatusCd == '0'):
+            print("success")
+            ret = parse_ddl_file(totalfilePath, projectid, fileName, dbinstance)
+        else:
+            print(retStatusCd)
+            ret = {"success": False, "status": 420, "message": "ddl generation failed", "errdetails": errResponseMsg}
+
+    #return {"success": True, "status": 200, "message": "ok"}
+    return ret
+
+def current_milli_time():
+    return round(time.time() * 1000)
+def getErrMsg(lines):
+    #print(text.split("=")[1].strip())
+    #text = text.split("=")[1].strip()
+
+    #lines = text.split("\r\r\n")
+    for line in lines:
+        if "Exception" in line.decode('utf-8'):
+            print("line", line.decode('utf-8'))
+            exceptionLine = line.decode('utf-8')
+            #if "SqlException" in exceptionLine:
+            errmsg = "SqlException" + (exceptionLine.split(":")[-1])
+            break
+    return errmsg

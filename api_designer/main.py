@@ -13,6 +13,8 @@ from api_designer.artefacts.artefacts_init import generate_artefacts
 from api_designer.visualizer.sankey import process_sankey_visualizer
 from api_designer.codegen.jdl_init import generate_jdl_file
 from api_designer.ddl_parser.parser_init import parse_db_ddl_file
+from api_designer.ddl_parser.parser_init import gen_db_ddl_file
+
 
 class EzAPIModels:
     def __init__(self, projectid):
@@ -33,6 +35,10 @@ class EzAPIModels:
 
     def parse_db_ddl_file(self, ddl_path, ddl_filename, db_type):
         ret = parse_db_ddl_file(ddl_path, self.projectid, ddl_filename, db_type, self.db)
+        return ret
+
+    def gen_db_ddl_file(self, server, username, password, database):
+        ret = gen_db_ddl_file(server, username, password, database, self.projectid, self.db)
         return ret
 
     def matcher(self):
