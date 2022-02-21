@@ -141,7 +141,7 @@ def extract_mysql_column_values(text):
     text = re.sub("[\[\]]", "", text)
     text = text.strip(" ,\n")
     text = text.split(" ")
-    print("text after stripping:", text)
+    # print("text after stripping:", text)
     
     column_values = {}
     if len(text) >= 2:
@@ -215,7 +215,7 @@ def extract_mysql_constraint_keys(text):
         column_name = column_name.strip("`")
         outer_dict["keyType"] = "primary"
         outer_dict["constraint"] = inner_dict
-        print("important:",column_name,outer_dict)
+        # print("important:",column_name,outer_dict)
         initial_list.append(outer_dict)
         return column_name, initial_list
 
@@ -239,7 +239,7 @@ def extract_mysql_constraint_keys(text):
         column_name = column_name.strip("`")
         outer_dict["keyType"] = "unique"
         outer_dict["constraint"] = inner_dict
-        print("important:",column_name,outer_dict)
+        # print("important:",column_name,outer_dict)
         initial_list.append(outer_dict)
         return column_name, initial_list
 
@@ -254,11 +254,11 @@ def extract_mysql_column_data(text):
 
     for cc in tmp:
         if cc.startswith("\n primary"):
-            print("primary keyyy")
+            # print("primary keyyy")
             column_name, constraint_list = extract_mysql_constraint_keys(cc)
             primarykey_dict[column_name] = constraint_list
         elif cc.startswith("\n constraint"):
-            print("foriegn keyyy")
+            # print("foriegn keyyy")
             column_name, constraint_list = extract_mysql_constraint_keys(cc)
             foreignkey_dict[column_name] = constraint_list
         elif cc.startswith("\n unique"):
@@ -319,7 +319,7 @@ def get_alter_table_data(text):
 
 def get_table_data(lines):
     res = []
-    print("lines", lines)
+    # print("lines", lines)
     for line in lines:
         line = line.replace("\n", " ")
         line = re.sub("\t", " ", line)
@@ -378,13 +378,12 @@ def get_db_table_data(lines, db_type):
         line = re.sub("\t", " ", line)
         line = re.sub(" +", " ", line)
         line = line.strip()
-        print("line after removing spaces and \n and tabspaces:", line)
+        # print("line after removing spaces and \n and tabspaces:", line)
         if line.startswith("create table"):  # table found
             if line.__contains__(";"):
                 tmp = line.split(";")[0].split("(", 1)
-                print(tmp)
+                # print(tmp)
             else:
-                print("!!!!!!!!!!")
                 tmp = line.split("(", 1)
 
             if len(tmp) != 2:
