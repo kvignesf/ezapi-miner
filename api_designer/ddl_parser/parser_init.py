@@ -422,7 +422,7 @@ def parse_db_ddl_file(ddl_file, projectid=None, ddl_filename=None, db_type=None,
         filedata = filedata.split("\ngo\n")
     
     tables = get_db_table_data(filedata, db_type)
-    print('tables', tables)
+    # print('tables', tables)
     for table in tables:
         table_collection = "tables"
         table_document = table
