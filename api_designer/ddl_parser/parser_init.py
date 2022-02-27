@@ -8,7 +8,7 @@ from api_designer import config
 from api_designer.ddl_parser import dtmapper
 from multipledispatch import dispatch
 from pprint import pprint
-import re,subprocess,time
+import re, subprocess, time
 
 from api_designer.utils.decrypter import _decrypt
 
@@ -16,9 +16,13 @@ constraint = re.compile("\[(\w+)\] +(asc|desc)")
 
 # Reference - https://www.w3schools.com/sql/sql_datatypes.asp
 
-DATA_TYPES_NUMERIC_POSTGRES = [
+_DATA_TYPES_NUMERIC_POSTGRES = [
     "smallint",
     "integer"
+]
+_DATA_TYPES_STRING_POSTGRES = [
+    "character",
+    "boolean"
 ]
 _DATA_TYPES_NUMERIC = [
     "bit",
@@ -60,7 +64,7 @@ _DATA_TYPES_STRING = [
 _DATA_TYPES_OTHER = ["sql_variant", "uniqueidentifier", "xml", "cursor", "table"]
 
 _DATA_TYPES_ALL = (
-    _DATA_TYPES_NUMERIC + _DATA_TYPES_DATETIME + _DATA_TYPES_STRING + _DATA_TYPES_OTHER
+    _DATA_TYPES_NUMERIC + _DATA_TYPES_DATETIME + _DATA_TYPES_STRING + _DATA_TYPES_OTHER + _DATA_TYPES_NUMERIC_POSTGRES + _DATA_TYPES_STRING_POSTGRES
 )
 
 
@@ -207,17 +211,20 @@ def extract_column_data(text):
 def extract_mysql_constraint_keys(text):
     text = text.strip(" \n")
     initial_list = []
+    column_name_list = []
     outer_dict = {}
     inner_dict = {}
 
     if text.startswith("primary"):
-        column_name = text.split('(')[1].split(')')[0]
-        column_name = column_name.strip("`")
+        column_names = text.split('(')[1].split(',')
+        for each_name in column_names:
+            each_name = each_name.strip(" `\n")
+            column_name_list.append(each_name)
         outer_dict["keyType"] = "primary"
         outer_dict["constraint"] = inner_dict
         # print("important:",column_name,outer_dict)
         initial_list.append(outer_dict)
-        return column_name, initial_list
+        return column_name_list, initial_list
 
     elif text.startswith("constraint"):
         tmp = text.split('(',1)[1].split(')',1)
@@ -243,6 +250,51 @@ def extract_mysql_constraint_keys(text):
         initial_list.append(outer_dict)
         return column_name, initial_list
 
+def extract_postgres_column_values(text):
+    text = re.sub("[\[\]]", "", text)
+    text = text.strip(" ,\n")
+    text = text.split(" ")
+    print("column_values:",text)
+    column_values = {}
+
+    if len(text) >= 2:
+        name, dt = text[0], text[1]
+
+        if dt.split("(")[0] not in _DATA_TYPES_ALL:
+            print("*Error - Unidentified Data Type ", dt)
+            return None
+
+        column_values["name"] = name
+        column_values["datatype"] = dt
+        column_values["valueconstraint"] = "null"
+
+        openapi_type = dtmapper.convert_sql_server_dtype(dt)
+        column_values["openapi"] = openapi_type
+
+        if "identity(1,1)" in text:
+            column_values["serial"] = True
+
+        if len(text) >= 3 and text[-2] == "not":
+            column_values["valueconstraint"] = "not null"
+
+        return column_values
+    return None
+
+
+
+def extract_postgres_column_data(text):
+    column_values = []
+    print("postgresText:",text)
+    tmp = text.split(",")
+    print("tmp:",tmp)
+
+    for cc in tmp:
+        cc = cc.strip(" \n")
+        ret = extract_postgres_column_values(cc)
+        column_values.append(ret)
+    return column_values
+    
+        
 
 
 def extract_mysql_column_data(text):
@@ -252,21 +304,40 @@ def extract_mysql_column_data(text):
     column_values = []
     tmp = text.split(",")
 
+    primaryKeyStatement = ""
+    flag = -1
     for cc in tmp:
+    
+        if flag == 0:
+            cc = cc.strip(" \n'")
+            primaryKeyStatement = primaryKeyStatement + cc + ","
+            if ")" in cc:
+                primaryKeyStatement = primaryKeyStatement.split(")",1)[0]
+                flag = 1
+                column_name_list, constraint_list = extract_mysql_constraint_keys(primaryKeyStatement)
+                for column_name in column_name_list:
+                    primarykey_dict[column_name] = constraint_list
         if cc.startswith("\n primary"):
-            # print("primary keyyy")
-            column_name, constraint_list = extract_mysql_constraint_keys(cc)
-            primarykey_dict[column_name] = constraint_list
-        elif cc.startswith("\n constraint"):
-            # print("foriegn keyyy")
-            column_name, constraint_list = extract_mysql_constraint_keys(cc)
-            foreignkey_dict[column_name] = constraint_list
-        elif cc.startswith("\n unique"):
-            column_name, constraint_list = extract_mysql_constraint_keys(cc)
-            uniquekey_dict[column_name] = constraint_list
+            cc = cc.strip(" \n")
+            flag = 0
+            primaryKeyStatement = primaryKeyStatement + cc + "," 
+            if ")" in cc:
+                primaryKeyStatement = primaryKeyStatement.split(")",1)[0]
+                flag = 1
+                column_name_list, constraint_list = extract_mysql_constraint_keys(primaryKeyStatement)
+                for column_name in column_name_list:
+                    primarykey_dict[column_name] = constraint_list
+            elif cc.startswith("\n constraint"):
+                #print("foriegn keyyy")
+                column_name, constraint_list = extract_mysql_constraint_keys(cc)
+                foreignkey_dict[column_name] = constraint_list
+            elif cc.startswith("\n unique"):
+                column_name, constraint_list = extract_mysql_constraint_keys(cc)
+                uniquekey_dict[column_name] = constraint_list
     counter = 0
     for cc in tmp:
-        
+        if cc.startswith("\n primary"):
+                break
         if not cc.startswith(("\n primary", "\n key", "\n constraint", "\n unique")):
             if "decimal" in cc:
                 cc = cc + ", " + tmp[counter+1][1:]
@@ -356,7 +427,7 @@ def parse_ddl_file(ddl_file, projectid=None, ddl_filename=None, db=None):
     filedata = "".join(filedata)
     filedata = filedata.lower()
     filedata = filedata.split("\ngo\n")
-    print('filedata', filedata)
+    #print('filedata', filedata)
 
     tables = get_table_data(filedata)
     #print('tables', tables)
@@ -389,9 +460,12 @@ def get_db_table_data(lines, db_type):
             if len(tmp) != 2:
                 continue
 
+            print("tmp1:",tmp[1])                     
             table_data = extract_table_data(tmp[0], db_type)
             if db_type == "mysql":
                 column_data = extract_mysql_column_data(tmp[1])
+            elif db_type == "postgres":
+                column_data = extract_postgres_column_data(tmp[1])
             else:
                 column_data = extract_column_data(tmp[1])
 
@@ -414,13 +488,15 @@ def parse_db_ddl_file(ddl_file, projectid=None, ddl_filename=None, db_type=None,
     filedata = file.readlines()
     filedata = "".join(filedata)
     filedata = filedata.lower()
+    print("filedata:",filedata)
 
     if db_type == "postgres":
-        filedata = filedata.split("--")
+        filedata = filedata.split(";")
     elif db_type == "mysql":
         filedata = filedata.split("# ------------------------------------------------------------\n")
     else:
         filedata = filedata.split("\ngo\n")
+    print("filedata1:",filedata)
     
     tables = get_db_table_data(filedata, db_type)
     # print('tables', tables)
