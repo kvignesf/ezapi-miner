@@ -18,17 +18,17 @@ include:
     - 'deploy-python-devinstance-stage.yaml'
     - 'deploy-python-demo-master.yaml'
 stages:
-  - whitesource-test
+  #- whitesource-test
   - build
   - deploy-test
   - deploy-stage
   - deploy-master
-whitesource-test:
-  stage: whitesource-test
-  image: ubuntu:20.04
-  extends: .sast-whitesource
-  only:
-    - refactoredv3
+#whitesource-test:
+#  stage: whitesource-test
+#  image: ubuntu:20.04
+#  extends: .sast-whitesource
+#  only:
+#    - refactoredv3
 build:
   stage: build
   extends: .build
