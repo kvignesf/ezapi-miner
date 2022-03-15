@@ -321,7 +321,7 @@ class Parser:
             self.get_alter_conditions(self.filedata)
             self.get_table_insertion_order()
 
-            pprint(self.table_details)
+            #pprint(self.table_details)
             return self.table_details
         except Exception as e:
             return None
