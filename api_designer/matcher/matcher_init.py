@@ -42,14 +42,17 @@ def transform_schema_data(schemas_data):
 
 
 def transform_tables_data(tables_data):
+    #print("tables_data", tables_data, len(tables_data))
     table_names = [x["table"] for x in tables_data]
     table_names = transform_naming(table_names)
+    #print("table_names", table_names)
 
     for x in range(len(tables_data)):
         tables_data[x]["name2"] = table_names[x]
         table_attributes = tables_data[x]["attributes"]
+        #print("table_attributes", table_attributes, len(table_attributes))
 
-        attr_names = [p["name"] for p in table_attributes]
+        attr_names = [p["name"] for p in table_attributes if p is not None]
         attr_names = transform_naming(attr_names)
 
         for y in range(len(table_attributes)):
@@ -265,15 +268,19 @@ def spec_ddl_matcher(projectid, db):
     print("Schemas Data Fetched ", round(time.time(), 1))
     schemas_data = list(schemas_data)
     schemas_data = [s["data"] for s in schemas_data]
-
+    #print("Schemas data final", schemas_data)
     tables_data = db.tables.find({"projectid": projectid})
     print("Tables Data Fetched ", round(time.time(), 1))
     tables_data = list(tables_data)
+    #print("Tables data final", tables_data)
 
     schemas_data = transform_schema_data(schemas_data)
     print("Schemas Data Transformed ", round(time.time(), 1))
+    #print("schemas_data transformed final", schemas_data)
     tables_data = transform_tables_data(tables_data)
     print("Tables Data Transformed ", round(time.time(), 1))
+    #print("Tables transformed final", tables_data)
+
 
     all_documents = solve_matching(schemas_data, tables_data, projectid)
 
