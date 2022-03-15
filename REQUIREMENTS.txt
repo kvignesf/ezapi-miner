@@ -12,3 +12,6 @@ python-decouple==3.4
 multipledispatch==0.6.0
 pycryptodomex==3.14.1
 mssql-scripter==1.0.0a23
+psycopg2==2.9.3
+sqlalchemy==1.4.32
+google_cloud_storage==2.1.0
