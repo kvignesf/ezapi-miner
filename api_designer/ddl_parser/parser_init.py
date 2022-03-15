@@ -12,15 +12,18 @@ def parse_ddl_file(ddl_file, projectid, ddl_filename, db, ddltype = 'mssql'):
 
     if ddltype == 'mssql':
         P = MSSqlParser(filedata)
+        parsed_result = P.parse_data()
 
     elif ddltype == 'mysql':
         P = MysqlParser(filedata)
+        parsed_result = P.parse_data()
 
     elif ddltype == 'postgres':
         P = PostgresqlParser(filedata)
+        parsed_result = P.parse_data()
 
 
-    parsed_result = P.parse_data()
+
     if parsed_result:
         for table in parsed_result:
             table_document = table
