@@ -2,14 +2,19 @@
 # This code is copyright of EZAPI LLC. For further info, reach out to rams@ezapi.ai
 # *****************************************************************
 
+#from crypt import methods
 import json
 import os
+from google.cloud import storage
+from google.oauth2 import service_account
+
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
 
 from api_designer.main import EzAPIModels
 
+from urllib.parse import urlparse
 from werkzeug import Request, Response
 from werkzeug import exceptions as exc
 from decouple import config
@@ -40,6 +45,22 @@ def home():
     return "Hello EzAPI"
 
 
+@app.route("/db_extractor", methods=["POST"])
+def db_extractor():
+    request_data = request.get_json()
+    projectid = str(request_data.get("projectid", ""))
+    dbtype = str(request_data.get("dbtype", ""))
+
+    if projectid and dbtype:
+        model = EzAPIModels(projectid)
+        model.set_db_instance()
+        ret = model.extract_sql_connect(request_data, dbtype)
+        model.client.close()
+    else:
+        bad_request({"success": False, "message": "Some parameters are missing: projectid, dbtype"})
+
+    return json_response({"data": ret})
+
 @app.route("/matcher", methods=["POST"])
 def mathcer_model():
     print("Matcher Received")
@@ -55,7 +76,7 @@ def mathcer_model():
     else:
         bad_request({"success": False, "message": "Some parameters are missing"})
 
-    return json_response(ret, status=ret["status"])
+    return json_response(ret)
 
 
 @app.route("/ddl_parser", methods=["POST"])
@@ -63,6 +84,7 @@ def ddl_parser_model():
     print("DDL Parser Received")
     ddl_file = request.files.getlist("ddl_file", None)
     projectid = str(request.form.get("projectid", ""))
+    ddltype = str(request.form.get("dbtype", "mssql"))
 
     if not os.path.exists("./uploads"):
         os.makedirs("./uploads")
@@ -80,8 +102,8 @@ def ddl_parser_model():
 
             model = EzAPIModels(projectid)
             model.set_db_instance()
-            ret = model.parse_ddl_file(ddl_path, ddl_filename)
-            model.client.close()
+            ret = model.parse_ddl_file(ddl_path, ddl_filename, ddltype)
+            # model.client.close()
     else:
         ret = bad_request({"success": False, "message": "Some parameters are missing"})
 
@@ -263,6 +285,64 @@ def db_ddl_generator_model():
     #     print("Error deleting Uploaded File")
 
     return json_response(ret, status=ret["status"])
+
+
+#@app.route("/db_extractor", methods=["POST"])
+def db_extract_model():
+    print("DDL Parser Received")
+    #ddl_file = request.files.getlist("ddl_file", None)
+    projectid = str(request.form.get("projectid", ""))
+    server = str(request.form.get("server", ""))
+    username = str(request.form.get("username", ""))
+    password = str(request.form.get("password", ""))
+    database = str(request.form.get("database", ""))
+    #dbtype = str(request.form.get("dbtype", ""))
+
+    if not os.path.exists("./uploads"):
+        os.makedirs("./uploads")
+
+    if server and username and password and database:
+        if projectid:
+            # ddl_file = ddl_file[0]
+            # ddl_filename = ddl_file.filename
+            # ddl_path = "./uploads/" + ddl_filename
+            # ddl_file.save(ddl_path)
+            #
+            model = EzAPIModels(projectid)
+            model.set_db_instance()
+            ret = model.gen_db_ddl_file(server, username, password, database)
+            model.client.close()
+    else:
+        ret = bad_request({"success": False, "message": "Some parameters are missing"})
+
+    # try:
+    #     os.remove(ddl_path)
+    # except Exception as e:
+    #     print("Error deleting Uploaded File")
+
+    return json_response(ret, status=ret["status"])
+
+#@app.route("/gcsdownload", methods=["POST"])
+def download_gcsfile():
+    url = str(request.form.get("url", ""))
+    creds = service_account.Credentials.from_service_account_file('creds2.json')
+
+    print("url", url)
+    print("creds", creds)
+
+    storage_client = storage.Client(credentials=creds)
+    bucket, file_path = decode_gcs_url(url)
+    bucket = storage_client.bucket(bucket)
+    print("file_path", file_path)
+    blob = bucket.blob(file_path)
+    #blob.download_to_filename(os.path.basename(file_path))
+    blob.download_to_filename("uploads/"+os.path.basename(file_path))
+
+def decode_gcs_url(url):
+    p = urlparse(url)
+    path = p.path[1:].split('/', 1)
+    bucket, file_path = path[0], path[1]
+    return bucket, file_path
 
 if __name__ == "__main__":
     app.run(debug=True)
