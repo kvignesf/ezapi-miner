@@ -12,7 +12,7 @@ from api_designer.spec_generator.generator_init import generate_spec
 from api_designer.artefacts.artefacts_init import generate_artefacts
 from api_designer.visualizer.sankey import process_sankey_visualizer
 from api_designer.sql_connect.sql_init import handle_sql_connect
-# from api_designer.codegen.jdl_init import generate_jdl_file
+from api_designer.codegen.jdl_init import generate_jdl_file
 # from api_designer.ddl_parser.parser_init import parse_db_ddl_file
 # from api_designer.ddl_parser.parser_init import gen_db_ddl_file
 

@@ -22,7 +22,7 @@ def download_gcsfile(url):
     bucket = storage_client.bucket(bucket)
     print("file_path", file_path)
     blob = bucket.blob(file_path)
-    destfilePath = "uploads/"+os.path.basename(file_path)
+    destfilePath = "gcpdownloads/"+os.path.basename(file_path)
     blob.download_to_filename(destfilePath)
     return destfilePath
 
@@ -98,8 +98,8 @@ def handle_sql_connect(request_data, dbtype, projectid, db ):
             "user": "admin1",
             "password": "welcome2cumulations"
         }
-        P = MysqlExtractor(args)
-        res = P.extract_data()
-        print(res)
+        #P = MysqlExtractor(args)
+        #res = P.extract_data()
+        #print(res)
     elif dbtype == "mssql":
         pass
