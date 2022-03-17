@@ -14,8 +14,8 @@ def download_gcsfile(url):
     #url = str(request.form.get("url", ""))
     creds = service_account.Credentials.from_service_account_file('creds.json')
 
-    print("url", url)
-    print("creds", creds)
+    #print("url", url)
+    #print("creds", creds)
 
     storage_client = storage.Client(credentials=creds)
     bucket, file_path = decode_gcs_url(url)
@@ -87,15 +87,19 @@ def handle_sql_connect(request_data, dbtype, projectid, db ):
 
         P = PsqlExtractor(args, sslMode)
         db_document, table_documents = P.extract_data()
-        from pprint import pprint
-        pprint(table_documents)
+        #from pprint import pprint
+        #pprint(table_documents)
         
         # store_document("database", db_document, db)
         # store_bulk_document("tables", table_documents, db)
+        if db_document and table_documents:
+            return {"success": True}
+        else:
+            return {"success": False}
 
         # G = DataGen(table_documents)
         # G.gen()
-        return {"success": True}
+        #return {"success": True}
 
 
     elif dbtype == "mysql":
