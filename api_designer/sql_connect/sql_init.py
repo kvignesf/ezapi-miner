@@ -45,7 +45,7 @@ def handle_sql_connect(request_data, dbtype, projectid, db ):
     passkey = 'ezapidbpwdhandshake'
     server = str(request_data.get("server", ""))
     username = str(request_data.get("username", ""))
-    password = str(request_data.get("password", ""))
+    password = request_data.get("password", "")
     database = str(request_data.get("database", ""))
     portNo = request_data.get("portNo", "")
     certPath = str(request_data.get("certPath", ""))

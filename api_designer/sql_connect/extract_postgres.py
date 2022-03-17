@@ -12,8 +12,9 @@ class Extractor:
         if sslmode=='Y':
             self.engine = create_engine('postgresql+psycopg2://', connect_args = args)
         else:
-            print(args.username)
-            self.engine = create_engine('postgresql+psycopg2://'+args.username+":"+args.password+"@"+args.server+":"+args.portNo+"/"+args.database)
+            #print(args.username)
+            #self.engine = create_engine('postgresql+psycopg2://'+args.username+":"+args.password+"@"+args.server+":"+args.portNo+"/"+args.database)
+            self.engine = create_engine('postgresql+psycopg2://', connect_args=args)
         self.conn = self.engine.connect()
         self.schemas = []
         self.tables = []
