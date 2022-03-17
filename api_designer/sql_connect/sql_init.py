@@ -5,7 +5,7 @@ from google.oauth2 import service_account
 from urllib.parse import urlparse
 import os
 from api_designer.utils.decrypter import _decrypt
-
+import json, re, shutil, subprocess
 #from api_designer.sql_connect.extract_mysql import Extractor as MysqlExtractor
 
 #from api_designer.sql_connect.generator import DataGen
@@ -24,6 +24,7 @@ def download_gcsfile(url):
     blob = bucket.blob(file_path)
     destfilePath = "gcpdownloads/"+os.path.basename(file_path)
     blob.download_to_filename(destfilePath)
+    generate_code(file_path)
     return destfilePath
 
 def decode_gcs_url(url):
@@ -32,7 +33,13 @@ def decode_gcs_url(url):
     bucket, file_path = path[0], path[1]
     return bucket, file_path
 
+def generate_code(file_path):
+    cmd1 = "cd gcpdownloads/"
+    cmd2 = "chmod 600 " + file_path.split('/')[1]
+    cmd = cmd1 + "; " + cmd2
+    cmd3 = "pwd"
 
+    subprocess.run(cmd, shell=True)
 
 def handle_sql_connect(request_data, dbtype, projectid, db ):
     passkey = 'ezapidbpwdhandshake'
