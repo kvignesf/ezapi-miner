@@ -86,13 +86,14 @@ def handle_sql_connect(request_data, dbtype, projectid, db ):
             }
 
         P = PsqlExtractor(args, sslMode)
-        db_document, table_documents = P.extract_data()
+        db_document, table_documents = P.extract_data(projectid)
         #from pprint import pprint
         #pprint(table_documents)
         
-        # store_document("database", db_document, db)
-        # store_bulk_document("tables", table_documents, db)
+
         if db_document and table_documents:
+            store_document("database", db_document, db)
+            store_bulk_document("tables", table_documents, db)
             return {"success": True}
         else:
             return {"success": False}

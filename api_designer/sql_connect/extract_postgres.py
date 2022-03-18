@@ -186,16 +186,17 @@ class Extractor:
             })
         self.insertion_order = get_ts_order(tables)
 
-    def prepare_db_document(self):
+    def prepare_db_document(self, projectid):
         document = {
             'type': 'postgres',
+            'projectid': projectid,
             'schemas': self.schemas,
             'tables': self.tables,
             'order': self.insertion_order
         }
         return document
 
-    def prepare_table_document(self):
+    def prepare_table_document(self, projectid):
         table_documents = []
         for t in self.tables:
             keys = self.table_keys.get(t, [])
@@ -206,6 +207,7 @@ class Extractor:
                 keyType = 'composite'
 
             document = {
+                'projectid': projectid,
                 'key': t,
                 'schema': t.split('.')[0],
                 'table': t.split('.')[1],
@@ -234,7 +236,7 @@ class Extractor:
             table_documents.append(document)
         return table_documents
 
-    def extract_data(self):
+    def extract_data(self, projectid):
         self.get_schemas()
         self.get_tables()
         self.get_foreign_relations()
@@ -242,8 +244,8 @@ class Extractor:
         self.get_table_keys()
         self.get_table_details()
         self.get_sample_data()
-        db_document = self.prepare_db_document()
-        table_documents = self.prepare_table_document()
+        db_document = self.prepare_db_document(projectid)
+        table_documents = self.prepare_table_document(projectid)
 
         # import json
         # json_data = json.dumps(table_documents, indent=4, sort_keys=True, default=str)
