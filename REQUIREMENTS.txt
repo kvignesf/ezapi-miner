@@ -14,4 +14,6 @@ pycryptodomex==3.14.1
 mssql-scripter==1.0.0a23
 psycopg2==2.9.3
 sqlalchemy==1.4.32
+numpy==1.22.3
+pyodbc==4.0.32
 google_cloud_storage==2.1.0
