@@ -2,26 +2,21 @@
 # This code is copyright of EZAPI LLC. For further info, reach out to rams@ezapi.ai
 # *****************************************************************
 
-#from crypt import methods
 import json
 import os
-from google.cloud import storage
-from google.oauth2 import service_account
-
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
 
 from api_designer.main import EzAPIModels
 
-from urllib.parse import urlparse
 from werkzeug import Request, Response
 from werkzeug import exceptions as exc
 from decouple import config
 
 
 def json_response(data, status=200):
-    return Response(json.dumps(data), content_type="application/json", status=status)
+    return Response(json.dumps(data, default=str), content_type="application/json", status=status)
 
 
 def bad_request(data):
@@ -200,20 +195,19 @@ def sankey_model():
 
 @app.route("/codegen", methods=["POST"])
 def codegen_model():
-    print("Codegen Received")
-    request_data = request.get_json()
-    projectid = str(request_data.get("projectid", ""))
+     print("Codegen Received")
+     request_data = request.get_json()
+     projectid = str(request_data.get("projectid", ""))
 
-    if projectid:
-        model = EzAPIModels(projectid)
-        model.set_db_instance()
-        ret = model.jdl_generator()
-        model.client.close()
+     if projectid:
+         model = EzAPIModels(projectid)
+         model.set_db_instance()
+         ret = model.jdl_generator()
+         model.client.close()
+     else:
+         ret = bad_request({"success": False, "message": "Some parameters are missing"})
 
-    else:
-        ret = bad_request({"success": False, "message": "Some parameters are missing"})
-
-    return json_response(ret, status=ret["status"])
+     return json_response(ret, status=ret["status"])
 
 
 @app.route("/db_ddl_parser", methods=["POST"])
@@ -285,64 +279,6 @@ def db_ddl_generator_model():
     #     print("Error deleting Uploaded File")
 
     return json_response(ret, status=ret["status"])
-
-
-#@app.route("/db_extractor", methods=["POST"])
-def db_extract_model():
-    print("DDL Parser Received")
-    #ddl_file = request.files.getlist("ddl_file", None)
-    projectid = str(request.form.get("projectid", ""))
-    server = str(request.form.get("server", ""))
-    username = str(request.form.get("username", ""))
-    password = str(request.form.get("password", ""))
-    database = str(request.form.get("database", ""))
-    #dbtype = str(request.form.get("dbtype", ""))
-
-    if not os.path.exists("./uploads"):
-        os.makedirs("./uploads")
-
-    if server and username and password and database:
-        if projectid:
-            # ddl_file = ddl_file[0]
-            # ddl_filename = ddl_file.filename
-            # ddl_path = "./uploads/" + ddl_filename
-            # ddl_file.save(ddl_path)
-            #
-            model = EzAPIModels(projectid)
-            model.set_db_instance()
-            ret = model.gen_db_ddl_file(server, username, password, database)
-            model.client.close()
-    else:
-        ret = bad_request({"success": False, "message": "Some parameters are missing"})
-
-    # try:
-    #     os.remove(ddl_path)
-    # except Exception as e:
-    #     print("Error deleting Uploaded File")
-
-    return json_response(ret, status=ret["status"])
-
-#@app.route("/gcsdownload", methods=["POST"])
-def download_gcsfile():
-    url = str(request.form.get("url", ""))
-    creds = service_account.Credentials.from_service_account_file('creds2.json')
-
-    print("url", url)
-    print("creds", creds)
-
-    storage_client = storage.Client(credentials=creds)
-    bucket, file_path = decode_gcs_url(url)
-    bucket = storage_client.bucket(bucket)
-    print("file_path", file_path)
-    blob = bucket.blob(file_path)
-    #blob.download_to_filename(os.path.basename(file_path))
-    blob.download_to_filename("uploads/"+os.path.basename(file_path))
-
-def decode_gcs_url(url):
-    p = urlparse(url)
-    path = p.path[1:].split('/', 1)
-    bucket, file_path = path[0], path[1]
-    return bucket, file_path
 
 if __name__ == "__main__":
     app.run(debug=True)

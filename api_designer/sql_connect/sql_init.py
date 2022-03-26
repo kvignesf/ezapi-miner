@@ -1,26 +1,22 @@
 from api_designer.config import store_document, store_bulk_document
 from api_designer.sql_connect.extract_postgres import Extractor as PsqlExtractor
+from api_designer.sql_connect.extract_mysql import Extractor as MysqlExtractor
+from api_designer.sql_connect.extract_mssql import Extractor as MssqlExtractor
+from api_designer.utils.decrypter import _decrypt
+
 from google.cloud import storage
 from google.oauth2 import service_account
 from urllib.parse import urlparse
-import os
-from api_designer.utils.decrypter import _decrypt
-import json, re, shutil, subprocess
-#from api_designer.sql_connect.extract_mysql import Extractor as MysqlExtractor
+import json, os, re, shutil, subprocess
+from decouple import config
 
-#from api_designer.sql_connect.generator import DataGen
+
 
 def download_gcsfile(url):
-    #url = str(request.form.get("url", ""))
     creds = service_account.Credentials.from_service_account_file('creds.json')
-
-    #print("url", url)
-    #print("creds", creds)
-
     storage_client = storage.Client(credentials=creds)
     bucket, file_path = decode_gcs_url(url)
     bucket = storage_client.bucket(bucket)
-    print("file_path", file_path)
     blob = bucket.blob(file_path)
     destfilePath = "gcpdownloads/"+os.path.basename(file_path)
     blob.download_to_filename(destfilePath)
@@ -41,8 +37,9 @@ def generate_code(file_path):
 
     subprocess.run(cmd, shell=True)
 
-def handle_sql_connect(request_data, dbtype, projectid, db ):
-    passkey = 'ezapidbpwdhandshake'
+def handle_sql_connect(request_data, dbtype, projectid, db):
+    print("Inside SQL Connect")
+    passkey = config('dbpasskey')
     server = str(request_data.get("server", ""))
     username = str(request_data.get("username", ""))
     password = request_data.get("password", "")
@@ -85,7 +82,7 @@ def handle_sql_connect(request_data, dbtype, projectid, db ):
                 "port": portNo
             }
 
-        P = PsqlExtractor(args, sslMode)
+        P = PsqlExtractor(args)
         db_document, table_documents = P.extract_data(projectid)
         #from pprint import pprint
         #pprint(table_documents)
@@ -105,13 +102,30 @@ def handle_sql_connect(request_data, dbtype, projectid, db ):
 
     elif dbtype == "mysql":
         args = {
-            "host": "database-1.c9jpouik3ypb.ap-south-1.rds.amazonaws.com",
-            "database": "testezapi",
-            "user": "admin1",
-            "password": "welcome2cumulations"
+            "host": "xxxx",
+            "database": "xxxxx",
+            "user": "xxxx",
+            "password": "xxxxx"
         }
         #P = MysqlExtractor(args)
         #res = P.extract_data()
         #print(res)
     elif dbtype == "mssql":
-        pass
+        from sqlalchemy.engine import URL
+        connection_url = URL.create(
+            "mssql+pyodbc",
+            username=username,
+            password=bytes.decode(decryptedpassword),
+            host=server,
+            database=database,
+            query={
+                "driver": "ODBC Driver 17 for SQL Server"
+            },
+        )
+        P = MssqlExtractor(connection_url)
+        db_document, table_documents = P.extract_data(projectid)
+
+        store_document("database", db_document, db)
+        store_bulk_document("tables", table_documents, db)
+
+        return {"success": True}

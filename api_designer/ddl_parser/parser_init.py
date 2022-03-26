@@ -12,18 +12,15 @@ def parse_ddl_file(ddl_file, projectid, ddl_filename, db, ddltype = 'mssql'):
 
     if ddltype == 'mssql':
         P = MSSqlParser(filedata)
-        parsed_result = P.parse_data()
 
     elif ddltype == 'mysql':
         P = MysqlParser(filedata)
-        parsed_result = P.parse_data()
 
     elif ddltype == 'postgres':
         P = PostgresqlParser(filedata)
-        parsed_result = P.parse_data()
 
 
-
+    parsed_result = P.parse_data()
     if parsed_result:
         for table in parsed_result:
             table_document = table
@@ -31,8 +28,7 @@ def parse_ddl_file(ddl_file, projectid, ddl_filename, db, ddltype = 'mssql'):
             table_document["ddl_file"] = ddl_filename
             config.store_document(TABLE_COLLECTION, table_document, db)
 
-        #return {"success": True, "status": 200, "message": "ok", "data": parsed_result}
-        return {"success": True, "status": 200, "message": "ok"}
+        return {"success": True, "status": 200, "message": "ok", "data": parsed_result}
     else:
         return {"success": False, "status": 500, "message": "Error parsing file data"}
 

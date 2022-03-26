@@ -65,7 +65,7 @@ class Parser:
         self.filedata = filedata
         self.filedata = "".join(self.filedata)
         self.filedata = self.filedata.lower()
-        self.filedata = self.filedata.split(";")
+        self.filedata = self.filedata.split("--")
 
         self.types = {}
         self.tables = []    # schema_name.table_name
@@ -106,54 +106,65 @@ class Parser:
         table_constraints = {}
         manual_datatype_list = []
 
-        for line in lines:
-            table_dict = {}
-            new_list = []
-            # line = re.sub("\t", " ", line)
-            line = line.strip()
-            if line.startswith("alter table"):
-                tmp = line.split("\n")
-                table_name = tmp[0].split(".")[1]
-                if "primary key" in tmp[1]:
-                    tmp[1] = tmp[1].split("(")[1].split(")")[0].split(",")
-                    if len(tmp[1]) > 1:
-                        for each_item in tmp[1]:
-                            each_item = each_item.strip(" ")
-                            new_list.append(each_item)
+        for nline in lines:
+            newlines = nline.split(";")
+            for line in newlines:
+                table_dict = {}
+                new_list = []
+                # line = re.sub("\t", " ", line)
+                line = line.strip()
+                if line.startswith("alter table") and line.__contains__("primary key"):
+                    tmp = line.split("\n")
+                    table_name = tmp[0].split(".")[1]
+                    #print("alter table", table_name)
+                    if "primary key" in tmp[1]:
+                        tmp[1] = tmp[1].split("(")[1].split(")")[0].split(",")
+                        if len(tmp[1]) > 1:
+                            for each_item in tmp[1]:
+                                each_item = each_item.strip(" ")
+                                new_list.append(each_item)
 
-                        table_dict["composite"] = new_list
-                        table_dict["primary"] = "None"
-                        table_constraints[table_name] = table_dict
-                        # print("KeyType: composite")
+                            table_dict["composite"] = new_list
+                            table_dict["primary"] = "None"
+                            table_constraints[table_name] = table_dict
+                            # print("KeyType: composite")
+                        else:
+                            table_dict["composite"] = []
+                            table_dict["primary"] = tmp[1][0]
+                            table_constraints[table_name] = table_dict
                     else:
-                        table_dict["composite"] = []
-                        table_dict["primary"] = tmp[1][0]
+                        foreign_dict = {}
+                        empty_dict = {}
+                        foriegn_dict_keys = {}
+                        tmpp = tmp[1].split("references")
+                        column_name = tmpp[0].split("(", 1)[1].split(")", 1)[0]
+                        tmpp[1] = tmpp[1].strip(" ")
+                        temp = tmpp[1].split(".", 1)
+                        reference_schema = temp[0]
+                        tempp = temp[1].split("(", 1)
+                        reference_table = tempp[0]
+                        reference_column = tempp[1].split(")", 1)[0]
+                        foreign_dict["column"] = reference_column
+                        foreign_dict["schema"] = reference_schema
+                        foreign_dict["table"] = reference_table
+                        if "foreign_keys" in table_constraints[table_name].keys():
+                            table_constraints[table_name]["foreign_keys"][column_name] = foreign_dict
+                        else:
+                            foriegn_dict_keys[column_name] = foreign_dict
+                            table_constraints[table_name]["foreign_keys"] = foriegn_dict_keys
+                            # table_constraints[table_name] = table_dict
+                elif line.startswith("create type") or line.startswith("create domain"):
+                    tmp = line.split("\n")
+                    tmpp = tmp[0].split(" ")
+                    manual_datatype_list.append(tmpp[2])
+                elif line.startswith("alter table"):
+                    table_dict["composite"] = []
+                    table_dict["primary"] = []
+                    tmp = line.split("\n")
+                    table_name = (tmp[0].split(".")[1]).split(" ")[0]
+                    if (table_name):
                         table_constraints[table_name] = table_dict
-                else:
-                    foreign_dict = {}
-                    empty_dict = {}
-                    foriegn_dict_keys = {}
-                    tmpp = tmp[1].split("references")
-                    column_name = tmpp[0].split("(", 1)[1].split(")", 1)[0]
-                    tmpp[1] = tmpp[1].strip(" ")
-                    temp = tmpp[1].split(".", 1)
-                    reference_schema = temp[0]
-                    tempp = temp[1].split("(", 1)
-                    reference_table = tempp[0]
-                    reference_column = tempp[1].split(")", 1)[0]
-                    foreign_dict["column"] = reference_column
-                    foreign_dict["schema"] = reference_schema
-                    foreign_dict["table"] = reference_table
-                    if "foreign_keys" in table_constraints[table_name].keys():
-                        table_constraints[table_name]["foreign_keys"][column_name] = foreign_dict
-                    else:
-                        foriegn_dict_keys[column_name] = foreign_dict
-                        table_constraints[table_name]["foreign_keys"] = foriegn_dict_keys
-                        # table_constraints[table_name] = table_dict
-            elif line.startswith("create type") or line.startswith("create domain"):
-                tmp = line.split("\n")
-                tmpp = tmp[0].split(" ")
-                manual_datatype_list.append(tmpp[2])
+
         return table_constraints, manual_datatype_list
 
 
@@ -259,6 +270,7 @@ class Parser:
 
                     table_data = self.extract_table_data(tmp[0])
                     key = table_data[0] + "." + table_data[1]
+                    #print("table", key)
                     primary_key = table_constraints[table_data[1]]["primary"]
                     composite_list = table_constraints[table_data[1]]["composite"]
                     column_data = self.extract_postgres_column_data(tmp[1], table_constraints[table_data[1]],
@@ -285,4 +297,5 @@ class Parser:
             #pprint(self.table_details)
             #return self.table_details
         except Exception as e:
+            print("ex", e)
             return None

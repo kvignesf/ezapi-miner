@@ -1,22 +1,23 @@
+from multiprocessing import connection
 from pprint import pprint
-import psycopg2
-from random import sample
 from sqlalchemy import create_engine
 
 from api_designer.sql_connect.ts import get_ts_order
-from api_designer.sql_connect.postgres_decoder import DTDecoder
+from api_designer.sql_connect.mssql_decoder import DTDecoder
 from api_designer.sql_connect.ezsampler import Sampler
 
-_SYSTEM_SCHEMAS = ['pg_toast', 'pg_catalog', 'information_schema']
+import os, sys
+TO_STRING_DTYPES = ['geography', 'hierarchyid', 'geometry']
 
 class Extractor:
-    def __init__(self, args):
-        self.engine = create_engine('postgresql+psycopg2://', connect_args = args)
+    def __init__(self, url):
+        self.engine = create_engine(url)
         self.conn = self.engine.connect()
 
         self.schemas = []
         self.tables = []
         self.table_size = {}
+        self.user_defined_types = {}
         self.table_keys = {}
         self.foreign = {}
         self.table_details = {}
@@ -25,12 +26,18 @@ class Extractor:
         self.master_tables = []
 
     def get_schemas(self):
-        self.schemas = self.conn.execute("select schema_name from information_schema.schemata")
-        self.schemas = [x[0] for x in self.schemas if x[0] not in _SYSTEM_SCHEMAS]
+        self.schemas = self.conn.execute("""
+            select s.name
+            from sys.schemas s
+            inner join sys.sysusers u
+            on u.uid = s.principal_id
+            where u.name = 'dbo'
+        """)
+        self.schemas = [x[0] for x in self.schemas]
 
     def get_tables(self):
         for s in self.schemas:
-            res = self.conn.execute(f"SELECT table_name FROM information_schema.tables WHERE table_schema = '{s}'")
+            res = self.conn.execute(f"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES where TABLE_SCHEMA = '{s}' and TABLE_TYPE = 'BASE TABLE'")
             res = [f"{s}.{x[0]}" for x in res]
             self.tables += res
 
@@ -40,30 +47,52 @@ class Extractor:
             res = next(res)
             self.table_size[s] = res[0]
 
-    # Reference - https://dataedo.com/kb/query/postgresql/list-of-foreign-keys-with-columns
+    def get_user_defined_types(self):
+        query = """
+            SELECT t1.name as name, 
+                t2.name as basetype, 
+                t1.precision, 
+                t1.scale, 
+                t1.max_length as length, 
+                t1.is_nullable 
+            FROM sys.types t1 
+            JOIN sys.types t2 
+            ON t2.system_type_id = t1.system_type_id and t2.is_user_defined = 0 
+            WHERE t1.is_user_defined = 1 and t2.name <> 'sysname' order by t1.name;
+        """
+        res = self.conn.execute(query)
+        columns = list(res.keys())
+        res = [x for x in res]
+
+        for r in res:
+            tmp = {x:y for x, y in zip(columns, r)}
+            self.user_defined_types[r['name']] = tmp
+
+    # Reference - https://stackoverflow.com/a/18929992
     def get_foreign_relations(self):
         query = """
-            select kcu.table_schema || '.' || kcu.table_name as foreign_table,
-                rel_kcu.table_schema || '.' || rel_kcu.table_name as primary_table,
-                kcu.ordinal_position as no,
-                kcu.column_name as fk_column,
-                rel_kcu.column_name as pk_column,
-                kcu.constraint_name
-            from information_schema.table_constraints tco
-            join information_schema.key_column_usage kcu
-                on tco.constraint_schema = kcu.constraint_schema
-                and tco.constraint_name = kcu.constraint_name
-            join information_schema.referential_constraints rco
-                on tco.constraint_schema = rco.constraint_schema
-                and tco.constraint_name = rco.constraint_name
-            join information_schema.key_column_usage rel_kcu
-                on rco.unique_constraint_schema = rel_kcu.constraint_schema
-                and rco.unique_constraint_name = rel_kcu.constraint_name
-                and kcu.ordinal_position = rel_kcu.ordinal_position
-            where tco.constraint_type = 'FOREIGN KEY'
-            order by kcu.table_schema,
-                kcu.table_name,
-                kcu.ordinal_position
+            SELECT  obj.name AS FK_NAME,
+                sch.name AS schema_name,
+                tab1.name AS foreign_table,
+                col1.name AS fk_column,
+                tab2.name AS primary_table,
+                sch2.name AS primary_schema,
+                col2.name AS pk_column
+            FROM sys.foreign_key_columns fkc
+            INNER JOIN sys.objects obj
+                ON obj.object_id = fkc.constraint_object_id
+            INNER JOIN sys.tables tab1
+                ON tab1.object_id = fkc.parent_object_id
+            INNER JOIN sys.schemas sch
+                ON tab1.schema_id = sch.schema_id
+            INNER JOIN sys.columns col1
+                ON col1.column_id = parent_column_id AND col1.object_id = tab1.object_id
+            INNER JOIN sys.tables tab2
+                ON tab2.object_id = fkc.referenced_object_id
+            INNER JOIN sys.schemas sch2
+                ON tab2.schema_id = sch2.schema_id
+            INNER JOIN sys.columns col2
+                ON col2.column_id = referenced_column_id AND col2.object_id = tab2.object_id;
         """
         res = self.conn.execute(query)
         columns = list(res.keys())
@@ -71,49 +100,53 @@ class Extractor:
 
         for r in res:
             tmp = {x:y for x,y in zip(columns, r)}
-            key = f"{tmp['foreign_table']}.{tmp['fk_column']}"
-            value = f"{tmp['primary_table']}.{tmp['pk_column']}"
+            key = f"{tmp['schema_name']}.{tmp['foreign_table']}.{tmp['fk_column']}"
+            value = f"{tmp['primary_schema']}.{tmp['primary_table']}.{tmp['pk_column']}"
             self.foreign[key] = value
 
-    # Reference - https://dataedo.com/kb/query/postgresql/list-all-primary-keys-and-their-columns
+    # Reference - https://dataedo.com/kb/query/sql-server/list-all-primary-keys-in-database
     def get_table_keys(self):
-        for s in self.schemas:
-            query = f"""
-                select kcu.table_schema,
-                    kcu.table_name,
-                    tco.constraint_name,
-                    kcu.ordinal_position as position,
-                    kcu.column_name as key_column
-                from information_schema.table_constraints tco
-                join information_schema.key_column_usage kcu 
-                    on kcu.constraint_name = tco.constraint_name
-                    and kcu.constraint_schema = tco.constraint_schema
-                    and kcu.constraint_name = tco.constraint_name
-                where tco.constraint_type = 'PRIMARY KEY' and kcu.table_schema = '{s}'
-                order by kcu.table_schema,
-                    kcu.table_name,
-                    position;
-            """
-            res = self.conn.execute(query)
-            columns = list(res.keys())
-            res = [x for x in res]
+        query = """
+            select schema_name(tab.schema_id) as [schema_name], 
+                pk.[name] as pk_name,
+                substring(column_names, 1, len(column_names)-1) as [columns],
+                tab.[name] as table_name
+            from sys.tables tab
+                inner join sys.indexes pk
+                    on tab.object_id = pk.object_id 
+                    and pk.is_primary_key = 1
+            cross apply (select col.[name] + ', '
+                                from sys.index_columns ic
+                                    inner join sys.columns col
+                                        on ic.object_id = col.object_id
+                                        and ic.column_id = col.column_id
+                                where ic.object_id = tab.object_id
+                                    and ic.index_id = pk.index_id
+                                        order by col.column_id
+                                        for xml path ('') ) D (column_names)
+            order by schema_name(tab.schema_id), pk.[name]
+        """
+        res = self.conn.execute(query)
+        column_keys = list(res.keys())
+        res = [x for x in res]
 
-            for r in res:
-                tmp = {x:y for x,y in zip(columns, r)}
-                key = f"{s}.{tmp['table_name']}"
-                if key not in self.table_keys:
-                    self.table_keys[key] = []
-                self.table_keys[key].append(tmp['key_column'])
+        for r in res:
+            tmp = {x:y for x,y in zip(column_keys, r)}
+            key = f"{tmp['schema_name']}.{tmp['table_name']}"
+            if key not in self.table_keys:
+                self.table_keys[key] = []
+            columns = tmp['columns'].split(',')
+            self.table_keys[key] += columns
 
     @staticmethod
     def decode_table_attributes(data):
         data = {
-            'datatype': str(data['data_type']),
-            'valueconstraint': 'null' if data['is_nullable'] == 'YES' else 'not null',
-            'default': data['column_default']
+            'datatype': str(data['TYPE_NAME']),
+            'valueconstraint': 'null' if data['IS_NULLABLE'] == 'YES' else 'not null',
+            'default': data['COLUMN_DEF']
         }
-        data['auto'] = True if data['default'] else False
-        data['serial'] = True if (data['default'] and 'nextval(' in data['default']) else False
+        data['auto'] = True if (data['default'] or (' identity' in data['datatype'])) else False
+        data['serial'] = True if (data['default'] and 'newid(' in data['default']) or (' identity' in data['datatype']) else False
         return data
 
     def get_master_tables(self):
@@ -143,40 +176,23 @@ class Extractor:
                 if master:
                     self.master_tables.append(tk)
 
-    def get_master_tables2(self):
-        for tk, tv in self.table_details.items():
-            table_columns = 0
-            column_name = None
-            for col, col_data in tv.items():
-                foreign_key = f"{tk}.{col}"
-                if col_data["auto"] or foreign_key in self.foreign:
-                    continue
-                else:
-                    table_columns += 1
-                    column_name = col
-
-            if table_columns == 1:
-                column_sample = self.sample_data[tk][column_name]
-                if column_sample['repeat'] == 1:
-                    self.master_tables.append(tk)
-
     def get_table_details(self):
         for t in self.tables:
             t_schema, t_name = t.split(".")
-            column_desc = self.conn.execute(f"SELECT * from information_schema.columns where table_schema='{t_schema}' and table_name = '{t_name}'")
+            column_desc = self.conn.execute(f"exec sp_columns @table_name=N'{t_name}', @table_owner=N'{t_schema}'")
             column_keys = column_desc.keys()
             column_desc = list(column_desc)
-            
-            attributes = {}
 
+            attributes = {}
             for cd in column_desc:
                 tmp = {x:y for x, y in zip(column_keys, cd)}
-                attributes[tmp['column_name']] = Extractor.decode_table_attributes(tmp)
+                # attributes[tmp['COLUMN_NAME']] = {}
+                attributes[tmp['COLUMN_NAME']] = Extractor.decode_table_attributes(tmp)
 
-                D = DTDecoder(tmp)
-                attributes[tmp['column_name']]['decoder'] = D.decoder()
+                D = DTDecoder(tmp, self.user_defined_types)
+                attributes[tmp['COLUMN_NAME']]['decoder'] = D.decoder()
             self.table_details[t] = attributes
-            
+
     @staticmethod
     def is_definite_column(data):
         data = list(filter(None, data))
@@ -198,14 +214,30 @@ class Extractor:
 
         return False, None
 
+    # Reference - https://github.com/mkleehammer/pyodbc/wiki/Using-an-Output-Converter-function
+    # Reference - https://stackoverflow.com/a/70511716
     def get_sample_data(self):
+        # connection = self.conn.connection
+        # connection.add_output_converter(-151, str)
         for t in self.tables:
-            table_data = self.conn.execute(f"select * from {t} order by random() limit 100")
+            columns = self.table_details[t]
+            columns = {x:y['datatype'].split(" ")[0].lower() for x, y in columns.items()}
+
+            query = ''
+            for k, v in columns.items():
+                if v not in TO_STRING_DTYPES:
+                    query += f' "{k}",'
+                else:
+                    query += f' "{k}".ToString() as {k},'
+            query = query.strip(",")
+            query = f"SELECT TOP 100 {query} FROM {t} ORDER BY newid()"
+
+            table_data = self.conn.execute(query)
             table_keys = list(table_data.keys())
             table_data = [list(x) for x in table_data]
             
-            table_sample_data = {}
             if table_data and len(table_data) > 0:
+                table_sample_data = {}
                 transposed_data = list(zip(*table_data))
                 for idx, col in enumerate(table_keys):
                     column_data = transposed_data[idx]
@@ -214,6 +246,7 @@ class Extractor:
                 self.sample_data[t] = table_sample_data
             else:
                 self.sample_data[t] = {}
+        # connection.clear_output_converters()
 
     def get_insertion_order(self):
         tables = []
@@ -273,17 +306,19 @@ class Extractor:
                         'table': tmp2[1],
                         'column': tmp2[2]
                     }
-                if len(self.sample_data[t]) > 0:
-                    col_data["sample"] = self.sample_data[t][col]
+
+                col_data["sample"] = self.sample_data[t].get(col)
                 document['attributes'].append(col_data)
             table_documents.append(document)
         return table_documents
+
 
     def extract_data(self, projectid):
         self.projectid = projectid
         self.get_schemas()
         self.get_tables()
         self.get_table_size()
+        self.get_user_defined_types()
         self.get_foreign_relations()
         self.get_insertion_order()
         self.get_table_keys()
@@ -295,7 +330,7 @@ class Extractor:
 
         # import json
         # json_data = json.dumps(table_documents, indent=4, sort_keys=True, default=str)
-        # with open('dvdrental.json', 'w') as outfile:
+        # with open('adworks.json', 'w') as outfile:
         #     outfile.write(json_data)
 
         return db_document, table_documents
