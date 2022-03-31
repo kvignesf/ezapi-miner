@@ -1,6 +1,9 @@
 from pprint import pprint
 import re
 from api_designer.ddl_parser.ts import get_ts_order
+from api_designer.ddl_parser import dtmapper
+
+
 
 # Reference - https://www.w3schools.com/sql/sql_datatypes.asp
 _DATA_TYPES_NUMERIC = [
@@ -177,12 +180,15 @@ class Parser:
                 serial = True
                 auto = True # Auto Insertion
 
+            openapi_type = dtmapper.convert_sql_server_dtype(column_type)
+
             column = {
                 'name': column_name,
                 'type': column_type,
                 'valueconstraint': constraint,
                 'serial': serial,
                 'auto': auto,
+                'openapi': openapi_type
             }
 
             if column_name in constraint_keys:
@@ -312,7 +318,7 @@ class Parser:
             })
         
         table_order = get_ts_order(tables)
-        return table_order            
+        return table_order
 
     def parse_data(self):
         try:
