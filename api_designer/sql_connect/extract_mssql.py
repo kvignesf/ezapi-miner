@@ -21,6 +21,8 @@ class Extractor:
         self.table_keys = {}
         self.foreign = {}
         self.table_details = {}
+        self.table_constraints = {}
+        self.computed_columns = {}
         self.insertion_order = None
         self.sample_data = {}
         self.master_tables = []
@@ -193,6 +195,61 @@ class Extractor:
                 attributes[tmp['COLUMN_NAME']]['decoder'] = D.decoder()
             self.table_details[t] = attributes
 
+    def get_check_constraints(self):
+        query = """
+        select con.[name] as constraint_name,
+            schema_name(t.schema_id) + '.' + t.[name]  as table_key,
+            col.[name] as column_name,
+            con.[definition],
+            case when con.is_disabled = 0
+                then 'Active'
+                else 'Disabled'
+                end as [status]
+        from sys.check_constraints con
+            left outer join sys.objects t
+                on con.parent_object_id = t.object_id
+            left outer join sys.all_columns col
+                on con.parent_column_id = col.column_id
+                and con.parent_object_id = col.object_id
+        order by con.name
+        """
+        res = self.conn.execute(query)
+        column_keys = list(res.keys())
+        res = [x for x in res]
+
+        for r in res:
+            tmp = {x:y for x,y in zip(column_keys, r)}
+            key = tmp['table_key']
+            if key not in self.table_constraints:
+                self.table_constraints[key] = []
+            self.table_constraints[key].append({
+                'name': tmp['constraint_name'],
+                'column': tmp['column_name'],
+                'definition': tmp['definition'],
+                'status': tmp['status']
+            })
+
+    def get_computed_columns(self):
+        query = """
+        select ss.name as schema_name,
+            tt.name as table_name,
+            cc.name as column_name,
+            cc.definition as definition
+        from sys.computed_columns cc
+            INNER JOIN sys.tables tt ON cc.object_id = tt.object_id
+            INNER JOIN sys.schemas ss ON ss.schema_id = tt.schema_id;
+        """
+        res = self.conn.execute(query)
+        column_keys = list(res.keys())
+        res = [x for x in res]
+
+        for r in res:
+            tmp = {x:y for x,y in zip(column_keys, r)}
+            key = f"{tmp['schema_name']}.{tmp['table_name']}"
+            if key not in self.computed_columns:
+                self.computed_columns[key] = {}
+            self.computed_columns[key][tmp['column_name']] = tmp['definition']
+
     @staticmethod
     def is_definite_column(data):
         data = list(filter(None, data))
@@ -291,7 +348,8 @@ class Extractor:
                 'primary': keys[0] if keyType == 'primary' else None,
                 'composite': keys if keyType == 'composite' else [],
                 'master': True if t in self.master_tables else False,
-                'attributes': []
+                'attributes': [],
+                'constraints': self.table_constraints[t] if t in self.table_constraints else []
             }
 
             for col, col_data in self.table_details[t].items():
@@ -308,6 +366,10 @@ class Extractor:
                     }
 
                 col_data["sample"] = self.sample_data[t].get(col)
+                
+                if t in self.computed_columns and col in self.computed_columns[t]:
+                    col_data['computed'] = self.computed_columns[t][col]
+
                 document['attributes'].append(col_data)
             table_documents.append(document)
         return table_documents
@@ -323,6 +385,8 @@ class Extractor:
         self.get_insertion_order()
         self.get_table_keys()
         self.get_table_details()
+        self.get_check_constraints()
+        self.get_computed_columns()
         self.get_sample_data()
         self.get_master_tables()
         db_document = self.prepare_db_document()

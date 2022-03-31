@@ -40,7 +40,6 @@ class DTDecoder:
             "datetime",
             "time"
         ]
-        matched = False
         for dt in DATETIME_TYPES:
             if dtype.startswith(dt):
                 ret["type"] = "datetime"
