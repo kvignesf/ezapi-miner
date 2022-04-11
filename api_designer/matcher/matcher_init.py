@@ -55,7 +55,13 @@ def transform_tables_data(tables_data):
         attr_names = [p["name"] for p in table_attributes if p is not None]
         attr_names = transform_naming(attr_names)
 
+        #print("attr_names", attr_names)
+
+        #print("len(table_attributes)..", len(table_attributes))
+
         for y in range(len(table_attributes)):
+            #print("x", x)
+            #print("y", y)
             tables_data[x]["attributes"][y]["name2"] = attr_names[y]
 
     return tables_data

@@ -1,12 +1,12 @@
-from multiprocessing import connection
-from pprint import pprint
+import re
 from sqlalchemy import create_engine
 
-from api_designer.sql_connect.ts import get_ts_order
+from api_designer.sql_connect.ts2 import get_ts_order
 from api_designer.sql_connect.mssql_decoder import DTDecoder
+from api_designer.sql_connect.mssql_openapi import DTMapper
 from api_designer.sql_connect.ezsampler import Sampler
+from api_designer.sql_connect.utils import *
 
-import os, sys
 TO_STRING_DTYPES = ['geography', 'hierarchyid', 'geometry']
 
 class Extractor:
@@ -24,6 +24,7 @@ class Extractor:
         self.table_constraints = {}
         self.computed_columns = {}
         self.insertion_order = None
+        self.table_data = {}
         self.sample_data = {}
         self.master_tables = []
 
@@ -104,7 +105,12 @@ class Extractor:
             tmp = {x:y for x,y in zip(columns, r)}
             key = f"{tmp['schema_name']}.{tmp['foreign_table']}.{tmp['fk_column']}"
             value = f"{tmp['primary_schema']}.{tmp['primary_table']}.{tmp['pk_column']}"
-            self.foreign[key] = value
+            self.foreign[key] = {
+                'key': tmp['FK_NAME'],
+                'schema': tmp['primary_schema'],
+                'table': tmp['primary_table'],
+                'column': tmp['pk_column']
+            }
 
     # Reference - https://dataedo.com/kb/query/sql-server/list-all-primary-keys-in-database
     def get_table_keys(self):
@@ -154,6 +160,7 @@ class Extractor:
     def get_master_tables(self):
         for tk, tv in self.table_details.items():
             table_size = self.table_size[tk]
+            pk_columns = 0
             table_columns = 0
             table_foreign = 0
             column_names = []
@@ -161,13 +168,15 @@ class Extractor:
                 foreign_key = f"{tk}.{col}"
                 if col_data["auto"]:
                     continue
+                elif tk in self.table_keys and col in self.table_keys[tk]:
+                    pk_columns += 1
                 elif foreign_key in self.foreign:
                     table_foreign += 1
                 else:
                     table_columns += 1
                     column_names.append(col)
 
-            if (table_foreign + table_columns) <= 3 and table_foreign <= 1 and table_columns> 0 and table_size <= 150:
+            if (table_foreign + table_columns + pk_columns) <= 3 and table_foreign <= 1 and (table_columns + pk_columns)> 0 and table_size <= 250:
                 master = True
                 for col in column_names:
                     col_sample = self.sample_data[tk][col]
@@ -193,7 +202,114 @@ class Extractor:
 
                 D = DTDecoder(tmp, self.user_defined_types)
                 attributes[tmp['COLUMN_NAME']]['decoder'] = D.decoder()
+                
+                D = DTMapper(tmp, self.user_defined_types)
+                attributes[tmp['COLUMN_NAME']]['openapi'] = D.decoder()
             self.table_details[t] = attributes
+
+    @staticmethod
+    def parse_constraint(text):
+        ret = None
+        try:
+            if text and text[0] == '(' and text[-1] == ')':
+                text = text[1:-1]
+
+            columns = re.findall(r'\[.*?\]', text)
+            columns = [re.sub('[\[\]]', '', x) for x in columns]
+            columns = list(set(columns))
+
+            join_type = None
+            if " OR " in text and " AND " in text:
+                return ret
+            elif " OR " in text:
+                join_type = "or"
+            elif " AND " in text:
+                join_type = "and"
+
+            constraints = re.split("OR|AND", text)
+            constraints = [x.strip() for x in constraints]
+
+            valid_constraints = []
+            for c in constraints:
+                if contains_in_list(c, columns):
+                    valid_constraints.append(c)
+
+            parsed_constraints = []
+            for v in valid_constraints:
+                sep = [">=", "<=", "=", "<>", ">", "<", "!=", " IS ", " IS NOT "]
+                matched = None
+                for s in sep:
+                    if s in v:
+                        matched = s
+                        v = v.split(s, 1)
+                        break
+
+                if matched == '<>':
+                    matched = '!='
+                elif matched == ' IS ':
+                    matched = '=='
+                elif matched == ' IS NOT ':
+                    matched = '!='
+
+                if matched:
+                    lhs = v[0]
+                    rhs = v[1]
+                    lfound, rfound = False, False
+
+                    if contains_in_list(lhs, columns):
+                        lhs = re.findall(r'\[.*?\]', lhs)
+                        lhs = [re.sub('[\[\]]', '', x) for x in lhs]
+                        lhs = lhs[0]
+                        lfound = True
+
+                    if contains_in_list(rhs, columns):
+                        rhs = re.findall(r'\[.*?\]', rhs)
+                        rhs = [re.sub('[\[\]]', '', x) for x in rhs]
+                        rhs = rhs[0]
+                        rfound = True
+
+                    if lfound and rfound:
+                        parsed_constraints.append({
+                            "lhs": lhs,
+                            "rhs": rhs,
+                            "condition": matched,
+                            "type": "both"
+                        })
+                    elif lfound and not rfound:
+                        if rhs == 'NULL':
+                            rhs = 'None'
+                        try:
+                            rhs = eval(rhs)
+                            parsed_constraints.append({
+                                "lhs": lhs,
+                                "rhs": rhs,
+                                "condition": matched,
+                                "type": "lhs"
+                            })
+                        except:
+                            pass
+                    elif rfound and not lfound:
+                        if lhs == 'NULL':
+                            lhs = 'None'
+                        try:
+                            lhs = eval(lhs)
+                            parsed_constraints.append({
+                                "lhs": lhs,
+                                "rhs": rhs,
+                                "condition": matched,
+                                "type": "rhs"
+                            })
+                        except:
+                            pass
+
+            ret = {
+                "join_type": join_type,
+                "columns": columns,
+                "constraints": parsed_constraints
+            }
+        except Exception as e:
+            pass
+        return ret
 
     def get_check_constraints(self):
         query = """
@@ -226,7 +342,8 @@ class Extractor:
                 'name': tmp['constraint_name'],
                 'column': tmp['column_name'],
                 'definition': tmp['definition'],
-                'status': tmp['status']
+                'status': tmp['status'],
+                'parsed': Extractor.parse_constraint(tmp['definition'])
             })
 
     def get_computed_columns(self):
@@ -292,6 +409,8 @@ class Extractor:
             table_data = self.conn.execute(query)
             table_keys = list(table_data.keys())
             table_data = [list(x) for x in table_data]
+            table_data_with_header = [table_keys] + table_data
+            self.table_data[t] = table_data_with_header
             
             if table_data and len(table_data) > 0:
                 table_sample_data = {}
@@ -312,7 +431,7 @@ class Extractor:
 
             for ft, fr in self.foreign.items():
                 if t == ft.rsplit(".", 1)[0]:
-                    tmp = fr.rsplit(".", 1)[0]
+                    tmp = f"{fr['schema']}.{fr['table']}"
                     foreign_dependencies.add(tmp)
             tables.append({
                 "key": t,
@@ -349,7 +468,8 @@ class Extractor:
                 'composite': keys if keyType == 'composite' else [],
                 'master': True if t in self.master_tables else False,
                 'attributes': [],
-                'constraints': self.table_constraints[t] if t in self.table_constraints else []
+                'constraints': self.table_constraints[t] if t in self.table_constraints else [],
+                'data': self.table_data[t]
             }
 
             for col, col_data in self.table_details[t].items():
@@ -358,12 +478,7 @@ class Extractor:
                 
                 foreign_key = f"{t}.{col}"
                 if foreign_key in self.foreign:
-                    tmp2 = self.foreign[foreign_key].split('.')
-                    col_data['foreign'] = {
-                        'schema': tmp2[0],
-                        'table': tmp2[1],
-                        'column': tmp2[2]
-                    }
+                    col_data['foreign'] = self.foreign[foreign_key]
 
                 col_data["sample"] = self.sample_data[t].get(col)
                 

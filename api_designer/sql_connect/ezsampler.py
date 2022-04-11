@@ -5,7 +5,7 @@ import random
 class Sampler:
     def __init__(self, dtype, samples):
         self.dtype = dtype
-        self.samples = list(filter(None, samples))
+        self.samples = [x for x in samples if x != None]    # None and 0 are different
         self.null = len(samples) - len(self.samples)
     
     def get_sample_data(self):

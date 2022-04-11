@@ -1,0 +1,62 @@
+from collections import defaultdict
+
+class Graph:
+    def __init__(self, vertices):
+        self.graph = defaultdict(list)
+        self.V = vertices
+
+    def add_edge(self, u, v):
+        self.graph[u].append(v)
+
+    def ts(self):
+        in_degree = [0]*(self.V)
+        for i in self.graph:
+            for j in self.graph[i]:
+                in_degree[j] += 1
+
+        queue = []
+        for i in range(self.V):
+            if in_degree[i] == 0:
+                queue.append(i)
+
+        cnt = 0
+        ts_order = []
+        while queue:
+            u = queue.pop()
+            ts_order.append(u)
+
+            for i in self.graph[u]:
+                in_degree[i] -= 1
+                if in_degree[i] == 0:
+                    queue.append(i)
+
+            cnt += 1
+
+        if cnt == self.V:
+            return ts_order
+        else:
+            return None
+
+def get_ts_order(table_data):
+    ntables = len(table_data)
+    G = Graph(ntables)
+
+    start = 0
+    table_id = {}
+
+    for td in table_data:
+        table_id[td['key']] = start
+        start += 1
+    table_invert_mapping = {v: k for k, v in table_id.items()}
+
+    for td in table_data:
+        for dep in td["dependencies"]:
+            u = table_id[dep]
+            v = table_id[td['key']]
+            G.add_edge(u, v)
+
+    table_order = G.ts()
+    for i, to in enumerate(table_order):
+        table_order[i] = table_invert_mapping[table_order[i]]
+
+    return table_order
