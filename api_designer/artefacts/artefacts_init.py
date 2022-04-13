@@ -10,7 +10,7 @@ import os, sys
 # from api_designer.artefacts import generate_db_only
 from api_designer.artefacts.ezfaker import generate_field_data
 from api_designer.utils.common import *
-from api_designer import config
+from api_designer import mongo
 
 from urllib.parse import urlencode
 

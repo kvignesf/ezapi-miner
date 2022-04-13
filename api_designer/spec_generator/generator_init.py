@@ -3,7 +3,7 @@
 # *****************************************************************
 
 
-from api_designer import config
+from api_designer import mongo
 from api_designer.spec_generator import generate_db_only
 from pprint import pprint
 

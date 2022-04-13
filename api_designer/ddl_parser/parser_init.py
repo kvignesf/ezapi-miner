@@ -1,4 +1,4 @@
-from api_designer import config
+from api_designer import mongo
 from api_designer.ddl_parser.mssql_parser import Parser as MSSqlParser
 from api_designer.ddl_parser.postgresql_parser import Parser as PostgresqlParser
 from api_designer.ddl_parser.mysql_parser import Parser as MysqlParser

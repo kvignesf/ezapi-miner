@@ -3,7 +3,7 @@
 # *****************************************************************
 
 
-from api_designer import config
+from api_designer import mongo
 from api_designer.utils.schema_manager import SchemaDeref
 from pprint import pprint
 

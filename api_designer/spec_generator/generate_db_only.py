@@ -4,7 +4,7 @@
 
 
 from pprint import pprint
-from api_designer import config
+from api_designer import mongo
 
 PATH_DESCRIPTION_KEYS = ["tags", "summary", "description", "operationId"]
 PARAMETER_KEY = "parameters"

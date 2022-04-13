@@ -1,11 +1,11 @@
-from pprint import pprint
 import psycopg2
-from random import sample
 from sqlalchemy import create_engine
 
 from api_designer.sql_connect.ts import get_ts_order
 from api_designer.sql_connect.postgres_decoder import DTDecoder
+from api_designer.sql_connect.postgres_openapi import DTMapper
 from api_designer.sql_connect.ezsampler import Sampler
+from api_designer.sql_connect.utils import *
 
 _SYSTEM_SCHEMAS = ['pg_toast', 'pg_catalog', 'information_schema']
 
@@ -19,8 +19,12 @@ class Extractor:
         self.table_size = {}
         self.table_keys = {}
         self.foreign = {}
+        self.user_defined_types = {}
         self.table_details = {}
+        self.table_constraints = {}
+        self.computed_columns = {}
         self.insertion_order = None
+        self.table_data = {}
         self.sample_data = {}
         self.master_tables = []
 
@@ -30,7 +34,7 @@ class Extractor:
 
     def get_tables(self):
         for s in self.schemas:
-            res = self.conn.execute(f"SELECT table_name FROM information_schema.tables WHERE table_schema = '{s}'")
+            res = self.conn.execute(f"SELECT table_name FROM information_schema.tables WHERE table_schema = '{s}' and table_type = 'BASE TABLE'")
             res = [f"{s}.{x[0]}" for x in res]
             self.tables += res
 
@@ -73,7 +77,12 @@ class Extractor:
             tmp = {x:y for x,y in zip(columns, r)}
             key = f"{tmp['foreign_table']}.{tmp['fk_column']}"
             value = f"{tmp['primary_table']}.{tmp['pk_column']}"
-            self.foreign[key] = value
+            self.foreign[key] = {
+                'key': tmp['constraint_name'],
+                'schema': tmp['primary_table'].split('.', 1)[0],
+                'table': tmp['primary_table'].split('.', 1)[1],
+                'column': tmp['pk_column']
+            }
 
     # Reference - https://dataedo.com/kb/query/postgresql/list-all-primary-keys-and-their-columns
     def get_table_keys(self):
@@ -119,6 +128,7 @@ class Extractor:
     def get_master_tables(self):
         for tk, tv in self.table_details.items():
             table_size = self.table_size[tk]
+            pk_columns = 0
             table_columns = 0
             table_foreign = 0
             column_names = []
@@ -126,13 +136,15 @@ class Extractor:
                 foreign_key = f"{tk}.{col}"
                 if col_data["auto"]:
                     continue
+                elif tk in self.table_keys and col in self.table_keys[tk]:
+                    pk_columns += 1
                 elif foreign_key in self.foreign:
                     table_foreign += 1
                 else:
                     table_columns += 1
                     column_names.append(col)
 
-            if (table_foreign + table_columns) <= 3 and table_foreign <= 1 and table_columns> 0 and table_size <= 150:
+            if (table_foreign + table_columns + pk_columns) <= 3 and table_foreign <= 1 and (table_columns + pk_columns)> 0 and table_size <= 250:
                 master = True
                 for col in column_names:
                     col_sample = self.sample_data[tk][col]
@@ -143,23 +155,6 @@ class Extractor:
                 if master:
                     self.master_tables.append(tk)
 
-    def get_master_tables2(self):
-        for tk, tv in self.table_details.items():
-            table_columns = 0
-            column_name = None
-            for col, col_data in tv.items():
-                foreign_key = f"{tk}.{col}"
-                if col_data["auto"] or foreign_key in self.foreign:
-                    continue
-                else:
-                    table_columns += 1
-                    column_name = col
-
-            if table_columns == 1:
-                column_sample = self.sample_data[tk][column_name]
-                if column_sample['repeat'] == 1:
-                    self.master_tables.append(tk)
-
     def get_table_details(self):
         for t in self.tables:
             t_schema, t_name = t.split(".")
@@ -168,6 +163,7 @@ class Extractor:
             column_desc = list(column_desc)
             
             attributes = {}
+            generated = {}
 
             for cd in column_desc:
                 tmp = {x:y for x, y in zip(column_keys, cd)}
@@ -175,7 +171,58 @@ class Extractor:
 
                 D = DTDecoder(tmp)
                 attributes[tmp['column_name']]['decoder'] = D.decoder()
+
+                D = DTMapper(tmp, self.user_defined_types)
+                attributes[tmp['column_name']]['openapi'] = D.decoder()
+
+                if "is_generated" in tmp and "generation_expression" in tmp and tmp["is_generated"] == "ALWAYS":
+                    generated[tmp['column_name']] = tmp['generation_expression']
+
             self.table_details[t] = attributes
+            self.computed_columns[t] = generated
+
+    def get_check_constraints(self):
+        query = """
+        select tc.table_schema as table_schema,
+            tc.table_name as table_name,
+            string_agg(col.column_name, ', ') as column_name,
+            tc.constraint_name as constraint_name,
+            cc.check_clause as definition
+        from information_schema.table_constraints tc
+        join information_schema.check_constraints cc
+            on tc.constraint_schema = cc.constraint_schema
+            and tc.constraint_name = cc.constraint_name
+        join pg_namespace nsp on nsp.nspname = cc.constraint_schema
+        join pg_constraint pgc on pgc.conname = cc.constraint_name
+                            and pgc.connamespace = nsp.oid
+                            and pgc.contype = 'c'
+        join information_schema.columns col
+            on col.table_schema = tc.table_schema
+            and col.table_name = tc.table_name
+            and col.ordinal_position = ANY(pgc.conkey)
+        where tc.constraint_schema not in('pg_catalog', 'information_schema')
+        group by tc.table_schema,
+                tc.table_name,
+                tc.constraint_name,
+                cc.check_clause
+        order by tc.table_schema,
+                tc.table_name
+        """
+        res = self.conn.execute(query)
+        column_keys = list(res.keys())
+        res = [x for x in res]
+
+        for r in res:
+            tmp = {x:y for x,y in zip(column_keys, r)}
+            key = tmp['table_schema'] + '.' + tmp['table_name']
+            if key not in self.table_constraints:
+                self.table_constraints[key] = []
+            self.table_constraints[key].append({
+                'name': tmp['constraint_name'],
+                'column': tmp['column_name'],
+                'definition': tmp['definition'],
+                # 'parsed': Extractor.parse_constraint(tmp['definition'])
+            })
             
     @staticmethod
     def is_definite_column(data):
@@ -203,6 +250,8 @@ class Extractor:
             table_data = self.conn.execute(f"select * from {t} order by random() limit 100")
             table_keys = list(table_data.keys())
             table_data = [list(x) for x in table_data]
+            table_data_with_header = [table_keys] + table_data
+            self.table_data[t] = table_data_with_header
             
             table_sample_data = {}
             if table_data and len(table_data) > 0:
@@ -222,7 +271,7 @@ class Extractor:
 
             for ft, fr in self.foreign.items():
                 if t == ft.rsplit(".", 1)[0]:
-                    tmp = fr.rsplit(".", 1)[0]
+                    tmp = f"{fr['schema']}.{fr['table']}"
                     foreign_dependencies.add(tmp)
             tables.append({
                 "key": t,
@@ -258,7 +307,9 @@ class Extractor:
                 'primary': keys[0] if keyType == 'primary' else None,
                 'composite': keys if keyType == 'composite' else [],
                 'master': True if t in self.master_tables else False,
-                'attributes': []
+                'attributes': [],
+                'constraints': self.table_constraints[t] if t in self.table_constraints else [],
+                'data': self.table_data[t]
             }
 
             for col, col_data in self.table_details[t].items():
@@ -267,14 +318,13 @@ class Extractor:
                 
                 foreign_key = f"{t}.{col}"
                 if foreign_key in self.foreign:
-                    tmp2 = self.foreign[foreign_key].split('.')
-                    col_data['foreign'] = {
-                        'schema': tmp2[0],
-                        'table': tmp2[1],
-                        'column': tmp2[2]
-                    }
-                if len(self.sample_data[t]) > 0:
-                    col_data["sample"] = self.sample_data[t][col]
+                    col_data['foreign'] = self.foreign[foreign_key]
+
+                col_data["sample"] = self.sample_data[t].get(col)
+
+                if t in self.computed_columns and col in self.computed_columns[t]:
+                    col_data['computed'] = self.computed_columns[t][col]
+
                 document['attributes'].append(col_data)
             table_documents.append(document)
         return table_documents
@@ -285,11 +335,12 @@ class Extractor:
         self.get_tables()
         self.get_table_size()
         self.get_foreign_relations()
-        self.get_insertion_order()
         self.get_table_keys()
         self.get_table_details()
+        self.get_check_constraints()
         self.get_sample_data()
         self.get_master_tables()
+        self.get_insertion_order()
         db_document = self.prepare_db_document()
         table_documents = self.prepare_table_document()
 
