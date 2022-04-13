@@ -571,9 +571,9 @@ def generate_artefacts(projectid, db):
             if x["status"][0] == "2"
         ]
 
-        config.store_bulk_document(TESTCASE_COLLECTION, all_testcases, db)
-        config.store_bulk_document(VIRTUAL_COLLECTION, virtual_tests, db)
-        config.store_document(TESTRESULT_COLLECTION, testcase_result, db)
+        mongo.store_bulk_document(TESTCASE_COLLECTION, all_testcases, db)
+        mongo.store_bulk_document(VIRTUAL_COLLECTION, virtual_tests, db)
+        mongo.store_document(TESTRESULT_COLLECTION, testcase_result, db)
 
         return {"success": True, "message": "ok", "status": 200}
     except Exception as e:

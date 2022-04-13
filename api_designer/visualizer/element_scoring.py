@@ -167,7 +167,7 @@ def enhance_attributes(projectid, db, project_type, filename=None):
             "api_ops_id": projectid,
             "data": tag_wise_attributes,
         }
-        config.store_document(element_collction, element_document, db)
+        mongo.store_document(element_collction, element_document, db)
 
         return True, "ok"
 

@@ -215,7 +215,7 @@ def parse_openapi(jsondata, projectid, spec_filename, db):
             "projectid": projectid,
             "data": jsondata,
         }
-        config.store_document(fullspec_collection, fullspec_document, db)
+        mongo.store_document(fullspec_collection, fullspec_document, db)
 
         path_data = jsondata.get("paths")
         components_data = jsondata.get("components")
@@ -257,7 +257,7 @@ def parse_openapi(jsondata, projectid, spec_filename, db):
                 "projectid": projectid,
                 "data": path,
             }
-            config.store_document(path_collection, path_document, db)
+            mongo.store_document(path_collection, path_document, db)
 
         parameter_collection = "parameters"
         parameter_document = {
@@ -265,7 +265,7 @@ def parse_openapi(jsondata, projectid, spec_filename, db):
             "projectid": projectid,
             "data": all_parameters,
         }
-        config.store_document(parameter_collection, parameter_document, db)
+        mongo.store_document(parameter_collection, parameter_document, db)
 
         component_collection = "components"
         component_document = {
@@ -273,7 +273,7 @@ def parse_openapi(jsondata, projectid, spec_filename, db):
             "projectid": projectid,
             "data": components_data,
         }
-        config.store_document(component_collection, component_document, db)
+        mongo.store_document(component_collection, component_document, db)
 
         schemas = components_data["schemas"]
         crawled_schemas = crawl_schema(schemas)
@@ -285,7 +285,7 @@ def parse_openapi(jsondata, projectid, spec_filename, db):
                 "projectid": projectid,
                 "data": cs,
             }
-            config.store_document(schema_collection, schema_document, db)
+            mongo.store_document(schema_collection, schema_document, db)
 
         res = {"success": True, "status": 200, "message": "ok"}
 

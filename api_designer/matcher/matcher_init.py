@@ -291,7 +291,7 @@ def spec_ddl_matcher(projectid, db):
     all_documents = solve_matching(schemas_data, tables_data, projectid)
 
     print("Inserting into DB ", round(time.time(), 1))
-    config.store_bulk_document(match_collection, all_documents, db)
+    mongo.store_bulk_document(match_collection, all_documents, db)
 
     """
     # ---------- CSV Generation Part ----------

@@ -26,7 +26,7 @@ def parse_ddl_file(ddl_file, projectid, ddl_filename, db, ddltype = 'mssql'):
             table_document = table
             table_document["projectid"] = projectid
             table_document["ddl_file"] = ddl_filename
-            config.store_document(TABLE_COLLECTION, table_document, db)
+            mongo.store_document(TABLE_COLLECTION, table_document, db)
 
         #return {"success": True, "status": 200, "message": "ok", "data": parsed_result}
         return {"success": True, "status": 200, "message": "ok"}

@@ -211,7 +211,7 @@ def process_sankey_visualizer(projectid, db):  # tags can be multiple
                 "api_ops_id": projectid,
                 "data": sankey_data,
             }
-            config.store_document(sankey_collection, sankey_document, db)
+            mongo.store_document(sankey_collection, sankey_document, db)
 
             res = {"status": 200, "success": True, "message": "ok"}
         else:
