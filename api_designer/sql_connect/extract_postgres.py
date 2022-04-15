@@ -185,7 +185,6 @@ class Extractor:
 
     @staticmethod
     def parse_constraint(text, fields):
-        print(text, fields)
         ret = None
         try:
             if text and len(text) >= 4 and text[:2] == '((' and text[-2:] == '))':
