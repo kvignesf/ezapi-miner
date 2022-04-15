@@ -1,7 +1,8 @@
 import psycopg2
+import re
 from sqlalchemy import create_engine
 
-from api_designer.sql_connect.ts import get_ts_order
+from api_designer.sql_connect.ts2 import get_ts_order
 from api_designer.sql_connect.postgres_decoder import DTDecoder
 from api_designer.sql_connect.postgres_openapi import DTMapper
 from api_designer.sql_connect.ezsampler import Sampler
@@ -10,7 +11,8 @@ from api_designer.sql_connect.utils import *
 _SYSTEM_SCHEMAS = ['pg_toast', 'pg_catalog', 'information_schema']
 
 class Extractor:
-    def __init__(self, args):
+    def __init__(self, dbtype, args):
+        self.dbtype = dbtype
         self.engine = create_engine('postgresql+psycopg2://', connect_args = args)
         self.conn = self.engine.connect()
 
@@ -181,6 +183,110 @@ class Extractor:
             self.table_details[t] = attributes
             self.computed_columns[t] = generated
 
+    @staticmethod
+    def parse_constraint(text, fields):
+        print(text, fields)
+        ret = None
+        try:
+            if text and len(text) >= 4 and text[:2] == '((' and text[-2:] == '))':
+                text = text[2:-2]
+
+            columns = []
+            for f in fields:
+                if f in text:
+                    columns.append(f)
+
+            join_type = None
+            if " OR " in text and " AND " in text:
+                return ret
+            elif " OR " in text:
+                join_type = "or"
+            elif " AND " in text:
+                join_type = "and"
+
+            constraints = re.split("OR|AND", text)
+            constraints = [x.strip() for x in constraints]
+
+            valid_constraints = []
+            for c in constraints:
+                if contains_in_list(c, columns):
+                    valid_constraints.append(c)
+
+            parsed_constraints = []
+            for v in valid_constraints:
+                sep = [">=", "<=", "=", "<>", ">", "<", "!=", " IS NOT ", " IS "]
+                matched = None
+                for s in sep:
+                    if s in v:
+                        matched = s
+                        v = v.split(s, 1)
+                        break
+
+                if matched == '<>':
+                    matched = '!='
+                elif matched == ' IS NOT ':
+                    matched = '!='
+                elif matched == ' IS ':
+                    matched = '=='
+
+                if matched:
+                    lhs = v[0].strip()
+                    rhs = v[1].strip()
+
+                    lhs = lhs.strip("(").strip(")")
+                    rhs = rhs.strip("(").strip(")")
+
+                    lfound, rfound = False, False
+
+                    if lhs in columns:
+                        lfound = True
+
+                    if rhs in columns:
+                        rfound = True
+
+                    if lfound and rfound:
+                        parsed_constraints.append({
+                            "lhs": lhs,
+                            "rhs": rhs,
+                            "condition": matched,
+                            "type": "both"
+                        })
+                    elif lfound and not rfound:
+                        if rhs == 'NULL':
+                            rhs = 'None'
+                        try:
+                            rhs = eval(rhs)
+                            parsed_constraints.append({
+                                "lhs": lhs,
+                                "rhs": rhs,
+                                "condition": matched,
+                                "type": "lhs"
+                            })
+                        except:
+                            pass
+                    elif rfound and not lfound:
+                        if lhs == 'NULL':
+                            lhs = 'None'
+                        try:
+                            lhs = eval(lhs)
+                            parsed_constraints.append({
+                                "lhs": lhs,
+                                "rhs": rhs,
+                                "condition": matched,
+                                "type": "rhs"
+                            })
+                        except:
+                            pass
+
+            ret = {
+                "join_type": join_type,
+                "columns": columns,
+                "constraints": parsed_constraints
+            }
+        except Exception as e:
+            pass
+        return ret
+
     def get_check_constraints(self):
         query = """
         select tc.table_schema as table_schema,
@@ -217,11 +323,13 @@ class Extractor:
             key = tmp['table_schema'] + '.' + tmp['table_name']
             if key not in self.table_constraints:
                 self.table_constraints[key] = []
+            fields = tmp['column_name'].split(",")
+            fields = [x.strip() for x in fields]
             self.table_constraints[key].append({
                 'name': tmp['constraint_name'],
-                'column': tmp['column_name'],
+                'column': fields,
                 'definition': tmp['definition'],
-                # 'parsed': Extractor.parse_constraint(tmp['definition'])
+                'parsed': Extractor.parse_constraint(tmp['definition'], fields)
             })
             
     @staticmethod
@@ -282,7 +390,7 @@ class Extractor:
     def prepare_db_document(self):
         document = {
             'projectid': self.projectid,
-            'type': 'postgres',
+            'type': self.dbtype,
             'schemas': self.schemas,
             'tables': self.tables,
             'order': self.insertion_order

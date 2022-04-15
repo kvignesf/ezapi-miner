@@ -102,7 +102,7 @@ def handle_sql_connect(request_data, dbtype, projectid, db):
                 "port": portNo
             }
 
-        P = PsqlExtractor(args)
+        P = PsqlExtractor(dbtype, args)
         db_document, table_documents = P.extract_data(projectid)
 
         if db_document and table_documents:
@@ -140,7 +140,7 @@ def handle_sql_connect(request_data, dbtype, projectid, db):
                 "driver": "ODBC Driver 17 for SQL Server"
             },
         )
-        P = MssqlExtractor(connection_url)
+        P = MssqlExtractor(dbtype, connection_url)
         db_document, table_documents = P.extract_data(projectid)
 
         store_document("database", db_document, db)

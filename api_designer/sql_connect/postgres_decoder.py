@@ -72,7 +72,7 @@ class DTDecoder:
             "uuid",
             "xml",
             "json",
-
+            "jsonb"
         ]
 
         # Geometric Type
@@ -93,5 +93,10 @@ class DTDecoder:
             "macaddr",
             "macaddr8"
         ]
+
+        for dt in OTHER_TYPES + GEOMETRIC_TYPES + NETWORK_TYPES:
+            if dtype.startswith(dt):
+                ret["type"] = "postgres"
+                ret["format"] = dt
 
         return ret

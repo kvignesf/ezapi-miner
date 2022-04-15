@@ -10,7 +10,8 @@ from api_designer.sql_connect.utils import *
 TO_STRING_DTYPES = ['geography', 'hierarchyid', 'geometry']
 
 class Extractor:
-    def __init__(self, url):
+    def __init__(self, dbtype, url):
+        self.dbtype = dbtype
         self.engine = create_engine(url)
         self.conn = self.engine.connect()
 
@@ -442,7 +443,7 @@ class Extractor:
     def prepare_db_document(self):
         document = {
             'projectid': self.projectid,
-            'type': 'postgres',
+            'type': self.dbtype,
             'schemas': self.schemas,
             'tables': self.tables,
             'order': self.insertion_order
