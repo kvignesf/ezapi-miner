@@ -2,6 +2,8 @@ from pprint import pprint
 import re
 from api_designer.ddl_parser.ts import get_ts_order
 from api_designer.ddl_parser.common_parser import remove_prefix
+from api_designer.ddl_parser import dtmapper
+
 
 # Reference - https://www.w3schools.com/sql/sql_datatypes.asp
 _DATA_TYPES_NUMERIC_POSTGRES = [
@@ -53,18 +55,22 @@ _DATA_TYPES_STRING = [
     "mediumtext",
     "mediumblob"
 ]
-_DATA_TYPES_OTHER = ["sql_variant", "uniqueidentifier", "xml", "cursor", "table", "hierarchyid", "geography", "sysname"]
+_DATA_TYPES_OTHER = ["sql_variant", "uniqueidentifier", "xml",
+                     "cursor", "table", "hierarchyid", "geography", "sysname"]
 
 _DATA_TYPES_ALL = (
-    _DATA_TYPES_NUMERIC + _DATA_TYPES_DATETIME + _DATA_TYPES_STRING + _DATA_TYPES_OTHER + _DATA_TYPES_NUMERIC_POSTGRES + _DATA_TYPES_STRING_POSTGRES
+    _DATA_TYPES_NUMERIC + _DATA_TYPES_DATETIME + _DATA_TYPES_STRING +
+    _DATA_TYPES_OTHER + _DATA_TYPES_NUMERIC_POSTGRES + _DATA_TYPES_STRING_POSTGRES
 )
+
 
 class Parser:
     def __init__(self, filedata):
         self.filedata = filedata
         self.filedata = "".join(self.filedata)
         self.filedata = self.filedata.lower()
-        self.filedata = self.filedata.split("# ------------------------------------------------------------\n")
+        self.filedata = self.filedata.split(
+            "# ------------------------------------------------------------\n")
 
         self.types = {}
         self.tables = []    # schema_name.table_name
@@ -124,7 +130,8 @@ class Parser:
         column_name = tmp[0]
         column_name = column_name.strip("`")
         reference_table_name = tmp[1].split("`", 1)[1].split("`", 1)[0]
-        reference_table_column = tmp[1].split("`", 1)[1].split("`", 1)[1].split(')', 1)[0]
+        reference_table_column = tmp[1].split("`", 1)[1].split("`", 1)[
+            1].split(')', 1)[0]
         reference_table_column = reference_table_column.strip(" `(")
         foreign_key_dict["schema"] = "None"
         foreign_key_dict["table"] = reference_table_name
@@ -159,8 +166,8 @@ class Parser:
                 column_values["auto"] = True
                 column_values["serial"] = True
 
-            # openapi_type = dtmapper.convert_sql_server_dtype(dt)
-            # column_values["openapi"] = openapi_type
+            openapi_type = dtmapper.convert_mysql_server_dtype(dt)
+            column_values["openapi"] = openapi_type
 
             if len(text) >= 3 and "not" in text:
                 column_values["valueconstraint"] = "not null"
@@ -193,7 +200,8 @@ class Parser:
                 if ")" in cc:
                     primaryKeyStatement = primaryKeyStatement.split(")", 1)[0]
                     flag = 1
-                    primary_key, composite_key_list = self.get_mysql_primary_and_composite_list(primaryKeyStatement)
+                    primary_key, composite_key_list = self.get_mysql_primary_and_composite_list(
+                        primaryKeyStatement)
             if cc.startswith("\n primary"):
                 cc = cc.strip(" \n")
                 flag = 0
@@ -201,11 +209,13 @@ class Parser:
                 if ")" in cc:
                     primaryKeyStatement = primaryKeyStatement.split(")", 1)[0]
                     flag = 1
-                    primary_key, composite_key_list = self.get_mysql_primary_and_composite_list(primaryKeyStatement)
+                    primary_key, composite_key_list = self.get_mysql_primary_and_composite_list(
+                        primaryKeyStatement)
 
             elif cc.startswith("\n constraint"):
                 # print("foriegn keyyy")
-                column_name, constraint_list = self.extract_mysql_constraint_keys(cc)
+                column_name, constraint_list = self.extract_mysql_constraint_keys(
+                    cc)
                 foreignkey_dict[column_name] = constraint_list
             elif cc.startswith("\n unique"):
                 cc = cc.strip(" \n")
@@ -262,7 +272,8 @@ class Parser:
 
                     table_data = self.extract_table_data(tmp[0], "mysql")
                     key = table_data[1]
-                    primary_key, composite_list, column_data = self.extract_mysql_column_data(tmp[1], table_data[1])
+                    primary_key, composite_list, column_data = self.extract_mysql_column_data(
+                        tmp[1], table_data[1])
 
                     dict1 = {
                         "schema": table_data[0],
@@ -282,7 +293,7 @@ class Parser:
 
             return res
 
-            #pprint(self.table_details)
-            #return self.table_details
+            # pprint(self.table_details)
+            # return self.table_details
         except Exception as e:
             return None

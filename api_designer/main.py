@@ -3,7 +3,7 @@
 # *****************************************************************
 
 
-from api_designer import config
+from api_designer import mongo
 
 from api_designer.spec_parser.parser_init import parse_openapi_json
 from api_designer.ddl_parser.parser_init import parse_ddl_file
@@ -22,7 +22,7 @@ class EzAPIModels:
         self.projectid = projectid
 
     def set_db_instance(self):
-        client, db = config.get_db_connection()
+        client, db = mongo.get_db_connection()
         self.client = client
         self.db = db
         # self.client = None

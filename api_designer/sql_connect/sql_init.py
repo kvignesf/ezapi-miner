@@ -1,4 +1,5 @@
-from api_designer.config import store_document, store_bulk_document
+from email.policy import default
+from api_designer.mongo import store_document, store_bulk_document
 from api_designer.sql_connect.extract_postgres import Extractor as PsqlExtractor
 from api_designer.sql_connect.extract_mysql import Extractor as MysqlExtractor
 from api_designer.sql_connect.extract_mssql import Extractor as MssqlExtractor
@@ -10,7 +11,8 @@ from urllib.parse import urlparse
 import json, os, re, shutil, subprocess
 from decouple import config
 
-
+MSSQL_DEFAULT_PORT = 1433
+POSTGRES_DEFAULT_PORT = 5432
 
 def download_gcsfile(url):
     creds = service_account.Credentials.from_service_account_file('creds.json')
@@ -38,28 +40,46 @@ def generate_code(file_path):
     subprocess.run(cmd, shell=True)
 
 def handle_sql_connect(request_data, dbtype, projectid, db):
-    print("Inside SQL Connect")
-    passkey = config('dbpasskey')
-    server = str(request_data.get("server", ""))
-    username = str(request_data.get("username", ""))
-    password = request_data.get("password", "")
-    database = str(request_data.get("database", ""))
-    portNo = request_data.get("portNo", "")
-    certPath = str(request_data.get("certPath", ""))
-    keyPath = str(request_data.get("keyPath", ""))
-    rootPath = str(request_data.get("rootPath", ""))
-    sslMode = str(request_data.get("sslMode", ""))
+    if config("DEVELOPMENT", default = False):
+        server = str(config("server"))
+        username = str(config("username"))
+        password = str(config("password"))
+        database = str(config("database"))
+        portNo = config("portNo", default="")
 
-    if keyPath:
-        keyPathLocal = download_gcsfile(keyPath)
-    if rootPath:
-        rootPathLocal = download_gcsfile(rootPath)
-    if certPath:
-        certPathLocal = download_gcsfile(certPath)
-    if password:
-        decryptedpassword = _decrypt(bytes(password, 'utf-8'), "", passkey)
+        if config("ssl"):
+            certPath = str(config("certPath"))
+            keyPath = str(config("keyPath"))
+            rootPath = str(config("rootPath"))
+            sslMode = str(config("sslMode"))
+
+
+    else:
+        passkey = config('dbpasskey', default = None)
+        server = str(request_data.get("server", ""))
+        username = str(request_data.get("username", ""))
+        password = request_data.get("password", "")
+        database = str(request_data.get("database", ""))
+        portNo = request_data.get("portNo", "")
+        certPath = str(request_data.get("certPath", ""))
+        keyPath = str(request_data.get("keyPath", ""))
+        rootPath = str(request_data.get("rootPath", ""))
+        sslMode = str(request_data.get("sslMode", ""))
+
+        if keyPath:
+            keyPath = download_gcsfile(keyPath)
+        if rootPath:
+            rootPath = download_gcsfile(rootPath)
+        if certPath:
+            certPath = download_gcsfile(certPath)
+        if password and passkey:
+            decryptedpassword = _decrypt(bytes(password, 'utf-8'), "", passkey)
+            password = bytes.decode(decryptedpassword)
 
     if dbtype == "postgres":
+        if not portNo:
+            portNo = POSTGRES_DEFAULT_PORT
+            
         if sslMode == "Y":
             # keyPath and rootPath and certPath:
 
@@ -68,9 +88,9 @@ def handle_sql_connect(request_data, dbtype, projectid, db):
                 "host": server,
                 "user": username,
                 "database": database,
-                "sslcert": certPathLocal,
-                "sslkey": keyPathLocal,
-                "sslrootcert": rootPathLocal,
+                "sslcert": certPath,
+                "sslkey": keyPath,
+                "sslrootcert": rootPath,
                 "sslmode": "verify-full"
             }
         else:
@@ -78,15 +98,12 @@ def handle_sql_connect(request_data, dbtype, projectid, db):
                 "host": server,
                 "user": username,
                 "database": database,
-                "password": bytes.decode(decryptedpassword),
+                "password": password,
                 "port": portNo
             }
 
-        P = PsqlExtractor(args)
+        P = PsqlExtractor(dbtype, args)
         db_document, table_documents = P.extract_data(projectid)
-        #from pprint import pprint
-        #pprint(table_documents)
-        
 
         if db_document and table_documents:
             store_document("database", db_document, db)
@@ -94,10 +111,6 @@ def handle_sql_connect(request_data, dbtype, projectid, db):
             return {"success": True}
         else:
             return {"success": False}
-
-        # G = DataGen(table_documents)
-        # G.gen()
-        #return {"success": True}
 
 
     elif dbtype == "mysql":
@@ -110,19 +123,24 @@ def handle_sql_connect(request_data, dbtype, projectid, db):
         #P = MysqlExtractor(args)
         #res = P.extract_data()
         #print(res)
+
     elif dbtype == "mssql":
+        if not portNo:
+            portNo = MSSQL_DEFAULT_PORT
+
         from sqlalchemy.engine import URL
         connection_url = URL.create(
             "mssql+pyodbc",
             username=username,
-            password=bytes.decode(decryptedpassword),
+            password=password,
             host=server,
             database=database,
+            port=portNo,
             query={
                 "driver": "ODBC Driver 17 for SQL Server"
             },
         )
-        P = MssqlExtractor(connection_url)
+        P = MssqlExtractor(dbtype, connection_url)
         db_document, table_documents = P.extract_data(projectid)
 
         store_document("database", db_document, db)

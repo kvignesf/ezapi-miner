@@ -47,12 +47,13 @@ class DTDecoder:
 
         # Character Data Types
         length = self.props.get("LENGTH")
+        precision = self.props.get("PRECISION")
         STRING_TYPE = {
             "char": {"minLength": length, "maxLength": length},
             "varchar": {"maxLength": length},
             "text": {},
-            "nchar": {"format": "unicode", "minLength": length, "maxLength": length},
-            "nvarchar": {"format": "unicode", "maxLength": length},
+            "nchar": {"format": "unicode", "minLength": precision, "maxLength": precision},
+            "nvarchar": {"format": "unicode", "maxLength": precision},
             "ntext": {"format": "unicode"},
             "binary": {"format": "binary", "minLength": length, "maxLength": length},
             "varbinary": {"format": "binary", "maxLength": length},
@@ -64,6 +65,7 @@ class DTDecoder:
 
         # Other Types
         OTHER_TYPES = [
+            "sysname",
             "sql_variant",
             "uniqueidentifier",
             "xml",

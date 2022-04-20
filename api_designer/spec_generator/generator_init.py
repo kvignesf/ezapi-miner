@@ -3,7 +3,7 @@
 # *****************************************************************
 
 
-from api_designer import config
+from api_designer import mongo
 from api_designer.spec_generator import generate_db_only
 from pprint import pprint
 
@@ -543,7 +543,7 @@ def generate_spec(projectid, db):
         spec_data = SG.write_spec()
 
         spec_document = {"projectid": projectid, "data": spec_data}
-        config.store_document(SPEC_COLLECTION, spec_document, db)
+        mongo.store_document(SPEC_COLLECTION, spec_document, db)
 
         return {"success": True, "status": 200, "message": "ok"}
     except Exception as e:

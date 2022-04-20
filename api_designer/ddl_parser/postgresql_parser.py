@@ -2,6 +2,7 @@ from pprint import pprint
 import re
 from api_designer.ddl_parser.ts import get_ts_order
 from api_designer.ddl_parser.common_parser import remove_prefix
+from api_designer.ddl_parser import dtmapper
 
 # Reference - https://www.w3schools.com/sql/sql_datatypes.asp
 
@@ -54,11 +55,14 @@ _DATA_TYPES_STRING = [
     "mediumtext",
     "mediumblob"
 ]
-_DATA_TYPES_OTHER = ["sql_variant", "uniqueidentifier", "xml", "cursor", "table", "hierarchyid", "geography", "sysname"]
+_DATA_TYPES_OTHER = ["sql_variant", "uniqueidentifier", "xml",
+                     "cursor", "table", "hierarchyid", "geography", "sysname"]
 
 _DATA_TYPES_ALL = (
-    _DATA_TYPES_NUMERIC + _DATA_TYPES_DATETIME + _DATA_TYPES_STRING + _DATA_TYPES_OTHER + _DATA_TYPES_NUMERIC_POSTGRES + _DATA_TYPES_STRING_POSTGRES
+    _DATA_TYPES_NUMERIC + _DATA_TYPES_DATETIME + _DATA_TYPES_STRING +
+    _DATA_TYPES_OTHER + _DATA_TYPES_NUMERIC_POSTGRES + _DATA_TYPES_STRING_POSTGRES
 )
+
 
 class Parser:
     def __init__(self, filedata):
@@ -86,7 +90,7 @@ class Parser:
             return line
         return None
 
-    #@dispatch(str)
+    # @dispatch(str)
     def extract_table_data(self, text):
         schema_name = None
         table_name = None
@@ -167,7 +171,6 @@ class Parser:
 
         return table_constraints, manual_datatype_list
 
-
     def extract_postgres_column_values(self, text, table_constraints_dict, dataype_list):
         flag = 0
         text = re.sub("[\[\]]", "", text)
@@ -179,7 +182,15 @@ class Parser:
         if len(text) >= 2:
             name, dt = text[0], text[1]
             if not "numeric" in dt:
-                dt = dt.strip("\n)")
+                dt = dt.strip("\n")
+                if "\n" in dt:
+                    if dt[-2:] == "\n)":
+                        dt = dt.strip(")")
+                    dt = dt.replace("\n", "")
+                    #if "))" in dt:
+                    #    dt = dt.replace("))", ")")
+                    #if ")" in dt and "(" not in dt:
+                    #    dt = dt.replace(")", "")
 
             column_values["name"] = name
             if dt.split("(")[0] not in _DATA_TYPES_ALL:
@@ -194,6 +205,7 @@ class Parser:
                 dt = dt + " " + text[2]
             if "timestamp" == dt:
                 dt = dt + " " + text[2] + " " + text[3] + " " + text[4]
+            #print("dt:", dt)
             if flag == 0:
                 column_values["datatype"] = dt
             column_values["valueconstraint"] = "null"
@@ -202,7 +214,7 @@ class Parser:
             column_values["serial"] = False
 
             if "foreign_keys" in table_constraints_dict.keys() and name in table_constraints_dict[
-                "foreign_keys"].keys():
+                    "foreign_keys"].keys():
                 column_values["foreign"] = table_constraints_dict["foreign_keys"][name]
             if name == table_constraints_dict['primary']:
                 column_values["KeyType"] = 'primary'
@@ -210,8 +222,9 @@ class Parser:
                 column_values["KeyType"] = 'composite'
             else:
                 column_values["KeyType"] = 'null'
-            # openapi_type = dtmapper.convert_sql_server_dtype(dt)
-            # column_values["openapi"] = openapi_type
+
+            openapi_type = dtmapper.convert_postgres_server_dtype(dt)
+            column_values["openapi"] = openapi_type
 
             if "default" in text:
                 column_values["auto"] = True
@@ -228,7 +241,6 @@ class Parser:
             return column_values
         return None
 
-
     def extract_postgres_column_data(self, text, table_constraints_dict, datatype_list):
         column_values = []
         # print("postgresText:",text)
@@ -238,9 +250,12 @@ class Parser:
         for cc in tmp:
             cc = cc.strip(" \n")
             if "numeric" in cc:
+                #print("unformatted:", cc)
                 cc = cc + "," + tmp[counter + 1]
+                #print("formatted:", cc)
                 tmp.pop(counter + 1)
-            ret = self.extract_postgres_column_values(cc, table_constraints_dict, datatype_list)
+            ret = self.extract_postgres_column_values(
+                cc, table_constraints_dict, datatype_list)
             column_values.append(ret)
             counter = counter + 1
         return column_values
@@ -250,7 +265,8 @@ class Parser:
         try:
             lines = self.filedata
             res = []
-            table_constraints, manual_datatype_list = self.postgres_constraints_dict(lines)
+            table_constraints, manual_datatype_list = self.postgres_constraints_dict(
+                lines)
 
             for line in lines:
                 line = line.replace("\n\n\n", " ")
@@ -272,9 +288,10 @@ class Parser:
                     key = table_data[0] + "." + table_data[1]
                     #print("table", key)
                     primary_key = table_constraints[table_data[1]]["primary"]
-                    composite_list = table_constraints[table_data[1]]["composite"]
+                    composite_list = table_constraints[table_data[1]
+                                                       ]["composite"]
                     column_data = self.extract_postgres_column_data(tmp[1], table_constraints[table_data[1]],
-                                                                   manual_datatype_list)
+                                                                    manual_datatype_list)
 
                     dict1 = {
                         "schema": table_data[0],
@@ -294,8 +311,8 @@ class Parser:
 
             return res
 
-            #pprint(self.table_details)
-            #return self.table_details
+            # pprint(self.table_details)
+            # return self.table_details
         except Exception as e:
             print("ex", e)
             return None

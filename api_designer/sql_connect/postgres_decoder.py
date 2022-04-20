@@ -8,7 +8,6 @@ class DTDecoder:
         ret = {}
         dtype = self.props['data_type'].lower()
 
-        # -----------------------------------
         # Numeric Data Types (type - number) + MONEY
         NUMBER_TYPES = {
             "smallint": {"format": "int16", "minimum": (-1<<15), "maximum": (1<<15)-1},
@@ -29,7 +28,6 @@ class DTDecoder:
             ret["type"] = "number"
             ret = {**ret, **NUMBER_TYPES[dtype]}
 
-        # -----------------------------------
         # Character Data Types (type - string)
         maxLength = self.props.get("character_maximum_length")
         STRING_TYPE = {
@@ -44,7 +42,6 @@ class DTDecoder:
             ret["type"] = "string"
             ret = {**ret, **STRING_TYPE[dtype]}
 
-        # -----------------------------------
         # Date/Time Types
         DT_TYPE = [
             "timestamp",    # both date and time
@@ -65,24 +62,41 @@ class DTDecoder:
             ret["timezone"] = True if "with time zone" in dtype else False
             ret["precision"] = self.props.get("datetime_precision")
 
-        # -----------------------------------
-        # Enumerated Types
-        DT_TYPE = ['ENUM']
-        if dtype in DT_TYPE:
-            ret["type"] = "string"
-            ret["format"] = "enum"
 
-        # -----------------------------------
-        # Arrays Type
-        DT_TYPE = ['array']
-        if dtype in DT_TYPE:
-            ret["type"] = "array"
-            ret["format"] = self.props.get("udt_name")
+        # Other Types
+        OTHER_TYPES = [
+            "enum",
+            "array",
+            "tsvector",
+            "tsquery",
+            "uuid",
+            "xml",
+            "json",
+            "jsonb"
+        ]
 
-        # -----------------------------------
-        # Byte Type (binary string)
-        DT_TYPE = ['bytea']
-        if dtype in DT_TYPE:
-            ret["type"] = "byte"
+        # Geometric Type
+        GEOMETRIC_TYPES = [
+            "point",
+            "line",
+            "lseg",
+            "box",
+            "path",
+            "polygon",
+            "circle"
+        ]
+
+        # Network Address Type
+        NETWORK_TYPES = [
+            "inet",
+            "cidr",
+            "macaddr",
+            "macaddr8"
+        ]
+
+        for dt in OTHER_TYPES + GEOMETRIC_TYPES + NETWORK_TYPES:
+            if dtype.startswith(dt):
+                ret["type"] = "postgres"
+                ret["format"] = dt
 
         return ret

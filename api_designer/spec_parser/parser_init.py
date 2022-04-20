@@ -3,7 +3,7 @@
 # *****************************************************************
 
 
-from api_designer import config
+from api_designer import mongo
 
 from api_designer.spec_parser.openapi_parser import parse_openapi
 from api_designer.spec_parser.swagger_parser import parse_swagger

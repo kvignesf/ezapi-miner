@@ -3,7 +3,7 @@
 # *****************************************************************
 
 
-from api_designer import config
+from api_designer import mongo
 from api_designer.utils.common import *
 
 from pprint import pprint
@@ -55,7 +55,13 @@ def transform_tables_data(tables_data):
         attr_names = [p["name"] for p in table_attributes if p is not None]
         attr_names = transform_naming(attr_names)
 
+        #print("attr_names", attr_names)
+
+        #print("len(table_attributes)..", len(table_attributes))
+
         for y in range(len(table_attributes)):
+            #print("x", x)
+            #print("y", y)
             tables_data[x]["attributes"][y]["name2"] = attr_names[y]
 
     return tables_data
@@ -285,7 +291,7 @@ def spec_ddl_matcher(projectid, db):
     all_documents = solve_matching(schemas_data, tables_data, projectid)
 
     print("Inserting into DB ", round(time.time(), 1))
-    config.store_bulk_document(match_collection, all_documents, db)
+    mongo.store_bulk_document(match_collection, all_documents, db)
 
     """
     # ---------- CSV Generation Part ----------
