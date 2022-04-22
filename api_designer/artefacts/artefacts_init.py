@@ -7,6 +7,8 @@ import random
 import string
 import os, sys
 
+from itsdangerous import exc
+
 # from api_designer.artefacts import generate_db_only
 from api_designer.artefacts.ezfaker import generate_field_data
 from api_designer.utils.common import *
@@ -425,9 +427,20 @@ def generate_artefacts(projectid, db):
     print("Inside Artefacts Generator")
     try:
         # Remove esisting testcases
-        db.testcases.remove({"projectid": projectid})
-        db.virtual.remove({"projectid": projectid})
-        db.test_result.remove({"projectid": projectid})
+        try:
+            db.testcases.remove({"projectid": projectid})
+        except:
+            pass
+
+        try:
+            db.virtual.remove({"projectid": projectid})
+        except:
+            pass
+
+        try:
+            db.test_result.remove({"projectid": projectid})
+        except:
+            pass
 
         project_data = db.projects.find_one({"projectId": projectid})
         try:
