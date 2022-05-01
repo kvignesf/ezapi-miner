@@ -38,25 +38,98 @@ class Graph:
             return None
 
 def get_ts_order(table_data):
-    ntables = len(table_data)
-    G = Graph(ntables)
+   for i in range(len(table_data)):
+      if table_data[i]["key"] in table_data[i]["dependencies"]:
+         table_data[i]["dependencies"].remove(table_data[i]["key"])
 
-    start = 0
-    table_id = {}
+   ntables = len(table_data)
+   G = Graph(ntables)
 
-    for td in table_data:
-        table_id[td['key']] = start
-        start += 1
-    table_invert_mapping = {v: k for k, v in table_id.items()}
+   start = 0
+   table_id = {}
 
-    for td in table_data:
-        for dep in td["dependencies"]:
-            u = table_id[dep]
-            v = table_id[td['key']]
-            G.add_edge(u, v)
+   for td in table_data:
+      table_id[td['key']] = start
+      start += 1
 
-    table_order = G.ts()
-    for i, to in enumerate(table_order):
-        table_order[i] = table_invert_mapping[table_order[i]]
+   table_invert_mapping = {v: k for k, v in table_id.items()}
 
-    return table_order
+   for td in table_data:
+      for dep in td["dependencies"]:
+         u = table_id[dep]
+         v = table_id[td['key']]
+         G.add_edge(u, v)
+
+   table_order = G.ts()
+
+   for i, to in enumerate(table_order):
+      table_order[i] = table_invert_mapping[table_order[i]]
+
+   return table_order
+
+"""
+table_data = [
+   {
+      "key":"production.categories",
+      "dependencies":[
+         
+      ]
+   },
+   {
+      "key":"production.brands",
+      "dependencies":[
+         
+      ]
+   },
+   {
+      "key":"production.products",
+      "dependencies":[
+         "production.brands",
+         "production.categories"
+      ]
+   },
+   {
+      "key":"production.stocks",
+      "dependencies":[
+         "sales.stores",
+         "production.products"
+      ]
+   },
+   {
+      "key":"sales.customers",
+      "dependencies":[
+         
+      ]
+   },
+   {
+      "key":"sales.stores",
+      "dependencies":[
+         
+      ]
+   },
+   {
+      "key":"sales.staffs",
+      "dependencies":[
+         "sales.stores",
+         "sales.staffs"
+      ]
+   },
+   {
+      "key":"sales.orders",
+      "dependencies":[
+         "sales.stores",
+         "sales.staffs",
+         "sales.customers"
+      ]
+   },
+   {
+      "key":"sales.order_items",
+      "dependencies":[
+         "production.products",
+         "sales.orders"
+      ]
+   }
+]
+
+print(get_ts_order(table_data))
+"""
