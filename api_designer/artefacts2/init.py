@@ -40,103 +40,105 @@ class TestdataGenerator:
         return ret
 
     def generate_db_type_functional(self):
-        # try:
-        testdata = []
-        data = self.combine_table_dbdata()
-        GTD = GetTableData(self.projectid, data, self.db, generation_type="functional", selection_type="incremental")
-        testcount = 1
+        try:
+            testdata = []
+            data = self.combine_table_dbdata()
+            GTD = GetTableData(self.projectid, data, self.db, generation_type="functional", selection_type="incremental")
+            testcount = 1
 
-        for op in self.operation_data:
-            endpoint = op["endpoint"]
-            method = op["method"]
-            request_data = op["requestData"]
-            response_data = op["responseData"]
+            for op in self.operation_data:
+                endpoint = op["endpoint"]
+                method = op["method"]
+                request_data = op["requestData"]
+                response_data = op["responseData"]
 
-            for resp in response_data:
-                GTD.flush_data()
+                for resp in response_data:
+                    GTD.flush_data()
 
-                GTD.set_operation_data(method, resp["status_code"])
-                req_data = GTD.generate_request_data(request_data)
-                res_data = GTD.generate_response_data(resp)
+                    GTD.set_operation_data(method, resp["status_code"])
+                    req_data = GTD.generate_request_data(request_data)
+                    res_data = GTD.generate_response_data(resp)
 
-                # testdata.append({
-                #     "projectid": self.projectid,
-                #     "api_ops_id": self.projectid,
-                #     "filename": None,
-                #     "endpoint": endpoint,
-                #     "method": method,
-                #     "resource": op.get("tags", []),
-                #     "operation_id": op.get("operationId"),
-                #     "test_case_name": op.get("operationId") + "__P",
-                #     "description": "ok",
-                #     "test_case_type": "F",
-                #     "delete": False,
-                #     "inputData": req_data,
-                #     "status": res_data["status"],
-                #     "assertionData": res_data["content"],
-                #     "testcaseId": testcount,
-                #     "mock": False
-                # })
-                # testcount += 1
+                    testdata.append({
+                        "projectid": self.projectid,
+                        "api_ops_id": self.projectid,
+                        "filename": None,
+                        "endpoint": endpoint,
+                        "method": method,
+                        "resource": op.get("tags", []),
+                        "operation_id": op.get("operationId"),
+                        "test_case_name": op.get("operationId") + "__P",
+                        "description": "ok",
+                        "test_case_type": "F",
+                        "delete": False,
+                        "inputData": req_data,
+                        "status": res_data["status"],
+                        "assertionData": res_data["content"],
+                        "testcaseId": testcount,
+                        "mock": False
+                    })
+                    testcount += 1
 
-                testdata.append({
-                    "endpoint": endpoint,
-                    "method": method,
-                    "inputData": req_data,
-                    "assertionData": res_data["content"],
-                    "status": res_data["status"]
-                })
+                    # testdata.append({
+                    #     "endpoint": endpoint,
+                    #     "method": method,
+                    #     "inputData": req_data,
+                    #     "assertionData": res_data["content"],
+                    #     "status": res_data["status"]
+                    # })
 
-        # mongo.store_bulk_document(TESTCASE_COLLECTION, testdata, self.db)
-        return True, "ok", testdata
-        # except Exception as e:
-        #     return False, str(e)
+            mongo.store_bulk_document(TESTCASE_COLLECTION, testdata, self.db)
+            return True, "ok"
+        except Exception as e:
+            return False, str(e)
 
     def generate_db_type_performance(self):
-        testdata = []
-        data = self.combine_table_dbdata()
-        GTD = GetTableData(self.projectid, data, self.db, generation_type="performance", selection_type="incremental")
-        testcount = 1
+        try:
+            testdata = []
+            data = self.combine_table_dbdata()
+            GTD = GetTableData(self.projectid, data, self.db, generation_type="performance", selection_type="incremental")
+            testcount = 1
 
-        for op in self.operation_data:
-            endpoint = op["endpoint"]
-            method = op["method"]
-            request_data = op["requestData"]
-            response_data = op["responseData"]
+            for op in self.operation_data:
+                endpoint = op["endpoint"]
+                method = op["method"]
+                request_data = op["requestData"]
+                response_data = op["responseData"]
 
-            for resp in response_data:
-                status_code = resp["status_code"]
-                
-                if status_code == "default" or status_code.startswith("2"):
-                    for _ in range(10):
-                        GTD.flush_data()
-                        GTD.set_operation_data(method, resp["status_code"])
-                        req_data = GTD.generate_request_data(request_data)
-                        res_data = GTD.generate_response_data(resp)
+                for resp in response_data:
+                    status_code = resp["status_code"]
+                    
+                    if status_code == "default" or status_code.startswith("2"):
+                        for _ in range(10):
+                            GTD.flush_data()
+                            GTD.set_operation_data(method, resp["status_code"])
+                            req_data = GTD.generate_request_data(request_data)
+                            res_data = GTD.generate_response_data(resp)
 
-                        testdata.append({
-                            "endpoint": endpoint,
-                            "method": method,
-                            "inputData": req_data,
-                            "assertionData": res_data["content"],
-                            "status": res_data["status"]
-                        })
-                    # else:
-                    #     GTD.flush_data()
-                    #     GTD.set_operation_data(method, resp["status_code"])
-                    #     req_data = GTD.generate_request_data(request_data)
-                    #     res_data = GTD.generate_response_data(resp)
+                            testdata.append({
+                                "projectid": self.projectid,
+                                "api_ops_id": self.projectid,
+                                "filename": None,
+                                "endpoint": endpoint,
+                                "method": method,
+                                "resource": op.get("tags", []),
+                                "operation_id": op.get("operationId"),
+                                "test_case_name": op.get("operationId") + "__P",
+                                "description": "ok",
+                                "test_case_type": "P",
+                                "delete": False,
+                                "inputData": req_data,
+                                "status": res_data["status"],
+                                "assertionData": res_data["content"],
+                                "testcaseId": testcount,
+                                "mock": False
+                            })
+                            testcount += 1
 
-                    #     for _ in range(10):
-                    #         testdata.append({
-                    #             "endpoint": endpoint,
-                    #             "method": method,
-                    #             "inputData": req_data,
-                    #             "assertionData": res_data["content"],
-                    #             "status": res_data["status"]
-                    #         })
-                
-        return True, "ok", testdata
+            mongo.store_bulk_document(TESTCASE_COLLECTION, testdata, self.db) 
+            return True, "ok"
+        except Exception as e:
+            return False, str(e)
 
 
     def generate_spec_db_type(self):
@@ -146,13 +148,13 @@ class TestdataGenerator:
         ret = None
         if self.project_data["projectType"] == "db":
             if self.type == "performance":   
-                success, message, data = self.generate_db_type_performance()
+                success, message = self.generate_db_type_performance()
             else:
-                success, message, data = self.generate_db_type_functional()
+                success, message = self.generate_db_type_functional()
 
         elif self.project_data["projectType"] == "both":
             success, message = self.generate_spec_db_type()
 
         else:
             pass
-        return {"success": success, "message": message, "status": 200 if success else 500, "data": data}
+        return {"success": success, "message": message, "status": 200 if success else 500}
