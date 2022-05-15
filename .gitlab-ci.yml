@@ -46,10 +46,10 @@ deploy-stage:
   image: alpine 
   extends: .deploy-python-devinstance-stage
   only: 
-    - stage
+    - master
 deploy-master:
   stage: deploy-master
   image: alpine 
   extends: .deploy-python-demo-master
   only: 
-    - master
+    - stage
