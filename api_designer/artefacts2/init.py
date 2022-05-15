@@ -75,7 +75,8 @@ class TestdataGenerator:
                         "status": res_data["status"],
                         "assertionData": res_data["content"],
                         "testcaseId": testcount,
-                        "mock": False
+                        "mock": False,
+                        "isExecuted": False
                     })
                     testcount += 1
 
@@ -86,6 +87,19 @@ class TestdataGenerator:
                     #     "assertionData": res_data["content"],
                     #     "status": res_data["status"]
                     # })
+
+            #for testdata_item in testdata:
+            #    for key, val in testdata_item.items():
+            #        if key == "projectid":
+            #            projectid = val
+            #        if key == "testcaseId":
+            #            testcaseId = val
+
+            #    mongo.update_document(TESTCASE_COLLECTION,
+            #                        {"projectid": projectid, "mock": False, "testcaseId": testcaseId},
+            #                        {"$set": {"active": False}},
+            #                          self.db
+            #                        )
 
             mongo.store_bulk_document(TESTCASE_COLLECTION, testdata, self.db)
             return True, "ok"
@@ -131,7 +145,8 @@ class TestdataGenerator:
                                 "status": res_data["status"],
                                 "assertionData": res_data["content"],
                                 "testcaseId": testcount,
-                                "mock": False
+                                "mock": False,
+                                "isExecuted": False
                             })
                             testcount += 1
 

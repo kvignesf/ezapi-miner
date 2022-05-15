@@ -1,6 +1,6 @@
 import hashlib
 
-from Crypto.Cipher import AES
+from Cryptodome.Cipher import AES
 from hashlib import md5
 import base64
 
