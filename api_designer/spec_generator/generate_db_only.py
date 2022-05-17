@@ -141,7 +141,7 @@ class SpecGenerator:
         elif body_type == "ezapi_table":
             # ret = {"type": "object", "properties": self.generate_table(body_data)}
             schema_name = self.generate_table(body_data)
-            ret = {"$ref": f"#/components/schemas/{schema_name}"}
+            ret = {"ezapi_ref": f"#/components/schemas/{schema_name}"}
         elif body_type in ["string", "number", "integer"]:
             ret = {"type": "object", "properties": self.generate_field(body_data)}
         return ret
