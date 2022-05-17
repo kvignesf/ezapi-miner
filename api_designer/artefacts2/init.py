@@ -52,6 +52,7 @@ class TestdataGenerator:
                 request_data = op["requestData"]
                 response_data = op["responseData"]
 
+                # if endpoint == "/customer" and method.lower() == "patch":
                 for resp in response_data:
                     GTD.flush_data()
 
@@ -71,9 +72,9 @@ class TestdataGenerator:
                         "description": "ok",
                         "test_case_type": "F",
                         "delete": False,
-                        "inputData": req_data,
+                        "inputData": [req_data],
                         "status": res_data["status"],
-                        "assertionData": res_data["content"],
+                        "assertionData": [res_data["content"]],
                         "testcaseId": testcount,
                         "mock": False,
                         "isExecuted": False
@@ -102,32 +103,39 @@ class TestdataGenerator:
                     status_code = resp["status_code"]
                     
                     if status_code == "default" or status_code.startswith("2"):
+                        input_data = []
+                        assertion_data = []
+
                         for _ in range(10):
                             GTD.flush_data()
                             GTD.set_operation_data(method, resp["status_code"])
                             req_data = GTD.generate_request_data(request_data)
                             res_data = GTD.generate_response_data(resp)
 
-                            testdata.append({
-                                "projectid": self.projectid,
-                                "api_ops_id": self.projectid,
-                                "filename": None,
-                                "endpoint": endpoint,
-                                "method": method,
-                                "resource": op.get("tags", []),
-                                "operation_id": op.get("operationId"),
-                                "test_case_name": op.get("operationId") + "__P",
-                                "description": "ok",
-                                "test_case_type": "P",
-                                "delete": False,
-                                "inputData": req_data,
-                                "status": res_data["status"],
-                                "assertionData": res_data["content"],
-                                "testcaseId": testcount,
-                                "mock": False,
-                                "isExecuted": False
-                            })
-                            testcount += 1
+                            input_data.append(req_data)
+                            assertion_data.append(res_data["content"])
+                            res_status = res_data["status"]
+
+                        testdata.append({
+                            "projectid": self.projectid,
+                            "api_ops_id": self.projectid,
+                            "filename": None,
+                            "endpoint": endpoint,
+                            "method": method,
+                            "resource": op.get("tags", []),
+                            "operation_id": op.get("operationId"),
+                            "test_case_name": op.get("operationId") + "__P",
+                            "description": "ok",
+                            "test_case_type": "P",
+                            "delete": False,
+                            "inputData": input_data,
+                            "status": res_status,
+                            "assertionData": assertion_data,
+                            "testcaseId": testcount,
+                            "mock": False,
+                            "isExecuted": False
+                        })
+                        testcount += 1
 
             mongo.store_bulk_document(TESTCASE_COLLECTION, testdata, self.db) 
             return True, "ok"
