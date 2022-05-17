@@ -512,6 +512,7 @@ def generate_artefacts(projectid, db):
                 "status": None,
                 "assertionData": None,
                 "testcaseId": None,
+                "mock": True
             }
 
             gd.set_response_flag(True)

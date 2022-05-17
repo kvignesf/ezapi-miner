@@ -174,7 +174,6 @@ def artefacts_model():
 
     return json_response(ret, status=ret["status"])
 
-
 @app.route("/sankey", methods=["POST"])
 def sankey_model():
     print("Sankey Received")
@@ -277,6 +276,42 @@ def db_ddl_generator_model():
     #     os.remove(ddl_path)
     # except Exception as e:
     #     print("Error deleting Uploaded File")
+
+    return json_response(ret, status=ret["status"])
+
+
+@app.route("/artefacts2", methods=["POST"])
+def run_artefacts2():
+    print("Artefacts Received")
+    request_data = request.get_json()
+    projectid = str(request_data.get("projectid", ""))
+    type = str(request_data.get("type", "functional")) # or performance
+
+    if projectid:
+        model = EzAPIModels(projectid)
+        model.set_db_instance()
+        ret = model.artefacts_generator2(type)
+        model.client.close()
+
+    else:
+        ret = bad_request({"success": False, "message": "Some parameters are missing"})
+
+    return json_response(ret, status=ret["status"])
+
+@app.route("/update_tests", methods=["POST"])
+def run_update_tests():
+    print("Update Testcases Received")
+    request_data = request.get_json()
+    projectid = str(request_data.get("projectid", ""))
+
+    if projectid:
+        model = EzAPIModels(projectid)
+        model.set_db_instance()
+        ret = model.update_testdata()
+        model.client.close()
+
+    else:
+        ret = bad_request({"success": False, "message": "Some parameters are missing"})
 
     return json_response(ret, status=ret["status"])
 

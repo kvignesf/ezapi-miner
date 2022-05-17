@@ -13,6 +13,8 @@ from api_designer.artefacts.artefacts_init import generate_artefacts
 from api_designer.visualizer.sankey import process_sankey_visualizer
 from api_designer.sql_connect.sql_init import handle_sql_connect
 from api_designer.codegen.jdl_init import generate_jdl_file
+from api_designer.artefacts2.init import TestdataGenerator
+from api_designer.artefacts2.insert_placeholders import TestdataUpdator
 # from api_designer.ddl_parser.parser_init import parse_db_ddl_file
 # from api_designer.ddl_parser.parser_init import gen_db_ddl_file
 
@@ -67,3 +69,13 @@ class EzAPIModels:
     def extract_sql_connect(self, request_data, dbtype):
         ret = handle_sql_connect(request_data, dbtype, self.projectid, self.db)
         return ret
+
+    def artefacts_generator2(self, type):
+        TG = TestdataGenerator(self.projectid, self.db, type)
+        TG.fetch_data()
+        return TG.generate_testdata()
+
+    def update_testdata(self):
+        TU = TestdataUpdator(self.projectid, self.db)
+        TU.fetch_data()
+        return TU.update_testcases()
