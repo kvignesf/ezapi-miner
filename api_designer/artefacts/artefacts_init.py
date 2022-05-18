@@ -7,10 +7,12 @@ import random
 import string
 import os, sys
 
+from itsdangerous import exc
+
 # from api_designer.artefacts import generate_db_only
 from api_designer.artefacts.ezfaker import generate_field_data
 from api_designer.utils.common import *
-from api_designer import config
+from api_designer import mongo
 
 from urllib.parse import urlencode
 
@@ -425,9 +427,20 @@ def generate_artefacts(projectid, db):
     print("Inside Artefacts Generator")
     try:
         # Remove esisting testcases
-        db.testcases.remove({"projectid": projectid})
-        db.virtual.remove({"projectid": projectid})
-        db.test_result.remove({"projectid": projectid})
+        try:
+            db.testcases.remove({"projectid": projectid})
+        except:
+            pass
+
+        try:
+            db.virtual.remove({"projectid": projectid})
+        except:
+            pass
+
+        try:
+            db.test_result.remove({"projectid": projectid})
+        except:
+            pass
 
         project_data = db.projects.find_one({"projectId": projectid})
         try:
@@ -499,6 +512,7 @@ def generate_artefacts(projectid, db):
                 "status": None,
                 "assertionData": None,
                 "testcaseId": None,
+                "mock": True
             }
 
             gd.set_response_flag(True)
@@ -571,9 +585,9 @@ def generate_artefacts(projectid, db):
             if x["status"][0] == "2"
         ]
 
-        config.store_bulk_document(TESTCASE_COLLECTION, all_testcases, db)
-        config.store_bulk_document(VIRTUAL_COLLECTION, virtual_tests, db)
-        config.store_document(TESTRESULT_COLLECTION, testcase_result, db)
+        mongo.store_bulk_document(TESTCASE_COLLECTION, all_testcases, db)
+        mongo.store_bulk_document(VIRTUAL_COLLECTION, virtual_tests, db)
+        mongo.store_document(TESTRESULT_COLLECTION, testcase_result, db)
 
         return {"success": True, "message": "ok", "status": 200}
     except Exception as e:

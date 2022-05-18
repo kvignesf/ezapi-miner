@@ -4,7 +4,7 @@
 
 
 from pprint import pprint
-from api_designer import config
+from api_designer import mongo
 
 PATH_DESCRIPTION_KEYS = ["tags", "summary", "description", "operationId"]
 PARAMETER_KEY = "parameters"
@@ -52,6 +52,7 @@ class SpecGenerator:
         self.responses = {}
         self.schemas = {}
         self.components = {}
+        self.schema_counter = {}
 
         self.spec = {}
         self.schemas_list = set()
@@ -75,8 +76,9 @@ class SpecGenerator:
         ret[name] = values
         return ret
 
-    def generate_table(self, table_data):
+    def generate_table(self, table_data, is_object = False):   # convert it into a schema
         ret = {}
+        # ret2 = {}
         table_key = table_data["name"]
         selected_columns = table_data.get("selectedColumns", [])
 
@@ -95,6 +97,28 @@ class SpecGenerator:
                     del sv["format"]
 
                 ret[table_key]["properties"][sk] = sv
+
+        if not is_object:
+            schema_name = None
+            if table_key not in self.schemas:
+                self.schemas[table_key] = ret[table_key]
+                self.schema_counter[table_key] = 1
+                schema_name = table_key
+            else:
+                schema_found = False
+                for ks, vs in self.schemas.items():
+                    if vs == ret[table_key]:
+                        schema_name = ks
+                        schema_found = True
+                        break
+
+                if not schema_found:
+                    schema_name = table_key + "_" + str(self.schema_counter[table_key])
+                    self.schema_counter[table_key] += 1
+                    self.schemas[schema_name] = ret[table_key]
+
+            return schema_name
+
         return ret
 
     def generate_object(self, object_data):
@@ -102,7 +126,8 @@ class SpecGenerator:
 
         for k, v in object_data["properties"].items():
             if v["type"] == "ezapi_table":
-                dict_merge(ret["properties"], self.generate_table(v))
+                # dict_merge(ret["properties"], self.generate_table(v, is_parent_object=True))
+                dict_merge(ret["properties"], self.generate_table(v, is_object=True))
             elif v["type"] in ["string", "number", "integer"]:
                 dict_merge(ret["properties"], self.generate_field(v))
 
@@ -114,9 +139,11 @@ class SpecGenerator:
         if body_type == "object":
             ret = self.generate_object(body_data)
         elif body_type == "ezapi_table":
-            ret = {"type": "object", "properties": self.generate_table(body_data)}
+            # ret = {"type": "object", "properties": self.generate_table(body_data)}
+            schema_name = self.generate_table(body_data)
+            ret = {"ezapi_ref": f"#/components/schemas/{schema_name}"}
         elif body_type in ["string", "number", "integer"]:
-            ret = self.generate_field(body_data)
+            ret = {"type": "object", "properties": self.generate_field(body_data)}
         return ret
 
     def generate_path(self):
@@ -242,6 +269,9 @@ class SpecGenerator:
             },
             "tags": [],
             "paths": self.paths,
+            "components":{
+                "schemas": self.schemas
+            }
         }
         return self.spec
 
@@ -262,7 +292,7 @@ def generate_spec(project_data, projectid, db):
         spec_data = SG.write_spec()
 
         spec_document = {"projectid": projectid, "data": spec_data}
-        config.store_document(SPEC_COLLECTION, spec_document, db)
+        mongo.store_document(SPEC_COLLECTION, spec_document, db)
 
         return {"success": True, "status": 200, "message": "ok"}
     except Exception as e:

@@ -16,7 +16,7 @@ from decouple import config
 
 
 def json_response(data, status=200):
-    return Response(json.dumps(data), content_type="application/json", status=status)
+    return Response(json.dumps(data, default=str), content_type="application/json", status=status)
 
 
 def bad_request(data):
@@ -40,6 +40,22 @@ def home():
     return "Hello EzAPI"
 
 
+@app.route("/db_extractor", methods=["POST"])
+def db_extractor():
+    request_data = request.get_json()
+    projectid = str(request_data.get("projectid", ""))
+    dbtype = str(request_data.get("dbtype", ""))
+
+    if projectid and dbtype:
+        model = EzAPIModels(projectid)
+        model.set_db_instance()
+        ret = model.extract_sql_connect(request_data, dbtype)
+        model.client.close()
+    else:
+        bad_request({"success": False, "message": "Some parameters are missing: projectid, dbtype"})
+
+    return json_response({"data": ret})
+
 @app.route("/matcher", methods=["POST"])
 def mathcer_model():
     print("Matcher Received")
@@ -55,7 +71,7 @@ def mathcer_model():
     else:
         bad_request({"success": False, "message": "Some parameters are missing"})
 
-    return json_response(ret, status=ret["status"])
+    return json_response(ret)
 
 
 @app.route("/ddl_parser", methods=["POST"])
@@ -63,6 +79,7 @@ def ddl_parser_model():
     print("DDL Parser Received")
     ddl_file = request.files.getlist("ddl_file", None)
     projectid = str(request.form.get("projectid", ""))
+    ddltype = str(request.form.get("dbtype", "mssql"))
 
     if not os.path.exists("./uploads"):
         os.makedirs("./uploads")
@@ -80,8 +97,8 @@ def ddl_parser_model():
 
             model = EzAPIModels(projectid)
             model.set_db_instance()
-            ret = model.parse_ddl_file(ddl_path, ddl_filename)
-            model.client.close()
+            ret = model.parse_ddl_file(ddl_path, ddl_filename, ddltype)
+            # model.client.close()
     else:
         ret = bad_request({"success": False, "message": "Some parameters are missing"})
 
@@ -157,7 +174,6 @@ def artefacts_model():
 
     return json_response(ret, status=ret["status"])
 
-
 @app.route("/sankey", methods=["POST"])
 def sankey_model():
     print("Sankey Received")
@@ -178,14 +194,103 @@ def sankey_model():
 
 @app.route("/codegen", methods=["POST"])
 def codegen_model():
-    print("Codegen Received")
+     print("Codegen Received")
+     request_data = request.get_json()
+     projectid = str(request_data.get("projectid", ""))
+
+     if projectid:
+         model = EzAPIModels(projectid)
+         model.set_db_instance()
+         ret = model.jdl_generator()
+         model.client.close()
+     else:
+         ret = bad_request({"success": False, "message": "Some parameters are missing"})
+
+     return json_response(ret, status=ret["status"])
+
+
+@app.route("/db_ddl_parser", methods=["POST"])
+def db_ddl_parser_model():
+    print("DDL Parser Received")
+    ddl_file = request.files.getlist("ddl_file", None)
+    projectid = str(request.form.get("projectid", ""))
+    dbType = str(request.form.get("dbtype", ""))
+
+    if not os.path.exists("./uploads"):
+        os.makedirs("./uploads")
+
+    if ddl_file and projectid and dbType:
+        if len(ddl_file) != 1:
+            ret = bad_request(
+                {"success": False, "message": "Some parameters are missing"}
+            )
+        else:
+            ddl_file = ddl_file[0]
+            ddl_filename = ddl_file.filename
+            ddl_path = "./uploads/" + ddl_filename
+            ddl_file.save(ddl_path)
+
+            model = EzAPIModels(projectid)
+            model.set_db_instance()
+            ret = model.parse_db_ddl_file(ddl_path, ddl_filename, dbType)
+            model.client.close()
+    else:
+        ret = bad_request({"success": False, "message": "Some parameters are missing"})
+
+    try:
+        os.remove(ddl_path)
+    except Exception as e:
+        print("Error deleting Uploaded File")
+
+    return json_response(ret, status=ret["status"])
+
+@app.route("/db_ddl_generator", methods=["POST"])
+def db_ddl_generator_model():
+    print("DDL Parser Received")
+    #ddl_file = request.files.getlist("ddl_file", None)
+    projectid = str(request.form.get("projectid", ""))
+    server = str(request.form.get("server", ""))
+    username = str(request.form.get("username", ""))
+    password = str(request.form.get("password", ""))
+    database = str(request.form.get("database", ""))
+    #dbtype = str(request.form.get("dbtype", ""))
+
+    if not os.path.exists("./uploads"):
+        os.makedirs("./uploads")
+
+    if server and username and password and database:
+        if projectid:
+            # ddl_file = ddl_file[0]
+            # ddl_filename = ddl_file.filename
+            # ddl_path = "./uploads/" + ddl_filename
+            # ddl_file.save(ddl_path)
+            #
+            model = EzAPIModels(projectid)
+            model.set_db_instance()
+            ret = model.gen_db_ddl_file(server, username, password, database)
+            model.client.close()
+    else:
+        ret = bad_request({"success": False, "message": "Some parameters are missing"})
+
+    # try:
+    #     os.remove(ddl_path)
+    # except Exception as e:
+    #     print("Error deleting Uploaded File")
+
+    return json_response(ret, status=ret["status"])
+
+
+@app.route("/artefacts2", methods=["POST"])
+def run_artefacts2():
+    print("Artefacts Received")
     request_data = request.get_json()
     projectid = str(request_data.get("projectid", ""))
+    type = str(request_data.get("type", "functional")) # or performance
 
     if projectid:
         model = EzAPIModels(projectid)
         model.set_db_instance()
-        ret = model.jdl_generator()
+        ret = model.artefacts_generator2(type)
         model.client.close()
 
     else:
@@ -193,6 +298,22 @@ def codegen_model():
 
     return json_response(ret, status=ret["status"])
 
+@app.route("/update_tests", methods=["POST"])
+def run_update_tests():
+    print("Update Testcases Received")
+    request_data = request.get_json()
+    projectid = str(request_data.get("projectid", ""))
+
+    if projectid:
+        model = EzAPIModels(projectid)
+        model.set_db_instance()
+        ret = model.update_testdata()
+        model.client.close()
+
+    else:
+        ret = bad_request({"success": False, "message": "Some parameters are missing"})
+
+    return json_response(ret, status=ret["status"])
 
 if __name__ == "__main__":
     app.run(debug=True)

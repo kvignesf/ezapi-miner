@@ -3,7 +3,7 @@
 # *****************************************************************
 
 
-from api_designer import config
+from api_designer import mongo
 from api_designer.utils.schema_manager import SchemaDeref
 from pprint import pprint
 
@@ -167,7 +167,7 @@ def enhance_attributes(projectid, db, project_type, filename=None):
             "api_ops_id": projectid,
             "data": tag_wise_attributes,
         }
-        config.store_document(element_collction, element_document, db)
+        mongo.store_document(element_collction, element_document, db)
 
         return True, "ok"
 
