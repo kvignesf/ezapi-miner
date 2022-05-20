@@ -1,11 +1,80 @@
 from pprint import pprint
 import random
-from scipy import rand
 import shortuuid
 
 from api_designer.dbgenerate.db_generator import DBGenerator
 
 DATA_TYPE_LIST = ["integer", "number", "string", "boolean"]
+
+def get_all_keys(obj):
+    for k,v in obj.items():
+        yield k
+        if isinstance(v, dict):
+            for k2 in get_all_keys(v):
+                yield f"{k}.{k2}"
+
+def get_all_required_info(obj, prefix = None):
+    if not obj:
+        return
+
+    if obj.get("type") == "object" and "properties" in obj:
+        for k,v in obj["properties"].items():
+            v_type = v["type"]
+            v_required = v.get("required", True)
+
+            if prefix:
+                yield (f"{prefix}.{k}", v_required)
+            else:
+                yield (k, v_required)
+
+            if v_type == "object":
+                get_all_required_info(v, prefix=k)
+
+            elif v_type == "ezapi_table":
+                for sc in v["selectedColumns"]:
+                    sc_required = sc.get("required", True)
+
+                    if prefix:
+                        yield (f"{prefix}.{k}.{v['name']}", sc_required)
+                    else:
+                        yield (f"{k}.{sc['name']}", sc_required)
+
+    elif obj.get("type") == "ezapi_table":
+        for sc in obj["selectedColumns"]:
+            sc_required = sc.get("required", True)
+            if prefix:
+                yield (f"{prefix}.{sc['name']}", sc_required)
+            else:
+                yield (sc["name"], sc_required)
+
+    elif obj.get("type") in DATA_TYPE_LIST:
+        obj_required = obj.get("required", True)
+        if prefix:
+            yield (f"{prefix}.{obj['name']}", obj_required)
+        else:
+            yield (obj["name"], obj_required)
+
+def get_subset_json(obj, fields, prefix = None):
+    ret = {}
+    if not obj:
+        return ret
+
+    for k, v in obj.items():
+        tmp = f"{prefix}.{k}" if prefix else k
+        if tmp in fields:
+            if isinstance(v, dict):
+                ret[k] = get_subset_json(v, fields, prefix = k)
+            else:
+                ret[k] = v
+    return ret
+
+def handle_required(data, source):
+    # data_keys = list(get_all_keys(data))
+    required_info = list(get_all_required_info(source))
+
+    selected = [x[0] for x in required_info if x[1] or random.randint(0, 1)]
+    res = get_subset_json(data, selected)
+    return res
 
 class GetTableData:
     def __init__(self, projectid, dbdata, db, generation_type = "functional", selection_type = "random"):
@@ -180,17 +249,7 @@ class GetTableData:
             v_type = v.get("type")
             table_name = v["key"]
 
-            # required handling
-            # required = v.get("required", True)
-            # toss = random.choice((0, 1))
-
             if v_type == "ezapi_table":
-                # required handling
-                # selected_columns = []
-                # required_columns = [x["sourceName"] for x in v["selectedColumns"] if x.get("required", True)]
-                # not_required_columns = [x["sourceName"] for x in v["selectedColumns"] if not x.get("required", True)]
-                # selected_columns = required_columns + random.sample(not_required_columns, random.randint(0, len(not_required_columns)))
-
                 ret[k] = DBG.generate_testcase_data(table_name, [x["sourceName"] for x in v["selectedColumns"]])
                 # ret[k] = DBG.generate_testcase_data(table_name, selected_columns)
 
@@ -244,20 +303,9 @@ class GetTableData:
             return ret
 
         body_type = body.get("type")
-        # required handling
-        # required = body.get("required", True)
-        # toss = random.choice((0, 1))
-        # if not toss:
-        #     return ret
 
         if body_type == "ezapi_table":
             table_name = body["key"]
-
-            # required handling
-            # selected_columns = []
-            # required_columns = [x["sourceName"] for x in body["selectedColumns"] if x.get("required", True)]
-            # not_required_columns = [x["sourceName"] for x in body["selectedColumns"] if not x.get("required", True)]
-            # selected_columns = required_columns + random.sample(not_required_columns, random.randint(0, len(not_required_columns)))
 
             gen = DBG.generate_testcase_data(table_name, [x["sourceName"] for x in body["selectedColumns"]])
             # gen = DBG.generate_testcase_data(table_name, selected_columns)
@@ -309,7 +357,7 @@ class GetTableData:
         self.method = method
         self.status = status
 
-    def generate_request_data(self, request_data):
+    def generate_request_data(self, request_data, is_performance = False):
         ret = {
             "path": self.get_request_params_data(request_data["path"]),
             "query": self.get_request_params_data(request_data["query"]),
@@ -317,6 +365,24 @@ class GetTableData:
             "form": {},
             "body": self.get_request_body_data(request_data["body"])
         }
+
+        if not is_performance:
+            rets = []
+            for _ in range(10):
+                # rquery = handle_required(ret["query"], request_data["query"])
+                rbody = handle_required(ret["body"], request_data["body"])
+
+                tmp = {
+                    "path": ret["path"],
+                    "query": ret["query"],
+                    "header": ret["header"],
+                    "form": ret["form"],
+                    "body": rbody
+                }
+                if tmp not in rets:
+                    rets.append(tmp)
+
+            return rets
         return ret
 
     def generate_response_data(self, resp):
