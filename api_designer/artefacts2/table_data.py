@@ -90,6 +90,7 @@ class GetTableData:
         self.selection_counter = {} # table_name, counter
         self.generation_type = generation_type
 
+
         for tk, tv in self.dbdata.items():
             if not tv["master"]:
                 self.functional[tk] = tv["functional"] if self.generation_type == "functional" else tv["performance"]
@@ -181,6 +182,8 @@ class GetTableData:
                 else:
                     if table_name not in self.selection_counter:
                         self.selection_counter[table_name] = 0
+
+                    print(table_name, table_name in self.functional, table_name in self.selection_counter, self.selection_counter[table_name], len(self.functional[table_name]))
 
                     rrow = self.functional[table_name][self.selection_counter[table_name]]
                     self.selection_counter[table_name] = (self.selection_counter[table_name] + 1) % len(self.functional[table_name])

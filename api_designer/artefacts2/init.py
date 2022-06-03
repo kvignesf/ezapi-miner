@@ -1,7 +1,7 @@
 from pprint import pprint
 
-from email import message
 from api_designer.artefacts2.table_data import GetTableData
+from api_designer.artefacts2.schema_data import GetSchemaData
 from api_designer import mongo
 
 TESTCASE_COLLECTION = "testcases"
@@ -52,7 +52,6 @@ class TestdataGenerator:
                 request_data = op["requestData"]
                 response_data = op["responseData"]
 
-                # if endpoint == "/customer" and method.lower() == "patch":
                 for resp in response_data:
                     GTD.flush_data()
 
@@ -144,20 +143,122 @@ class TestdataGenerator:
             return False, str(e)
 
 
-    def generate_spec_db_type(self):
-        pass
+    def generate_spec_db_type_functional(self):
+        try:
+            testdata = []
+            testcount = 1
+
+            data = self.combine_table_dbdata()
+            GSD = GetSchemaData(self.projectid, self.db, data)
+
+            for op in self.operation_data:
+                endpoint = op["endpoint"]
+                method = op["method"]
+                request_data = op["requestData"]
+                response_data = op["responseData"]
+
+                for resp in response_data:
+                    GSD.flush_data()
+                    GSD.set_operation_data(method, resp["status_code"])
+                    req_datas = GSD.generate_request_data(request_data)
+                    res_data = GSD.generate_response_data(resp)
+
+                    for req_data in req_datas:
+                        testdata.append({
+                            "projectid": self.projectid,
+                            "api_ops_id": self.projectid,
+                            "filename": None,
+                            "endpoint": endpoint,
+                            "method": method,
+                            "resource": op.get("tags", []),
+                            "operation_id": op.get("operationId"),
+                            "test_case_name": op.get("operationId") + "__P",
+                            "description": "ok",
+                            "test_case_type": "F",
+                            "delete": False,
+                            "inputData": [req_data],
+                            "status": res_data["status"],
+                            "assertionData": [res_data["content"]],
+                            "testcaseId": testcount,
+                            "mock": False,
+                            "isExecuted": False
+                        })
+                        testcount += 1
+
+            mongo.store_bulk_document(TESTCASE_COLLECTION, testdata, self.db)
+            return True, "ok"
+        except Exception as e:
+            return False, str(e)
+
+    def generate_spec_db_type_performance(self):
+        try:
+            testdata = []
+            data = self.combine_table_dbdata()
+            GSD = GetSchemaData(self.projectid, self.db, data, generation_type="performance", selection_type="incremental")
+            testcount = 1
+
+            for op in self.operation_data:
+                endpoint = op["endpoint"]
+                method = op["method"]
+                request_data = op["requestData"]
+                response_data = op["responseData"]
+
+                for resp in response_data:
+                    status_code = resp["status_code"]
+                    
+                    if status_code == "default" or status_code.startswith("2"):
+                        input_data = []
+                        assertion_data = []
+
+                        for _ in range(10):
+                            GSD.flush_data()
+                            GSD.set_operation_data(method, resp["status_code"])
+                            req_data = GSD.generate_request_data(request_data, is_performance = True)
+                            res_data = GSD.generate_response_data(resp)
+
+                            input_data.append(req_data)
+                            assertion_data.append(res_data["content"])
+                            res_status = res_data["status"]
+
+                        testdata.append({
+                            "projectid": self.projectid,
+                            "api_ops_id": self.projectid,
+                            "filename": None,
+                            "endpoint": endpoint,
+                            "method": method,
+                            "resource": op.get("tags", []),
+                            "operation_id": op.get("operationId"),
+                            "test_case_name": op.get("operationId") + "__P",
+                            "description": "ok",
+                            "test_case_type": "P",
+                            "delete": False,
+                            "inputData": input_data,
+                            "status": res_status,
+                            "assertionData": assertion_data,
+                            "testcaseId": testcount,
+                            "mock": False,
+                            "isExecuted": False
+                        })
+                        testcount += 1
+
+            mongo.store_bulk_document(TESTCASE_COLLECTION, testdata, self.db) 
+            return True, "ok"
+        except Exception as e:
+            return False, str(e)
+
 
     def generate_testdata(self):
-        ret = None
+        print("generating test data")
         if self.project_data["projectType"] == "db":
             if self.type == "performance":   
                 success, message = self.generate_db_type_performance()
             else:
                 success, message = self.generate_db_type_functional()
+            return {"success": success, "message": message, "status": 200 if success else 500}
 
         elif self.project_data["projectType"] == "both":
-            success, message = self.generate_spec_db_type()
-
-        else:
-            pass
-        return {"success": success, "message": message, "status": 200 if success else 500}
+            if self.type == "performance":
+                success, message = self.generate_spec_db_type_performance()
+            else:
+                success, message = self.generate_spec_db_type_functional()
+            return {"success": success, "message": message, "status": 200 if success else 500}
