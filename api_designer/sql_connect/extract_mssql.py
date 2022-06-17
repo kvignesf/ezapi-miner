@@ -169,6 +169,8 @@ class Extractor:
                 foreign_key = f"{tk}.{col}"
                 if col_data["auto"]:
                     continue
+                # elif "decoder" in col_data and col_data["decoder"].get("type") == "datetime":
+                #     continue
                 elif tk in self.table_keys and col in self.table_keys[tk]:
                     pk_columns += 1
                 elif foreign_key in self.foreign:

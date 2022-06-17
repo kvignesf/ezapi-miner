@@ -42,6 +42,7 @@ def home():
 
 @app.route("/db_extractor", methods=["POST"])
 def db_extractor():
+    print("In DB Extractor")
     request_data = request.get_json()
     projectid = str(request_data.get("projectid", ""))
     dbtype = str(request_data.get("dbtype", ""))
@@ -316,4 +317,4 @@ def run_update_tests():
     return json_response(ret, status=ret["status"])
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, port=5002)
