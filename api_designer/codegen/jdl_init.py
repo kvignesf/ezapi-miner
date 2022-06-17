@@ -14,11 +14,11 @@ from decouple import config
 
 
 POJO_URL = config('pojogenurl')
-#POJO_URL = "http://test-1-python.ezapi.ai:8098/gendtopojos"
+# POJO_URL = "http://test-1-python.ezapi.ai:8098/gendtopojos"
 # POJO_URL = "http://localhost:8098/gendtopojos"
 
 USER_ROOT_DIR = ""
-# USER_ROOT_DIR = "/Users/shbham"
+# USER_ROOT_DIR = "/Users/shubham/Desktop/workspace/ezapi"
 
 
 def convert_to_camel_case(s):
@@ -27,6 +27,12 @@ def convert_to_camel_case(s):
     res = "".join(x.title() for x in res)
     return res
 
+def convert_to_ref_name(s):
+    s = s.split("_")
+    s = [x.capitalize() for x in s]
+    s = "".join(s)
+    s = s[0].lower() + s[1:]
+    return s
 
 DIRECT_KEYS = set(["type", "format", "enum"])
 
@@ -59,6 +65,12 @@ class GenerateTemplate:
         self.matcher_data = None
         self.table_data = None
         self.entity_data = None
+        self.relationship_data = {
+            "OneToOne": [],
+            "OneToMany": [],
+            "ManyToOne": [],
+            "ManyToMany": []
+        }
 
     def set_field_value(self, field_name, field_value):
         if field_name in self.config_data:
@@ -79,7 +91,61 @@ class GenerateTemplate:
         )
 
     def generate_relationship_data(self):
-        pass
+        table_dict = {}
+        for td in self.table_data:
+            table_dict[td['key']] = {
+                "schema": td["schema"],
+                "table": td["table"],
+                "primary": td["primary"],
+                "composite": td["composite"],
+                "master": td["master"],
+                "attributes": td["attributes"]
+            }
+
+        for tk, tv in table_dict.items():
+            table_foreigns = []
+            table_uniques = tv.get("composite", [])
+            if tv["primary"]:
+                table_uniques.append(tv["primary"])
+
+            for attr in tv["attributes"]:
+                if attr.get("foreign", None):
+                    attr_foreign = attr["foreign"]
+                    f_key = f"{attr_foreign['schema']}.{attr_foreign['table']}"
+                    f_column = attr_foreign['column']
+                    table_foreigns.append((attr["name"], f_key, f_column))
+
+            for tf in table_foreigns:
+                foreign_table = table_dict[tf[1]]
+                foreign_uniques = foreign_table.get("composite", [])
+                if foreign_table["primary"]:
+                    foreign_uniques.append(foreign_table["primary"])
+                foreign_uniques = list(set(foreign_uniques))
+
+                source_type = None
+                if tf[0] in table_uniques and len(table_uniques) == 1:
+                    source_type = "one"
+                else:
+                    source_type = "many"
+
+                foreign_type = None
+                if tf[2] in foreign_uniques and len(foreign_uniques) == 1:
+                    foreign_type = "one"
+                else:
+                    foreign_type = "many"
+
+                table_pair = (tk, tf[1])
+                if source_type == "one" and foreign_type == "one":
+                    self.relationship_data["OneToOne"].append(table_pair)
+                elif source_type == "one" and foreign_type == "many":
+                    self.relationship_data["OneToMany"].append(table_pair)
+                elif source_type == "many" and foreign_type == "many":
+                    self.relationship_data["ManyToMany"].append(table_pair)
+                elif source_type == "many" and foreign_type == "one":
+                    self.relationship_data["ManyToOne"].append(table_pair)
+
+        pprint(self.relationship_data)
+        return self.relationship_data
 
     def generate_file(self):
         infile = open(self.infile, "r+")
@@ -144,6 +210,29 @@ class GenerateTemplate:
         outfile.write("\n")
 
         # relationship data
+        if self.relationship_data:
+            for k, v in self.relationship_data.items():
+                if v and len(v) > 0:
+                    relationship_type = k
+                    relationship_definition_line = (
+                        "relationship " + relationship_type + "{\n"
+                    )
+                    outfile.write(relationship_definition_line)
+
+                    for table_pair in v:
+                        tp1 = table_pair[0].rsplit(".", 1)[1]
+                        tp2 = table_pair[1].rsplit(".", 1)[1]
+
+                        if tp1 in self.entity_data and tp2 in self.entity_data:
+                            tp1_ref = convert_to_ref_name(tp1)
+                            tp2_ref = convert_to_ref_name(tp2)
+
+                            tp1 = convert_to_camel_case(tp1)
+                            tp2 = convert_to_camel_case(tp2)
+
+                            line = "\t" + tp1 + "{" + tp2_ref + "}" + " to " + tp2 + "{" + tp1_ref + "}\n"
+                            outfile.write(line)
+                    outfile.write("}\n\n")
 
         # footer data
         outfile.write("service all with serviceImpl\n\n")
@@ -159,6 +248,7 @@ class GenerateTemplate:
         cmd1 = "cd " + self.outfile.rsplit("/", 1)[0]
         cmd2 = "jhipster jdl --force " + self.outfile
         cmd = cmd1 + "; " + cmd2
+        print("cmd - ", cmd)
 
         subprocess.run(cmd, shell=True)
 
@@ -261,7 +351,7 @@ class GenerateSchemas:
                     )
                     pojo_schemas.append(tmp_dict)
 
-        pprint(pojo_schemas)
+        # pprint(pojo_schemas)
 
         try:
             for ps in pojo_schemas:
