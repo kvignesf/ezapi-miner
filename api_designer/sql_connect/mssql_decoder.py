@@ -57,7 +57,7 @@ class DTDecoder:
             "ntext": {"format": "unicode"},
             "binary": {"format": "binary", "minLength": length, "maxLength": length},
             "varbinary": {"format": "binary", "maxLength": length},
-            "image": {"format": "binary"}
+            # "image": {"format": "binary"}
         }
         if dtype in list(STRING_TYPE.keys()):
             ret["type"] = "string"
@@ -74,7 +74,8 @@ class DTDecoder:
             "rowversion",
             "hierarchy",
             "geometry",
-            "geography"
+            "geography",
+            "image"
         ]
         for dt in OTHER_TYPES:
             if dtype.startswith(dt):
