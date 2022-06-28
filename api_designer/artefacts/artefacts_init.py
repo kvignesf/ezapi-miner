@@ -6,6 +6,7 @@ from pprint import pprint
 import random
 import string
 import os, sys
+import jwt
 
 from itsdangerous import exc
 
@@ -118,6 +119,7 @@ class GenerateData:
     def __init__(self, schemas, is_response=False):
         self.schemas = schemas
         self.is_response = is_response
+        self.payload = ''.join(random.choices(string.ascii_uppercase + string.digits, k = 10))
 
     def set_response_flag(self, is_response):
         self.is_response = is_response
@@ -203,6 +205,17 @@ class GenerateData:
 
         return ret
 
+    def generate_authorization(self, auth):
+        if auth and "authType" in auth and "tokenType" in auth:
+            auth_type = auth["authType"]
+            auth_token = auth["tokenType"]
+
+            if auth_type == "Bearer Token" and auth_token == "JWT":
+                token = jwt.encode({'payload': self.payload}, 'secret', algorithm='HS256')
+                return token
+        return None
+
+
     def generate_body_data(self, body):
         ret = {}
         if not body:
@@ -230,12 +243,19 @@ class GenerateData:
             "form": {},
             "body": self.generate_body_data(request_data["body"]),
         }
+
+        if "authorization" in request_data:
+            token = self.generate_authorization(request_data["authorization"])
+            if token:
+                payload["header"]["Authorization"] = token
+
         return payload
 
 
 class GenerateTableData:
     def __init__(self, is_response=False):
         self.is_response = is_response
+        self.payload = ''.join(random.choices(string.ascii_uppercase + string.digits, k = 10))
 
     def set_response_flag(self, is_response):
         self.is_response = is_response
@@ -278,6 +298,16 @@ class GenerateTableData:
 
         return ret
 
+    def generate_authorization(self, auth):
+        if auth and "authType" in auth and "tokenType" in auth:
+            auth_type = auth["authType"]
+            auth_token = auth["tokenType"]
+
+            if auth_type == "Bearer Token" and auth_token == "JWT":
+                token = jwt.encode({'payload': self.payload}, 'secret', algorithm='HS256')
+                return token
+        return None
+
     def generate_body_data(self, body):
         ret = {}
         if not body:
@@ -303,6 +333,12 @@ class GenerateTableData:
             "form": {},
             "body": self.generate_body_data(request_data["body"]),
         }
+
+        if "authorization" in request_data:
+            token = self.generate_authorization(request_data["authorization"])
+            if token:
+                payload["header"]["Authorization"] = token
+
         return payload
 
 
