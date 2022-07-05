@@ -3,6 +3,7 @@
 # *****************************************************************
 
 from pprint import pprint
+import json
 import random
 import string
 import os, sys
@@ -532,6 +533,7 @@ def generate_artefacts(projectid, db):
         test_count = 0
 
         for path in paths:
+            paramswobracs = ""
             testdata = {
                 "projectid": projectid,
                 "api_ops_id": projectid,
@@ -550,7 +552,12 @@ def generate_artefacts(projectid, db):
                 "testcaseId": None,
                 "mock": True
             }
-
+            if ("{" in path.get("endpoint")) and ("}" in path.get("endpoint")):
+                pathparams = re.findall(r'\{.*?\}', path.get("endpoint"))
+                endpoint_orig = path.get("endpoint")
+                # print(path.get("endpoint").format(**testdata["inputData"]["path"]))
+                testdata["endpoint"] = path.get("endpoint").format(**testdata["inputData"]["path"])
+                testdata["endpoint_orig"] = endpoint_orig
             gd.set_response_flag(True)
 
             for resp in path["responseData"]:

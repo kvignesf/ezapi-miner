@@ -62,10 +62,16 @@ class TestdataUpdator:
             input_data = td["inputData"]
             assertion_data = td["assertionData"]
             testcaseId = td["testcaseId"]
+            endpoint = td["endpoint"]
 
             U = Updater(self.source_data)
             new_input_data = U.handle_object(input_data)
             new_assertion_data = U.handle_object(assertion_data)
+            new_final_end_point = []
+
+            for index, item in enumerate(endpoint):
+                new_end_point = str(endpoint[index]).format(**new_input_data[index]["path"])
+                new_final_end_point.append(new_end_point)
 
             # print("\n",td["endpoint"], td["method"])
             # pprint(new_input_data)
@@ -76,7 +82,7 @@ class TestdataUpdator:
             mongo.update_document(
                 "testcases",
                 {"projectid": self.projectid, "mock": False, "testcaseId": testcaseId},
-                {"$set": {"inputData": new_input_data, "assertionData": new_assertion_data}},
+                {"$set": {"inputData": new_input_data, "assertionData": new_assertion_data, "endpoint":new_end_point}},
                 self.db,
             )
 

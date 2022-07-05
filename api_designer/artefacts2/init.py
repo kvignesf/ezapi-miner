@@ -1,3 +1,4 @@
+import re
 from pprint import pprint
 
 from api_designer.artefacts2.table_data import GetTableData
@@ -60,11 +61,18 @@ class TestdataGenerator:
                     res_data = GTD.generate_response_data(resp)
 
                     for req_data in req_datas:
+                        # if ("{" in endpoint and "}" in endpoint):
+                        #     pathparams = re.findall(r'\{.*?\}', endpoint)
+                        #     endpoint_orig = endpoint
+                        #     print(endpoint.format(**req_data["path"]))
+                        #     #testdata["endpoint"] = endpoint.format(**req_data["path"])
+                        #     newendpoint = endpoint.format(**req_data["path"])
+                        #     #testdata["endpoint_orig"] = endpoint_orig
                         testdata.append({
                             "projectid": self.projectid,
                             "api_ops_id": self.projectid,
                             "filename": None,
-                            "endpoint": endpoint,
+                            "endpoint": [endpoint],
                             "method": method,
                             "resource": op.get("tags", []),
                             "operation_id": op.get("operationId"),
@@ -77,10 +85,12 @@ class TestdataGenerator:
                             "assertionData": [res_data["content"]],
                             "testcaseId": testcount,
                             "mock": False,
-                            "isExecuted": False
+                            "isExecuted": False,
+                            "endpoint_orig": endpoint
                         })
-                        testcount += 1
 
+                        testcount += 1
+            mongo.delete_bulk_query(TESTCASE_COLLECTION, {"projectid": self.projectid, "test_case_type": "F", "mock": False}, self.db)
             mongo.store_bulk_document(TESTCASE_COLLECTION, testdata, self.db)
             return True, "ok"
         except Exception as e:
@@ -120,7 +130,7 @@ class TestdataGenerator:
                             "projectid": self.projectid,
                             "api_ops_id": self.projectid,
                             "filename": None,
-                            "endpoint": endpoint,
+                            "endpoint": [endpoint],
                             "method": method,
                             "resource": op.get("tags", []),
                             "operation_id": op.get("operationId"),
@@ -136,7 +146,7 @@ class TestdataGenerator:
                             "isExecuted": False
                         })
                         testcount += 1
-
+            mongo.delete_bulk_query(TESTCASE_COLLECTION, {"projectid": self.projectid, "test_case_type": "P", "mock": False}, self.db)
             mongo.store_bulk_document(TESTCASE_COLLECTION, testdata, self.db) 
             return True, "ok"
         except Exception as e:
@@ -184,7 +194,7 @@ class TestdataGenerator:
                             "isExecuted": False
                         })
                         testcount += 1
-
+            mongo.delete_bulk_query(TESTCASE_COLLECTION, {"projectid": self.projectid, "test_case_type": "F", "mock": False}, self.db)
             mongo.store_bulk_document(TESTCASE_COLLECTION, testdata, self.db)
             return True, "ok"
         except Exception as e:
@@ -240,7 +250,7 @@ class TestdataGenerator:
                             "isExecuted": False
                         })
                         testcount += 1
-
+            mongo.delete_bulk_query(TESTCASE_COLLECTION, {"projectid": self.projectid, "test_case_type": "P", "mock": False}, self.db)
             mongo.store_bulk_document(TESTCASE_COLLECTION, testdata, self.db) 
             return True, "ok"
         except Exception as e:
