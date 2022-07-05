@@ -217,26 +217,48 @@ class GenerateTemplate:
                     relationship_definition_line = (
                         "relationship " + relationship_type + "{\n"
                     )
-                    outfile.write(relationship_definition_line)
+                    newLine = self.getRelationShipData(v)
+                    if (newLine):
+                        outfile.write(relationship_definition_line)
 
-                    for table_pair in v:
-                        tp1 = table_pair[0].rsplit(".", 1)[1]
-                        tp2 = table_pair[1].rsplit(".", 1)[1]
+                        for table_pair in v:
+                            tp1 = table_pair[0].rsplit(".", 1)[1]
+                            tp2 = table_pair[1].rsplit(".", 1)[1]
 
-                        if tp1 in self.entity_data and tp2 in self.entity_data:
-                            tp1_ref = convert_to_ref_name(tp1)
-                            tp2_ref = convert_to_ref_name(tp2)
+                            if tp1 in self.entity_data and tp2 in self.entity_data:
+                                tp1_ref = convert_to_ref_name(tp1)
+                                tp2_ref = convert_to_ref_name(tp2)
 
-                            tp1 = convert_to_camel_case(tp1)
-                            tp2 = convert_to_camel_case(tp2)
+                                tp1 = convert_to_camel_case(tp1)
+                                tp2 = convert_to_camel_case(tp2)
 
-                            line = "\t" + tp1 + "{" + tp2_ref + "}" + " to " + tp2 + "{" + tp1_ref + "}\n"
-                            outfile.write(line)
-                    outfile.write("}\n\n")
+                                line = "\t" + tp1 + "{" + tp2_ref + "}" + " to " + tp2 + "{" + tp1_ref + "}\n"
+                                outfile.write(line)
+                        outfile.write("}\n\n")
+
+
 
         # footer data
         outfile.write("service all with serviceImpl\n\n")
         outfile.write("dto * with mapstruct")
+
+
+    def getRelationShipData(self, v):
+        line2 = ""
+        for table_pair in v:
+            tp1 = table_pair[0].rsplit(".", 1)[1]
+            tp2 = table_pair[1].rsplit(".", 1)[1]
+
+            if tp1 in self.entity_data and tp2 in self.entity_data:
+                tp1_ref = convert_to_ref_name(tp1)
+                tp2_ref = convert_to_ref_name(tp2)
+
+                tp1 = convert_to_camel_case(tp1)
+                tp2 = convert_to_camel_case(tp2)
+
+                line = "\t" + tp1 + "{" + tp2_ref + "}" + " to " + tp2 + "{" + tp1_ref + "}\n"
+                line2 = line2 + line
+        return line2
 
     def generate_jdl(self):
         self.generate_config_data()
