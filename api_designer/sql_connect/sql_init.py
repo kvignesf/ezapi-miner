@@ -42,7 +42,7 @@ def generate_code(file_path):
 def handle_sql_connect(request_data, dbtype, projectid, db):
     if config("DEVELOPMENT", default = False):
         server = str(config("server"))
-        username = str(config("username"))
+        username = str(config("username2"))
         password = str(config("password"))
         database = str(config("database"))
         portNo = config("portNo", default="")
@@ -82,7 +82,9 @@ def handle_sql_connect(request_data, dbtype, projectid, db):
             
         if sslMode == "Y":
             # keyPath and rootPath and certPath:
-
+            #print("server", server)
+            #print("username", username)
+            #print("database", database)
             ## add code to download the files from the gc bucket path to local uploads folder
             args = {
                 "host": server,
@@ -93,6 +95,7 @@ def handle_sql_connect(request_data, dbtype, projectid, db):
                 "sslrootcert": rootPath,
                 "sslmode": "verify-full"
             }
+            #print("args", args)
         else:
             args = {
                 "host": server,
@@ -141,9 +144,15 @@ def handle_sql_connect(request_data, dbtype, projectid, db):
             },
         )
         P = MssqlExtractor(dbtype, connection_url)
-        db_document, table_documents = P.extract_data(projectid)
+        #P.extract_sp(projectid)
+        db_document, table_documents, sp_docs, dbdata_map_documents = P.extract_data(projectid)
+
 
         store_document("database", db_document, db)
         store_bulk_document("tables", table_documents, db)
+        if sp_docs:
+            store_bulk_document("stored_procedures", sp_docs, db)
+        if dbdata_map_documents:
+            store_bulk_document("table_dbdata_map", dbdata_map_documents, db)
 
         return {"success": True}

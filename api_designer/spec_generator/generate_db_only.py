@@ -3,7 +3,9 @@
 # *****************************************************************
 
 
+from importlib.resources import is_resource                                           
 from pprint import pprint
+from sqlalchemy import false, true                                  
 from api_designer import mongo
 
 PATH_DESCRIPTION_KEYS = ["tags", "summary", "description", "operationId"]
@@ -71,33 +73,95 @@ class SpecGenerator:
             "format": field_data.get("format", None),
             # "required": field_data.get("required", True), # no required field inside schema objects
         }
+        
+        if field_data["type"] == "array":
+           values = { 
+            "type": field_data["type"],
+            "format": field_data.get("format", None),
+            "items" : {
+                     "type":"integer"#This need to be changed in future, for now it is hardcoded.
+                }
+            } 
         if not values["format"]:
             del values["format"]
         ret[name] = values
         return ret
+        
+    def generate_array_table(self, table_data, request_body):   # convert it into a schema
+        table_key = table_data["name"]
+        selected_columns = table_data.get("selectedColumns", [])
+        ret = {
+            table_key: {"type": "array", "items": {"type":"object", "properties" : {}}},
+        }
+        required_array = []
 
-    def generate_table(self, table_data, is_object = False):   # convert it into a schema
+        if selected_columns:
+            for s in selected_columns:
+                sk = s["name"]
+                is_required = s["required"]
+
+                sv = {
+                    "type": s["type"],
+                    "format": s.get("format", None),
+                    # "required": s.get("required", True), # no required field inside schema objects
+                }
+
+                if is_required:
+                    required_array.append(s["name"])
+
+                if not sv["format"]:
+                    del sv["format"]
+
+                ret[table_key]["items"]["properties"][sk] = sv
+            if request_body:
+                ret[table_key]["items"]["required"] = required_array
+            
+        return ret
+    def generate_table(self, table_data, request_body = True,is_object = False):   # convert it into a schema
         ret = {}
         # ret2 = {}
         table_key = table_data["name"]
         selected_columns = table_data.get("selectedColumns", [])
+        required_array = []
+        # is_array = table_data["isArray"]
 
+        # if is_array:
+        #     ret = {
+        #         table_key: {"type": "array", "items": {}},
+        #     }
+        #     if selected_columns:
+        #         for s in selected_columns:
+        #             sk = s["name"]
+        #             sv = {
+        #                 "type": s["type"],
+        #                 "format": s.get("format", None),
+        #                 # "required": s.get("required", True), # no required field inside schema objects
+        #             }
+        #             if not sv["format"]:
+        #                 del sv["format"]
+
+        #             ret[table_key]["items"][sk] = sv
+        
         if selected_columns:
             ret = {
                 table_key: {"type": "object", "properties": {}},
             }
             for s in selected_columns:
                 sk = s["name"]
+                is_required = s["required"]                                           
                 sv = {
                     "type": s["type"],
                     "format": s.get("format", None),
                     # "required": s.get("required", True), # no required field inside schema objects
                 }
+                if is_required:
+                    required_array.append(s["name"])                                                  
                 if not sv["format"]:
                     del sv["format"]
 
                 ret[table_key]["properties"][sk] = sv
-
+            if request_body:
+                ret[table_key]["required"] = required_array
         if not is_object:
             schema_name = None
             if table_key not in self.schemas:
@@ -121,29 +185,52 @@ class SpecGenerator:
 
         return ret
 
-    def generate_object(self, object_data):
+    def generate_object(self, object_data, request_body):
         ret = {"type": "object", "properties": {}}
+        if request_body:
+            ret["required"] = []
 
         for k, v in object_data["properties"].items():
+            if request_body:
+                    ret["required"].append(v["name"])
             if v["type"] == "ezapi_table":
                 # dict_merge(ret["properties"], self.generate_table(v, is_parent_object=True))
-                dict_merge(ret["properties"], self.generate_table(v, is_object=True))
-            elif v["type"] in ["string", "number", "integer"]:
+                is_array = v["isArray"]
+                if is_array:
+                    dict_merge(ret["properties"], self.generate_array_table(v, request_body))
+                else:
+                    dict_merge(ret["properties"], self.generate_table(v, request_body, is_object=True))
+            elif v["type"] in ["string", "number", "integer", "array"] or (v["type"] == "object" and "schemaRef" in v):
                 dict_merge(ret["properties"], self.generate_field(v))
 
         return ret
 
-    def generate_body(self, body_data):
+    def generate_body(self, body_data, request_body):
         ret = {}
+        if request_body:
+            ret["required"] = []                               
         body_type = body_data.get("type")
         if body_type == "object":
-            ret = self.generate_object(body_data)
+            if "schemaRef" in body_data:
+                ret = {"type": "object", "properties": self.generate_field(body_data)}
+                if body_data["required"] and request_body:
+                    ret["required"].append(body_data["name"])
+            else:
+                ret = self.generate_object(body_data, request_body)
         elif body_type == "ezapi_table":
-            # ret = {"type": "object", "properties": self.generate_table(body_data)}
-            schema_name = self.generate_table(body_data)
-            ret = {"ezapi_ref": f"#/components/schemas/{schema_name}"}
-        elif body_type in ["string", "number", "integer"]:
+            is_array = body_data.get("isArray")
+            schema_name = self.generate_table(body_data, request_body)
+            
+            if is_array:
+                ret = {"type" : "array", "items" : {}}
+                ret["items"] = {"ezapi_ref": f"#/components/schemas/{schema_name}"}
+            else:                                               
+                # ret = {"type": "object", "properties": self.generate_table(body_data)}
+                ret = {"ezapi_ref": f"#/components/schemas/{schema_name}"}
+        elif body_type in ["string", "number", "integer" ,"array"]:
             ret = {"type": "object", "properties": self.generate_field(body_data)}
+            if body_data["required"] and request_body:
+                    ret["required"].append(body_data["name"])
         return ret
 
     def generate_path(self):
@@ -206,7 +293,7 @@ class SpecGenerator:
                         tmp["content"]["application/json"] = {}
                         tmp["content"]["application/json"][
                             "schema"
-                        ] = self.generate_body(body_data)
+                        ] = self.generate_body(body_data, request_body = True)
                         res[endpoint][method][BODY_KEY] = tmp
                     elif param_type == "formData":
                         pass
@@ -225,7 +312,7 @@ class SpecGenerator:
                             resp_dict[k]["application-json"] = {}
                             resp_dict[k]["application-json"][
                                 "schema"
-                            ] = self.generate_body(resp[k])
+                            ] = self.generate_body(resp[k], request_body = False)
                         else:
                             resp_dict[k] = {}
                     elif k == "description":

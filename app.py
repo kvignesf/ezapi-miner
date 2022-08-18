@@ -8,7 +8,7 @@ import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
 
-from api_designer.main import EzAPIModels
+from api_designer.main import EzAPIModels, BaseEzapiModels
 
 from werkzeug import Request, Response
 from werkzeug import exceptions as exc
@@ -38,6 +38,21 @@ CORS(app, support_credentials=True)
 @app.route("/")
 def home():
     return "Hello EzAPI"
+
+@app.route("/keywordchecker", methods=["POST"])
+def kw_checker():
+    request_data = request.get_json()
+    keywrd = str(request_data.get("keywrd", ""))
+    dbtype = str(request_data.get("dbtype", ""))
+    if keywrd and dbtype:
+        model = BaseEzapiModels(keywrd)
+        model.set_db_instance()
+        ret = model.check_keywrd(dbtype)
+        model.client.close()
+    else:
+        bad_request({"success": False, "message": "Some parameters are missing: keywrd, dbtype"})
+
+    return json_response({"data": ret})
 
 
 @app.route("/db_extractor", methods=["POST"])
@@ -167,13 +182,33 @@ def artefacts_model():
     if projectid:
         model = EzAPIModels(projectid)
         model.set_db_instance()
-        ret = model.artefacts_geerator()
+        ret = model.artefacts_generator()
         model.client.close()
 
     else:
         ret = bad_request({"success": False, "message": "Some parameters are missing"})
 
     return json_response(ret, status=ret["status"])
+
+
+@app.route("/simulation_artefacts", methods=["POST"])
+def simulation_model():
+    print("Sim Artefacts Received")
+    request_data = request.get_json()
+    projectid = str(request_data.get("projectid", ""))
+
+    if projectid:
+        model = EzAPIModels(projectid)
+        model.set_db_instance()
+        ret = model.sim_artefacts_generator()
+        model.client.close()
+
+    else:
+        ret = bad_request({"success": False, "message": "Some parameters are missing"})
+
+    return json_response(ret, status=ret["status"])
+
+
 
 @app.route("/sankey", methods=["POST"])
 def sankey_model():
@@ -316,5 +351,23 @@ def run_update_tests():
 
     return json_response(ret, status=ret["status"])
 
+@app.route("/extract_sp", methods=["POST"])
+def extract_stored_procs():
+    print("Update Testcases Received")
+    request_data = request.get_json()
+    projectid = str(request_data.get("projectid", ""))
+    dbtype = str(request_data.get("dbtype", ""))
+    if projectid:
+        model = EzAPIModels(projectid)
+        model.set_db_instance()
+        ret = model.extract_sp_data(request_data, dbtype)
+        model.client.close()
+
+    else:
+        ret = bad_request({"success": False, "message": "Some parameters are missing"})
+
+    return json_response(ret, status=ret["status"])
+
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, port=5000)

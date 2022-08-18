@@ -58,7 +58,7 @@ class TestdataGenerator:
 
                     GTD.set_operation_data(method, resp["status_code"])
                     req_datas = GTD.generate_request_data(request_data)
-                    res_data = GTD.generate_response_data(resp)
+                    res_data = GTD.generate_response_data(resp, req_datas[0])
 
                     for req_data in req_datas:
                         # if ("{" in endpoint and "}" in endpoint):
@@ -120,7 +120,7 @@ class TestdataGenerator:
                             GTD.flush_data()
                             GTD.set_operation_data(method, resp["status_code"])
                             req_data = GTD.generate_request_data(request_data, is_performance = True)
-                            res_data = GTD.generate_response_data(resp)
+                            res_data = GTD.generate_response_data(resp, req_data)
 
                             input_data.append(req_data)
                             assertion_data.append(res_data["content"])
