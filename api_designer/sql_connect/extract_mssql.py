@@ -1,14 +1,190 @@
 import re
 from sqlalchemy import create_engine
+import requests
 
 from api_designer.sql_connect.ts2 import get_ts_order
 from api_designer.sql_connect.mssql_decoder import DTDecoder
+from api_designer.sql_connect.sp_decoder import DataTypeMapper
 from api_designer.sql_connect.mssql_openapi import DTMapper
 from api_designer.sql_connect.ezsampler import Sampler
 from api_designer.sql_connect.utils import *
 
 TO_STRING_DTYPES = ['geography', 'hierarchyid', 'geometry']
-
+LIST_OF_KEYWORDS = [
+        "ADD",
+        "ALL",
+        "ALTER",
+        "AND",
+        "ANY",
+        "AS",
+        "ASC",
+        "AUTHORIZATION",
+        "BACKUP",
+        "BEGIN",
+        "BETWEEN",
+        "BREAK",
+        "BROWSE",
+        "BULK",
+        "BY",
+        "CASCADE",
+        "CASE",
+        "CHECK",
+        "CHECKPOINT",
+        "CLOSE",
+        "CLUSTERED",
+        "COALESCE",
+        "COLLATE",
+        "COLUMN",
+        "COMMIT",
+        "COMPUTE",
+        "CONSTRAINT",
+        "CONTAINS",
+        "CONTAINSTABLE",
+        "CONTINUE",
+        "CONVERT",
+        "CREATE",
+        "CROSS",
+        "CURRENT",
+        "CURRENT_DATE",
+        "CURRENT_TIME",
+        "CURRENT_TIMESTAMP",
+        "CURRENT_USER",
+        "CURSOR",
+        "DATABASE",
+        "DBCC",
+        "DEALLOCATE",
+        "DECLARE",
+        "DEFAULT",
+        "DELETE",
+        "DENY",
+        "DESC",
+        "DISK",
+        "DISTINCT",
+        "DISTRIBUTED",
+        "DOUBLE",
+        "DROP",
+        "DUMMY",
+        "DUMP",
+        "ELSE",
+        "END",
+        "ERRLVL",
+        "ESCAPE",
+        "EXCEPT",
+        "EXEC",
+        "EXECUTE",
+        "EXISTS",
+        "EXIT",
+        "FETCH",
+        "FILE",
+        "FILLFACTOR",
+        "FOR",
+        "FOREIGN",
+        "FREETEXT",
+        "FREETEXTTABLE",
+        "FROM",
+        "FULL",
+        "FUNCTION",
+        "GOTO",
+        "GRANT",
+        "GROUP",
+        "HAVING",
+        "HOLDLOCK",
+        "IDENTITY",
+        "IDENTITY_INSERT",
+        "IDENTITYCOL",
+        "IF",
+        "IN",
+        "INDEX",
+        "INNER",
+        "INSERT",
+        "INTERSECT",
+        "INTO",
+        "IS",
+        "JOIN",
+        "KEY",
+        "KILL",
+        "LEFT",
+        "LIKE",
+        "LINENO",
+        "LOAD",
+        "NATIONAL",
+        "NOCHECK",
+        "NONCLUSTERED",
+        "NOT",
+        "NULL",
+        "NULLIF",
+        "OF",
+        "OFF",
+        "OFFSETS",
+        "ON",
+        "OPEN",
+        "OPENDATASOURCE",
+        "OPENQUERY",
+        "OPENROWSET",
+        "OPENXML",
+        "OPTION",
+        "OR",
+        "ORDER",
+        "OUTER",
+        "OVER",
+        "PERCENT",
+        "PLAN",
+        "PRECISION",
+        "PRIMARY",
+        "PRINT",
+        "PROC",
+        "PROCEDURE",
+        "PUBLIC",
+        "RAISERROR",
+        "READ",
+        "READTEXT",
+        "RECONFIGURE",
+        "REFERENCES",
+        "REPLICATION",
+        "RESTORE",
+        "RESTRICT",
+        "RETURN",
+        "REVOKE",
+        "RIGHT",
+        "ROLLBACK",
+        "ROWCOUNT",
+        "ROWGUIDCOL",
+        "RULE",
+        "SAVE",
+        "SCHEMA",
+        "SELECT",
+        "SESSION_USER",
+        "SET",
+        "SETUSER",
+        "SHUTDOWN",
+        "SOME",
+        "STATISTICS",
+        "SYSTEM_USER",
+        "TABLE",
+        "TEXTSIZE",
+        "THEN",
+        "TO",
+        "TOP",
+        "TRANSACTION",
+        "TRIGGER",
+        "TRUNCATE",
+        "TSEQUAL",
+        "UNION",
+        "UNIQUE",
+        "UPDATE",
+        "UPDATETEXT",
+        "USE",
+        "USER",
+        "VALUES",
+        "VARYING",
+        "VIEW",
+        "WAITFOR",
+        "WHEN",
+        "WHERE",
+        "WHILE",
+        "WITH",
+        "WRITETEXT"
+    ]
 class Extractor:
     def __init__(self, dbtype, url):
         self.dbtype = dbtype
@@ -17,6 +193,7 @@ class Extractor:
 
         self.schemas = []
         self.tables = []
+        self.sp_names = []
         self.table_size = {}
         self.user_defined_types = {}
         self.table_keys = {}
@@ -39,11 +216,103 @@ class Extractor:
         """)
         self.schemas = [x[0] for x in self.schemas]
 
+    def get_sps(self):
+        query = """
+            select p.name as sp_name,  
+                   sc.name as schema_name 
+            from sys.procedures p
+            inner join sys.schemas sc 
+                on sc.schema_id = p.schema_id
+        """
+        res = self.conn.execute(query)
+        columns = list(res.keys())
+        res = [x for x in res]
+
+        for r in res:
+            tmp = {x:y for x, y in zip(columns, r)}
+            tmp_full_table = tmp["schema_name"] + "." + tmp["sp_name"]
+            self.sp_names.append(tmp_full_table)
+
+    def get_sp_details(self):
+        sp_documents= []
+        D = DataTypeMapper("", self.user_defined_types)
+
+        for sp in self.sp_names:
+            inputAttr = []
+            outputAttr = []
+            prname = sp.split(".")[1]
+
+            res = self.conn.execute(f"select pa.name as attribute_name, "
+                                    f"pa.is_output as output_col, pr.name as sp_name, t.name as datatype, s.name as schemaName, "
+                                    f"pa.precision as PRECISION, pa.scale as SCALE, pa.max_length as LENGTH "
+                                    f"from sys.parameters pa inner join sys.procedures pr "
+                                    f"on pa.object_id = pr.object_id "
+                                    f"inner join sys.types t "
+                                    f"on pa.system_type_id = t.system_type_id "
+                                    f"inner join sys.schemas s "
+                                    f"on s.schema_id = pr.schema_id AND pa.user_type_id = t.user_type_id "
+                                    f"where pr.name ='{prname}'")
+            columns = list(res.keys())
+            res = [x for x in res]
+            attr_details={}
+            attr_det_oa= {}
+            attr_det_dec={}
+            for r in res:
+                tmp = {x: y for x, y in zip(columns, r)}
+                DT = DataTypeMapper(tmp, self.user_defined_types)
+                attr_details["decoder"]=DT.decoder()
+                #attr_det_oa["openapi"] = D.datatypedecoder(tmp["datatype"])
+                attr_details["datatype"]=tmp["datatype"]
+                attr_details["name"]=tmp["attribute_name"].replace("@", '')
+                attr_details["openapi"] = D.datatypedecoder(tmp["datatype"])
+                if (tmp["output_col"] == 0):
+                    attr_details["type"] = "input"
+                    inputAttr.append(attr_details)
+                else:
+                    attr_details["type"] = "output"
+                    outputAttr.append(attr_details)
+
+                attr_details = {}
+
+            document = {
+                'projectid': self.projectid,
+                'schema': tmp["schemaName"],
+                "storedProcedure": tmp["sp_name"],
+                'inputAttributes': inputAttr,
+                "outputAttributes": outputAttr,
+                "type": "storedProcedure"
+            }
+
+            sp_documents.append(document)
+        #print(sp_documents)
+        return sp_documents
+
+
+
     def get_tables(self):
+        res1 = []
         for s in self.schemas:
+            res1= []
             res = self.conn.execute(f"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES where TABLE_SCHEMA = '{s}' and TABLE_TYPE = 'BASE TABLE'")
+            # for x in res:
+            #     print("info", f"{s}.{x[0]}")
             res = [f"{s}.{x[0]}" for x in res]
-            self.tables += res
+            for i in range(len(res)):
+                if "." in res[i]:
+                    tblName = res[i].split(".")[1]
+                    schemaName = res[i].split(".")[0]
+                    #params = {"keywrd": tblName, "dbtype": "sqlserver"}
+                    #respVal = requests.post(url="http://localhost:5000" + "/keywordchecker", json=params)
+                    #if respVal == "success":
+                    if tblName.upper() in LIST_OF_KEYWORDS:
+                        newTbl = schemaName+"."+"["+tblName+"]"
+                    else:
+                        newTbl = schemaName+"."+tblName
+                res1.append(newTbl)
+            print("res", res1)
+            self.tables += res1
+            #print("res", res)
+            #self.tables += res
 
     def get_table_size(self):
         for s in self.tables:
@@ -124,7 +393,7 @@ class Extractor:
                 inner join sys.indexes pk
                     on tab.object_id = pk.object_id 
                     and pk.is_primary_key = 1
-            cross apply (select col.[name] + ', '
+            cross apply (select col.[name] + ','
                                 from sys.index_columns ic
                                     inner join sys.columns col
                                         on ic.object_id = col.object_id
@@ -169,6 +438,8 @@ class Extractor:
                 foreign_key = f"{tk}.{col}"
                 if col_data["auto"]:
                     continue
+                # elif "decoder" in col_data and col_data["decoder"].get("type") == "datetime":
+                #     continue
                 elif tk in self.table_keys and col in self.table_keys[tk]:
                     pk_columns += 1
                 elif foreign_key in self.foreign:
@@ -180,10 +451,11 @@ class Extractor:
             if (table_foreign + table_columns + pk_columns) <= 3 and table_foreign <= 1 and (table_columns + pk_columns)> 0 and table_size <= 250:
                 master = True
                 for col in column_names:
-                    col_sample = self.sample_data[tk][col]
-                    col_details = self.table_details[tk][col]['decoder']
-                    if (col_sample.get('repeat') != 1) or (col_details.get("type") not in ("number", "string")):
-                        master = False
+                    if len(self.sample_data[tk]) > 0:
+                        col_sample = self.sample_data[tk][col]
+                        col_details = self.table_details[tk][col]['decoder']
+                        if (col_sample.get('repeat') != 1) or (col_details.get("type") not in ("number", "string")):
+                            master = False
 
                 if master:
                     self.master_tables.append(tk)
@@ -191,6 +463,8 @@ class Extractor:
     def get_table_details(self):
         for t in self.tables:
             t_schema, t_name = t.split(".")
+            if "[" in t_name :
+                t_name = t_name.replace("[","").replace("]","")
             column_desc = self.conn.execute(f"exec sp_columns @table_name=N'{t_name}', @table_owner=N'{t_schema}'")
             column_keys = column_desc.keys()
             column_desc = list(column_desc)
@@ -427,6 +701,7 @@ class Extractor:
 
     def get_insertion_order(self):
         tables = []
+        print("inside get_insertion_order", self.tables)
         for t in self.tables:
             foreign_dependencies = set()
 
@@ -449,6 +724,17 @@ class Extractor:
             'order': self.insertion_order
         }
         return document
+
+    def prepare_dbdata_map(self):
+        dbdata_map_documents = []
+        for t in self.tables:
+            document = {
+                'projectid': self.projectid,
+                'table': t,
+                'dbdata_recordindex': 0
+            }
+            dbdata_map_documents.append(document)
+        return dbdata_map_documents
 
     def prepare_table_document(self):
         table_documents = []
@@ -490,8 +776,16 @@ class Extractor:
             table_documents.append(document)
         return table_documents
 
+    def extract_sp(self, projectid):
+        self.projectid = projectid
+        self.get_sps()
+        storedproc_docs = self.get_sp_details()
+        #return sp_doc, sp_docs
+        return storedproc_docs
+
 
     def extract_data(self, projectid):
+        storedproc_docs = []
         self.projectid = projectid
         self.get_schemas()
         self.get_tables()
@@ -507,10 +801,13 @@ class Extractor:
         self.get_master_tables()
         db_document = self.prepare_db_document()
         table_documents = self.prepare_table_document()
+        storedproc_docs = self.extract_sp(projectid)
+        table_dbdata_map = self.prepare_dbdata_map()
+
 
         # import json
         # json_data = json.dumps(table_documents, indent=4, sort_keys=True, default=str)
         # with open('adworks.json', 'w') as outfile:
         #     outfile.write(json_data)
 
-        return db_document, table_documents
+        return db_document, table_documents, storedproc_docs, table_dbdata_map

@@ -3,9 +3,11 @@
 # *****************************************************************
 
 from pprint import pprint
+import json
 import random
 import string
 import os, sys
+import jwt
 
 from itsdangerous import exc
 
@@ -24,6 +26,8 @@ MAX_ITEMS = 3
 
 TESTCASE_COLLECTION = "testcases"
 VIRTUAL_COLLECTION = "virtual"
+SIM_TESTCASE_COLLECTION = "testcases_sim"
+SIM_VIRTUAL_COLLECTION = "virtual_sim"
 TESTRESULT_COLLECTION = "test_result"
 
 
@@ -118,6 +122,7 @@ class GenerateData:
     def __init__(self, schemas, is_response=False):
         self.schemas = schemas
         self.is_response = is_response
+        self.payload = ''.join(random.choices(string.ascii_uppercase + string.digits, k = 10))
 
     def set_response_flag(self, is_response):
         self.is_response = is_response
@@ -203,6 +208,17 @@ class GenerateData:
 
         return ret
 
+    def generate_authorization(self, auth):
+        if auth and "authType" in auth and "tokenType" in auth:
+            auth_type = auth["authType"]
+            auth_token = auth["tokenType"]
+
+            if auth_type == "Bearer Token" and auth_token == "JWT":
+                token = jwt.encode({'payload': self.payload}, 'secret', algorithm='HS256')
+                return token
+        return None
+
+
     def generate_body_data(self, body):
         ret = {}
         if not body:
@@ -230,12 +246,19 @@ class GenerateData:
             "form": {},
             "body": self.generate_body_data(request_data["body"]),
         }
+
+        if "authorization" in request_data:
+            token = self.generate_authorization(request_data["authorization"])
+            if token:
+                payload["header"]["Authorization"] = token
+
         return payload
 
 
 class GenerateTableData:
     def __init__(self, is_response=False):
         self.is_response = is_response
+        self.payload = ''.join(random.choices(string.ascii_uppercase + string.digits, k = 10))
 
     def set_response_flag(self, is_response):
         self.is_response = is_response
@@ -278,6 +301,16 @@ class GenerateTableData:
 
         return ret
 
+    def generate_authorization(self, auth):
+        if auth and "authType" in auth and "tokenType" in auth:
+            auth_type = auth["authType"]
+            auth_token = auth["tokenType"]
+
+            if auth_type == "Bearer Token" and auth_token == "JWT":
+                token = jwt.encode({'payload': self.payload}, 'secret', algorithm='HS256')
+                return token
+        return None
+
     def generate_body_data(self, body):
         ret = {}
         if not body:
@@ -303,6 +336,12 @@ class GenerateTableData:
             "form": {},
             "body": self.generate_body_data(request_data["body"]),
         }
+
+        if "authorization" in request_data:
+            token = self.generate_authorization(request_data["authorization"])
+            if token:
+                payload["header"]["Authorization"] = token
+
         return payload
 
 
@@ -374,6 +413,7 @@ def get_virtual_collection_data(testdata):
         "formData": testdata["inputData"]["form"],
         "requestBody": testdata["inputData"]["body"],
         "responseStatusCode": testdata["status"],
+        "operation_id": testdata["operation_id"]
     }
 
     virtual_service_data["responseBody"] = testdata.get("assertionData", {})
@@ -421,6 +461,21 @@ def getCountByKey(input_payload):
             tc_suffix = tc_suffix + k[0] + str(nmbrelmnts)
             elmntsNmbr = elmntsNmbr + nmbrelmnts
     return elmntsNmbr
+
+def check_keywrd_exists(keywrd, db, dbtype):
+    masterkeywrds = db.db_key_words.find({"dbtype": dbtype})
+    message = "failure"
+    for mstrdata in masterkeywrds:
+        #print(mstrdata["keywords"])
+        for i in range(len(mstrdata["keywords"])):
+            #print(mstrdata["keywords"][i])
+            if (mstrdata["keywords"][i]).lower() == keywrd.lower():
+                #print(keywrd.lower())
+                message = "success"
+
+    return message
+
+
 
 
 def generate_artefacts(projectid, db):
@@ -496,6 +551,7 @@ def generate_artefacts(projectid, db):
         test_count = 0
 
         for path in paths:
+            paramswobracs = ""
             testdata = {
                 "projectid": projectid,
                 "api_ops_id": projectid,
@@ -514,7 +570,12 @@ def generate_artefacts(projectid, db):
                 "testcaseId": None,
                 "mock": True
             }
-
+            if ("{" in path.get("endpoint")) and ("}" in path.get("endpoint")):
+                pathparams = re.findall(r'\{.*?\}', path.get("endpoint"))
+                endpoint_orig = path.get("endpoint")
+                # print(path.get("endpoint").format(**testdata["inputData"]["path"]))
+                testdata["endpoint"] = path.get("endpoint").format(**testdata["inputData"]["path"])
+                testdata["endpoint_orig"] = endpoint_orig
             gd.set_response_flag(True)
 
             for resp in path["responseData"]:
@@ -588,6 +649,201 @@ def generate_artefacts(projectid, db):
         mongo.store_bulk_document(TESTCASE_COLLECTION, all_testcases, db)
         mongo.store_bulk_document(VIRTUAL_COLLECTION, virtual_tests, db)
         mongo.store_document(TESTRESULT_COLLECTION, testcase_result, db)
+
+        tbl_dbdata_recs = db.table_dbdata_map.find({"projectid": projectid})
+        try:
+            for tbl_dbdata in tbl_dbdata_recs:
+                proj = tbl_dbdata['_id']
+                mongo.update_document(
+                    "table_dbdata_map",
+                    {"_id": proj},
+                    {
+                        "$set": {
+                            "dbdata_recordindex": 0
+                        }
+                    },
+                    db
+                )
+        except:
+            retMsg = "unable to update table data map"
+            return {"success": False, "message": retMsg, "status": 404}
+
+        return {"success": True, "message": "ok", "status": 200}
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        print("Artefacts Error - ", exc_type, fname, exc_tb.tb_lineno, str(e))
+
+        print("Artefacts Generator Error - ", str(e))
+        return {"success": False, "message": str(e), "status": 500}
+
+
+def generate_simulation_artefacts(projectid, db):
+    print("Inside Artefacts Generator")
+    try:
+        # Remove esisting testcases
+        try:
+            db.testcases_sim.remove({"projectid": projectid})
+        except:
+            pass
+
+        try:
+            db.virtual_sim.remove({"projectid": projectid})
+        except:
+            pass
+
+        project_data = db.projects.find_one({"projectId": projectid})
+        try:
+            filename = project_data.get("apiSpec")
+            filename = filename[0]["name"]
+        except:
+            filename = None
+
+        project_data = db.projects.find_one({"projectId": projectid})
+        project_type = project_data.get("projectType", None)
+
+        if not project_data or not project_type:
+            return {
+                "success": False,
+                "status": 404,
+                "message": "project data or project type not found",
+            }
+
+        try:
+            filename = project_data.get("apiSpec")
+            filename = filename[0]["name"]
+        except:
+            filename = None
+
+        paths = db.operationdatas.find({"projectid": projectid})
+        paths = list(paths)
+
+        if not paths:
+            return {
+                "success": False,
+                "message": "project data not found",
+                "status": 404,
+            }
+        paths = [x["data"] for x in paths]
+
+        if project_type == "db":
+            gd = GenerateTableData()
+        else:
+            components = db.components.find_one({"projectid": projectid})
+            components = components["data"]
+            schemas = components["schemas"]
+            gd = GenerateData(schemas)
+
+        testcase_result = {
+            "api_ops_id": projectid,
+            "projectid": projectid,
+            "run1": {},
+            "run2": {},
+            "run3": {},
+        }
+
+        all_testcases = []
+        test_count = 0
+
+        for path in paths:
+            paramswobracs = ""
+            testdata = {
+                "projectid": projectid,
+                "api_ops_id": projectid,
+                "filename": filename,
+                "endpoint": path.get("endpoint"),
+                "method": path.get("method"),
+                "resource": path.get("tags", []),
+                "operation_id": path.get("operationId"),
+                "test_case_name": path.get("operationId") + "__P",
+                "description": "ok",
+                "test_case_type": "F",
+                "delete": False,
+                "inputData": gd.generate_request_data(path["requestData"]),
+                "status": None,
+                "assertionData": None,
+                "testcaseId": None,
+                "mock": True
+            }
+            if ("{" in path.get("endpoint")) and ("}" in path.get("endpoint")):
+                pathparams = re.findall(r'\{.*?\}', path.get("endpoint"))
+                endpoint_orig = path.get("endpoint")
+                # print(path.get("endpoint").format(**testdata["inputData"]["path"]))
+                testdata["endpoint"] = path.get("endpoint").format(**testdata["inputData"]["path"])
+                testdata["endpoint_orig"] = endpoint_orig
+            gd.set_response_flag(True)
+
+            for resp in path["responseData"]:
+                testdata["status"] = resp["status_code"]
+                testdata["assertionData"] = (
+                    gd.generate_body_data(resp["content"]) if "content" in resp else {}
+                )
+                testdata["testcaseId"] = "test" + str(1 + test_count)
+
+                test_copy = testdata.copy()
+                generated = False
+
+                if resp["status_code"] == "default" or resp["status_code"].startswith(
+                    "2"
+                ):
+                    test_copy = match_request_response_data(test_copy)
+                    generated = True
+
+                elif resp["status_code"] == "400":
+                    # Deceptive Request
+                    tmp = test_copy["endpoint"].split("/")
+                    for i, t in enumerate(tmp):
+                        tmp[i] = "%/" + tmp[i]
+                        break
+                    test_copy["endpoint"] = "/".join(tmp)
+                    test_copy["description"] = "Deceptive request"
+                    generated = True
+
+                    # Bad Request (Missing Parameter)
+                    # todo
+
+                elif resp["status_code"] == "404":  # not found
+                    tmp = test_copy["endpoint"].split("/")
+                    tmp[0] = misspell_single_letter(tmp[0])
+                    # for i, t in enumerate(tmp):
+                    #     tmp[i] = "abc" + tmp[i]
+                    #     break
+                    test_copy["endpoint"] = "/".join(tmp)
+                    test_copy["description"] = "misspelled uri, not found"
+                    generated = True
+
+                elif resp["status_code"] == "405":  # method not allowed
+                    test_copy["method"] = "head"
+                    test_copy["description"] = "method not allowed"
+                    generated = True
+
+                if generated:
+                    if filename:
+                        suffix = getCountByKey(testdata["inputData"])
+                        suffix_end = " datasets" if suffix > 1 else " dataset"
+                        test_copy["test_case_name"] = (
+                            "Validate "
+                            + resp["status_code"]
+                            + " response for "
+                            + path.get("operationId")
+                            + " of "
+                            + filename.split(".")[0]
+                            + " API using "
+                            + str(suffix)
+                            + suffix_end
+                        )
+                    all_testcases.append(test_copy)
+                    test_count += 1
+
+        virtual_tests = [
+            get_virtual_collection_data(x)
+            for x in all_testcases
+            if x["status"][0] == "2"
+        ]
+
+        mongo.store_bulk_document(SIM_TESTCASE_COLLECTION, all_testcases, db)
+        mongo.store_bulk_document(SIM_VIRTUAL_COLLECTION, virtual_tests, db)
+        #mongo.store_document(TESTRESULT_COLLECTION, testcase_result, db)
 
         return {"success": True, "message": "ok", "status": 200}
     except Exception as e:

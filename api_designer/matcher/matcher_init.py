@@ -203,6 +203,7 @@ def solve_matching(schemas_data, tables_data, projectid):
         for td in tables_data:
             sd_name = sd["name2"]
             td_name = td["name2"]
+            table_key = td["key"]
 
             sd_attributes = sd["attributes"]
             td_attributes = td["attributes"]
@@ -228,7 +229,7 @@ def solve_matching(schemas_data, tables_data, projectid):
                 comb_score = nm_score
 
             matched_score.append(
-                [comb_score, nm_score, total_as_score, sd["name"], td["table"]]
+                [comb_score, nm_score, total_as_score, sd["name"], td["table"], table_key]
             )
 
         matched_score = sorted(matched_score, reverse=True)
@@ -241,6 +242,7 @@ def solve_matching(schemas_data, tables_data, projectid):
                 "projectid": projectid,
                 "schema": m[3],
                 "table": m[4],
+                "key": m[5],
                 "name_match_score": m[1],
                 "attributes_match_score": m[2],
                 "final_score": m[0],
@@ -289,7 +291,6 @@ def spec_ddl_matcher(projectid, db):
 
 
     all_documents = solve_matching(schemas_data, tables_data, projectid)
-
     print("Inserting into DB ", round(time.time(), 1))
     mongo.store_bulk_document(match_collection, all_documents, db)
 

@@ -41,7 +41,16 @@ def update_document(collection, query, value, db):
     db_collection = db[collection]
     db_collection.update_one(query, value)
 
+def update_bulk_document(collection, document_list, db):
+    document_list_copy = copy.deepcopy(json_safe(document_list))
+    db_collection = db[collection]
+    db_collection.update_many(document_list_copy)
+
 def store_bulk_document(collection, document_list, db):
     document_list_copy = copy.deepcopy(json_safe(document_list))
     db_collection = db[collection]
     db_collection.insert_many(document_list_copy)
+
+def delete_bulk_query(collection, query, db):
+    db_collection = db[collection]
+    db_collection.delete_many(query)

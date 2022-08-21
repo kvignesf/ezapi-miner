@@ -38,6 +38,7 @@ class Graph:
             return None
 
 def get_ts_order(table_data):
+   #print(table_data)
    for i in range(len(table_data)):
       if table_data[i]["key"] in table_data[i]["dependencies"]:
          table_data[i]["dependencies"].remove(table_data[i]["key"])
@@ -63,7 +64,9 @@ def get_ts_order(table_data):
    table_order = G.ts()
 
    for i, to in enumerate(table_order):
-      table_order[i] = table_invert_mapping[table_order[i]]
+        #print(i)
+        table_order[i] = table_invert_mapping[table_order[i]]
+
 
    return table_order
 
