@@ -12,6 +12,7 @@ import codecs
 import json
 
 
+
 def parse_openapi_json(filepath, projectid, spec_filename, db):
     try:
         jsondata = json.load(codecs.open(filepath, "r", "utf-8-sig"))

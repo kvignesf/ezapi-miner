@@ -31,6 +31,13 @@ class DBGenerator:
         self.table_documents = list(self.table_documents)
         self.table_documents = {x["key"]: x for x in self.table_documents}
 
+    def fetch_composite_keys(self, table_name):
+        if "composite" in self.table_documents[table_name]:
+            return self.table_documents[table_name]["composite"]
+        else:
+            return []
+
+
     def generate_mssql_query(self, table_key, columns, column_data, default_generated):
         query = f"INSERT INTO {table_key} ("
         for col in columns:
@@ -225,6 +232,8 @@ class DBGenerator:
                                 else:
                                     ret = ta["default"]
                                 generated_data[column_name] = ret
+                            elif ta.get("auto"):
+                                generated_data[column_name] = "placeholder"
                         else:
                             ret = self.generate_column_data(ta, table_constraints, generated_data)
                             generated_data[column_name] = ret
