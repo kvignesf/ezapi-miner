@@ -8,6 +8,8 @@ from api_designer.sql_connect.sp_decoder import DataTypeMapper
 from api_designer.sql_connect.mssql_openapi import DTMapper
 from api_designer.sql_connect.ezsampler import Sampler
 from api_designer.sql_connect.utils import *
+from decouple import config
+
 
 TO_STRING_DTYPES = ['geography', 'hierarchyid', 'geometry']
 LIST_OF_KEYWORDS = [
@@ -731,7 +733,8 @@ class Extractor:
             document = {
                 'projectid': self.projectid,
                 'table': t,
-                'dbdata_recordindex': 0
+                'dbdata_recordindex': 0,
+                'perf_dbdata_recordindex': 0
             }
             dbdata_map_documents.append(document)
         return dbdata_map_documents
@@ -801,7 +804,9 @@ class Extractor:
         self.get_master_tables()
         db_document = self.prepare_db_document()
         table_documents = self.prepare_table_document()
-        storedproc_docs = self.extract_sp(projectid)
+        print("config", config("storedprocenv"))
+        if (config('storedprocenv') == "true"):
+            storedproc_docs = self.extract_sp(projectid)
         table_dbdata_map = self.prepare_dbdata_map()
 
 
