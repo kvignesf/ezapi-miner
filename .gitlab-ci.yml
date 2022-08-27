@@ -3,14 +3,17 @@ before_script:
   - 'echo \dbconfig\ = \"$test_db_instance\">> .env.test'
   - 'echo \pojogenurl\ = \"$test_pojogen_url\">> .env.test'
   - 'echo \dbpasskey\ = \"$test_db_passkey\">> .env.test'
+  - 'echo \storedprocenv\ = \"$test_storedprocenv\">> .env.test'
   - cat .env.test
   - 'echo \dbconfig\ = \"$stage_db_instance\">> .env.stage'
   - 'echo \pojogenurl\ = \"$stage_pojogen_url\">> .env.stage'
   - 'echo \dbpasskey\ = \"$stage_db_passkey\">> .env.stage'
+  - 'echo \storedprocenv\ = \"$stage_storedprocenv\">> .env.stage'
   - cat .env.stage
   - 'echo \dbconfig\ = \"$prod_db_instance\">> .env.prod'
   - 'echo \pojogenurl\ = \"$prod_pojogen_url\">> .env.prod'
   - 'echo \dbpasskey\ = \"$prod_db_passkey\">> .env.prod'
+  - 'echo \storedprocenv\ = \"$prod_storedprocenv\">> .env.prod'
   - cat .env.prod
 include:
   project: 'ezapi_poc/infra_poc'
