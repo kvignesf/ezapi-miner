@@ -250,7 +250,7 @@ class GenerateData:
         if "authorization" in request_data:
             token = self.generate_authorization(request_data["authorization"])
             if token:
-                payload["header"]["Authorization"] = token
+                payload["header"]["authorization"] = token
 
         return payload
 
@@ -301,6 +301,21 @@ class GenerateTableData:
 
         return ret
 
+    def generate_header_data(self, param_list):
+        ret = {}
+        for param in param_list:
+            for k, v in param.items():
+                param_type = v.get("type")
+
+                if param_type == "object" and "properties" in v:
+                    ret[k.lower()] = self.generate_object_data(v)
+                elif param_type in DATA_TYPE_LIST:
+                    ret[k.lower()] = generate_field_data(v, k)
+                elif param_type == "ezapi_table":
+                    ret[k.lower()] = self.generate_ref_data(v)
+
+        return ret
+
     def generate_authorization(self, auth):
         if auth and "authType" in auth and "tokenType" in auth:
             auth_type = auth["authType"]
@@ -331,7 +346,8 @@ class GenerateTableData:
         payload = {
             "path": self.generate_param_data(request_data["path"]),
             "query": self.generate_param_data(request_data["query"]),
-            "header": self.generate_param_data(request_data["header"]),
+            #"header": self.generate_param_data(request_data["header"]),
+            "header": self.generate_header_data(request_data["header"]),
             # "form": generate_param_data(request_data["formData"]),
             "form": {},
             "body": self.generate_body_data(request_data["body"]),
@@ -340,7 +356,7 @@ class GenerateTableData:
         if "authorization" in request_data:
             token = self.generate_authorization(request_data["authorization"])
             if token:
-                payload["header"]["Authorization"] = token
+                payload["header"]["authorization"] = token
 
         return payload
 
