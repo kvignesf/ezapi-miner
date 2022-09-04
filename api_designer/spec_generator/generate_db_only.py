@@ -84,6 +84,8 @@ class SpecGenerator:
             } 
         if not values["format"]:
             del values["format"]
+        if values["type"] == "string":
+            del values["format"]
         ret[name] = values
         return ret
         
@@ -110,6 +112,8 @@ class SpecGenerator:
                     required_array.append(s["name"])
 
                 if not sv["format"]:
+                    del sv["format"]
+                if sv["type"] == "string":
                     del sv["format"]
 
                 ret[table_key]["items"]["properties"][sk] = sv
@@ -157,6 +161,8 @@ class SpecGenerator:
                 if is_required:
                     required_array.append(s["name"])                                                  
                 if not sv["format"]:
+                    del sv["format"]
+                if sv["type"] == "string":
                     del sv["format"]
 
                 ret[table_key]["properties"][sk] = sv
@@ -281,6 +287,9 @@ class SpecGenerator:
                             if not tmp["schema"]["format"]:
                                 del tmp["schema"]["format"]
 
+                            if tmp["schema"]["type"] == "string":
+                                del tmp["schema"]["format"]
+
                             res[endpoint][method][PARAMETER_KEY].append(tmp)
 
                 elif param_type in ("body", "formData") and param_data:
@@ -336,6 +345,8 @@ class SpecGenerator:
                                         del resp_dict[k][hk]["schema"]["format"]
                                     if not resp_dict[k][hk]["description"]:
                                         del resp_dict[k][hk]["description"]
+                                    if resp_dict[k][hk]["schema"]["type"] == "string":
+                                        del resp_dict[k][hk]["schema"]["format"]
 
                 res[endpoint][method]["responses"][status] = resp_dict
 
