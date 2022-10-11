@@ -32,17 +32,14 @@ def extract_path_data(path_data):
             path_obj = {}
             path_name = path
             path_obj["pathId"] = shortuuid.uuid()
-            path_obj["pathName"] = path_name
+            path_obj["pathName"] = path_name[1:]
+            #print("path_name", path_name)
             oper_array = []
             for http_method, http_method_specs in path_spec.items():
                 if http_method in _HTTP_VERBS:
                     oper_obj = {}
                     common_id = str(uuid.uuid4())
                     curr_path = {}
-                    print("path1: ", path)
-                    if ("//" in path):
-                        path = path.replace("//", "/")
-                    print("path2: ", path)
 
                     curr_path["endpoint"] = path
                     curr_path["method"] = http_method
