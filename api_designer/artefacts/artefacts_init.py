@@ -218,18 +218,60 @@ class GenerateData:
                 return token
         return None
 
+    def generate_array_ref_data(self, param_ref):
+        ref_schema = param_ref["ezapi_ref"]
+        ref_schema = ref_schema.split("/")[-1]
+
+        sd = SchemaDeref(self.schemas)
+        v = sd.deref_schema(self.schemas[ref_schema])
+
+        return self.generate_array_object_data(v)
+
+    def generate_array_object_data(self, param_object):
+        rets = []
+        for i in range(2):
+            ret = {}
+            for k, v in param_object["properties"].items():
+                is_required = v.get("required", True)
+                print("requi:", is_required)
+                toss_required = is_required or self.is_response
+                toss = 1 if toss_required else random.randint(0, 1)
+
+                v_type = v.get("type")
+
+                if toss:
+                    generated = None
+                    if v_type == "object" and "properties" in v:
+                        generated = self.generate_object_data(v)
+                    elif v_type == "array" and "items" in v:
+                        generated = self.generate_array_data(v, k)
+                    elif v_type in DATA_TYPE_LIST:
+                        generated = generate_field_data(v, k)
+                    elif "ezapi_ref" in v:
+                        generated = self.generate_ref_data(v)
+
+                    if generated:
+                        ret[k] = generated
+            rets.append(ret)
+        return rets
+
 
     def generate_body_data(self, body):
         ret = {}
+        rets = []
         if not body:
             return ret
         body_type = body.get("type")
+        isArray = body.get("isArray")
 
         if body_type == "object" and "properties" in body:
             ret = self.generate_object_data(body)
         elif body_type == "array" and "items" in body:
             ret = self.generate_array_data(body)
         elif "ezapi_ref" in body:
+            if isArray:
+                rets = self.generate_array_ref_data(body)
+                return rets
             ret = self.generate_ref_data(body)
 
         return ret
@@ -271,6 +313,17 @@ class GenerateTableData:
             ret[sname] = generate_field_data(s, sname)
 
         return ret
+
+    def generate_array_ref_data(self, param_ref):
+        selected_columns = param_ref.get("selectedColumns", [])
+        rets = []
+        for i in range(2):
+            ret = {}
+            for s in selected_columns:
+                sname = s["name"]
+                ret[sname] = generate_field_data(s, sname)
+            rets.append(ret)
+        return rets
 
     def generate_object_data(self, param_object):
         ret = {}
@@ -331,10 +384,14 @@ class GenerateTableData:
         if not body:
             return ret
         body_type = body.get("type")
+        isArray = body.get("isArray")
 
         if body_type == "object" and "properties" in body:
             ret = self.generate_object_data(body)
         elif body_type == "ezapi_table":
+            if isArray:
+                rets = self.generate_array_ref_data(body)
+                return rets
             ret = self.generate_ref_data(body)
 
         return ret
@@ -406,7 +463,11 @@ def match_request_response_data(testdata):
 
     for match_type, match_data in matched_schema_data.items():
         for m in match_data:
-            if m[0] in request_data[match_type]:
+            if match_type == 'body' and isinstance(request_data[match_type], list) and isinstance(response_data, list):
+                for i, _ in enumerate(response_data):
+                    if m[0] in request_data[match_type][i] and m[1] in response_data[i]:
+                        response_data[i][m[1]] = request_data[match_type][i][m[0]]
+            elif m[0] in request_data[match_type]:
                 source_value = request_data[match_type][m[0]]
                 if isinstance(response_data, list):
                     for i, _ in enumerate(response_data):
@@ -469,6 +530,8 @@ def getCountByKey(input_payload):
 
     for k, v in input_payload.items():
         if len(v) > 0:
+            if isinstance(v, list):
+                v = v[0]
             nmbrelmnts = len(v)
             for a, b in v.items():
                 if isinstance(b, dict):

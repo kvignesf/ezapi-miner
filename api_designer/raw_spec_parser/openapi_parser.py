@@ -23,7 +23,7 @@ _SCHEMA_FIELDS = [
     "maxItems",
     "allowEmptyValue",
 ]
-
+_SCHEMA_TYPES = ["integer", "decimal", "string", "date", "time", "boolean"]
 def extract_path_data(path_data):
     all_paths = []
     reso_path_array = []
@@ -114,49 +114,80 @@ def extract_param_data(param, components):
 
     return param_in, param_data
 
+
 def extract_body_content(body_content):
     # check for 'type' or 'ezapi_ref' for dereferencing
     resp_spec = body_content["schema"]
-    empty_obj = {}
+    final_obj = {}
+    properties_obj = {}
     if "properties" in resp_spec:
         resp_spec = resp_spec.get("properties")
-        for name,spec_data in resp_spec.items():
-            empty_obj['payloadId'] = shortuuid.uuid()
-            empty_obj['schemaName'] = name
+        for name, spec_data in resp_spec.items():
+            empty_obj = {}
 
             if "type" in spec_data and spec_data['type'] == 'array':
+                empty_obj['payloadId'] = shortuuid.uuid()
+                empty_obj['schemaName'] = name
                 empty_obj['type'] = 'ezapi_ref'
                 empty_obj['name'] = spec_data['items']['ezapi_ref'].split("/")[-1]
                 empty_obj['ezapi_ref'] = spec_data['items']['ezapi_ref']
                 empty_obj['ref'] = spec_data['items']['ezapi_ref'].split("/")[-1]
                 empty_obj['isArray'] = True
 
+            # elif "type" in spec_data and spec_data['type'] in _SCHEMA_TYPES:
+            #     empty_obj['payloadId'] = shortuuid.uuid()
+            #     empty_obj['name'] = name
+            #     empty_obj['type'] = spec_data['type']
+            #     empty_obj['description'] = "null"
+            #     empty_obj['required'] = spec_data.get('required',True)
+            #     empty_obj['possibleValues'] = "null"
+            #     empty_obj['format'] = spec_data.get('format',"null")
+
             else:
-                empty_obj['type'] = 'ezapi_ref' 
+                empty_obj['payloadId'] = shortuuid.uuid()
+                empty_obj['schemaName'] = name
+                empty_obj['type'] = 'ezapi_ref'
                 empty_obj['name'] = spec_data['ezapi_ref'].split("/")[-1]
                 empty_obj['ezapi_ref'] = spec_data['ezapi_ref']
                 empty_obj['ref'] = spec_data['ezapi_ref'].split("/")[-1]
                 empty_obj['isArray'] = False
 
+            properties_obj[name] = empty_obj
+
+        if len(properties_obj) > 1:
+            final_obj["type"] = "object"
+            final_obj["properties"] = properties_obj
+        elif len(properties_obj) == 1:
+            final_obj = list(properties_obj.values())[0]
 
     else:
         if "type" in resp_spec and resp_spec['type'] == 'array':
-            empty_obj['type'] = 'ezapi_ref'
-            empty_obj['name'] = resp_spec['items']['ezapi_ref'].split("/")[-1]
-            empty_obj['ezapi_ref'] = resp_spec['items']['ezapi_ref']
-            empty_obj['ref'] = resp_spec['items']['ezapi_ref'].split("/")[-1]
-            empty_obj['isArray'] = True
+            final_obj['type'] = 'ezapi_ref'
+            final_obj['name'] = resp_spec['items']['ezapi_ref'].split("/")[-1]
+            final_obj['ezapi_ref'] = resp_spec['items']['ezapi_ref']
+            final_obj['ref'] = resp_spec['items']['ezapi_ref'].split("/")[-1]
+            final_obj['isArray'] = True
+
+        # elif "type" in spec_data and spec_data['type'] in _SCHEMA_TYPES:
+        #         final_obj['payloadId'] = shortuuid.uuid()
+        #         final_obj['name'] = name
+        #         final_obj['type'] = spec_data['type']
+        #         final_obj['description'] = "null"
+        #         final_obj['required'] = spec_data.get('required',True)
+        #         final_obj['possibleValues'] = "null"
+        #         final_obj['format'] = spec_data.get('format',"null")
+
         else:
             schema_name = resp_spec['ezapi_ref'].split("/")[-1]
 
-            empty_obj['payloadId'] = shortuuid.uuid()
-            empty_obj['ezapi_ref'] = resp_spec['ezapi_ref']
-            empty_obj['name'] = schema_name
-            empty_obj['type'] = 'ezapi_ref'
-            empty_obj['ref'] = schema_name
-            empty_obj['isArray'] = False
+            final_obj['payloadId'] = shortuuid.uuid()
+            final_obj['ezapi_ref'] = resp_spec['ezapi_ref']
+            final_obj['name'] = schema_name
+            final_obj['type'] = 'ezapi_ref'
+            final_obj['ref'] = schema_name
+            final_obj['isArray'] = False
 
-    return empty_obj
+    return final_obj
 
 def extract_form_content(form_content):
     return form_content["schema"]
@@ -317,66 +348,76 @@ def extract_response_data(path_data, path, method, components):
             elif "application-json" in resp_spec:
                 resp_spec = resp_spec.get("application-json").get("schema")
 
-            empty_obj = {}
-            # if "properties" in resp_spec:
-            #     resp_spec = resp_spec.get("properties")
-            #     for name,spec_data in resp_spec.items():
-            #         empty_obj['payloadId'] = shortuuid.uuid()
-            #         empty_obj['ezapi_ref'] = "null" 
-            #         empty_obj['name'] = name
-            #         empty_obj['ref'] = "null"
-
-            #         if "type" in spec_data and spec_data['type'] == 'array':
-            #             empty_obj['type'] = 'array'
-            #             empty_obj['addedObjects'] = {}
-            #             empty_obj['addedObjects']['type'] = 'object'
-            #             empty_obj['addedObjects']['ezapi_ref'] = spec_data['items']['ezapi_ref']
-            #             empty_obj['addedObjects']['ref'] = spec_data['items']['ezapi_ref'].split("/")[-1]
-            #             empty_obj['addedObjects']['payloadId'] = shortuuid.uuid()
-            #         else:
-            #             empty_obj['type'] = 'object' 
-            #             empty_obj['addedObjects'] = {}
-            #             empty_obj['addedObjects']['type'] = 'object'
-            #             empty_obj['addedObjects']['ezapi_ref'] = spec_data['ezapi_ref']
-            #             empty_obj['addedObjects']['ref'] = spec_data['ezapi_ref'].split("/")[-1]
-            #             empty_obj['addedObjects']['payloadId'] = shortuuid.uuid()
-
+            final_obj = {}
+            properties_obj = {}
             if "properties" in resp_spec:
                 resp_spec = resp_spec.get("properties")
-                for name,spec_data in resp_spec.items():
-                    empty_obj['payloadId'] = shortuuid.uuid()
-                    empty_obj['schemaName'] = name
+                for name, spec_data in resp_spec.items():
+                    empty_obj = {}
 
                     if "type" in spec_data and spec_data['type'] == 'array':
+                        empty_obj['payloadId'] = shortuuid.uuid()
+                        empty_obj['schemaName'] = name
                         empty_obj['type'] = 'ezapi_ref'
                         empty_obj['name'] = spec_data['items']['ezapi_ref'].split("/")[-1]
                         empty_obj['ezapi_ref'] = spec_data['items']['ezapi_ref']
                         empty_obj['ref'] = spec_data['items']['ezapi_ref'].split("/")[-1]
                         empty_obj['isArray'] = True
+
+                    # elif "type" in spec_data and spec_data['type'] in _SCHEMA_TYPES:
+                    #     empty_obj['payloadId'] = shortuuid.uuid()
+                    #     empty_obj['name'] = name
+                    #     empty_obj['type'] = spec_data['type']
+                    #     empty_obj['description'] = "null"
+                    #     empty_obj['required'] = spec_data.get('required',True)
+                    #     empty_obj['possibleValues'] = "null"
+                    #     empty_obj['format'] = spec_data.get('format',"null")
+
                     else:
-                        empty_obj['type'] = 'ezapi_ref' 
+                        empty_obj['payloadId'] = shortuuid.uuid()
+                        empty_obj['schemaName'] = name
+                        empty_obj['type'] = 'ezapi_ref'
                         empty_obj['name'] = spec_data['ezapi_ref'].split("/")[-1]
                         empty_obj['ezapi_ref'] = spec_data['ezapi_ref']
                         empty_obj['ref'] = spec_data['ezapi_ref'].split("/")[-1]
                         empty_obj['isArray'] = False
+
+                    properties_obj[name] = empty_obj
+
+                if len(properties_obj) > 1:
+                    final_obj["type"] = "object"
+                    final_obj["properties"] = properties_obj
+                elif len(properties_obj) == 1:
+                    final_obj = list(properties_obj.values())[0]
+
             else:
                 if "type" in resp_spec and resp_spec['type'] == 'array':
-                        empty_obj['type'] = 'ezapi_ref'
-                        empty_obj['name'] = resp_spec['items']['ezapi_ref'].split("/")[-1]
-                        empty_obj['ezapi_ref'] = resp_spec['items']['ezapi_ref']
-                        empty_obj['ref'] = resp_spec['items']['ezapi_ref'].split("/")[-1]
-                        empty_obj['isArray'] = True
+                    final_obj['type'] = 'ezapi_ref'
+                    final_obj['name'] = resp_spec['items']['ezapi_ref'].split("/")[-1]
+                    final_obj['ezapi_ref'] = resp_spec['items']['ezapi_ref']
+                    final_obj['ref'] = resp_spec['items']['ezapi_ref'].split("/")[-1]
+                    final_obj['isArray'] = True
+
+                # elif "type" in spec_data and spec_data['type'] in _SCHEMA_TYPES:
+                #         final_obj['payloadId'] = shortuuid.uuid()
+                #         final_obj['name'] = name
+                #         final_obj['type'] = spec_data['type']
+                #         final_obj['description'] = "null"
+                #         final_obj['required'] = spec_data.get('required',True)
+                #         final_obj['possibleValues'] = "null"
+                #         final_obj['format'] = spec_data.get('format',"null")
+
                 else:
                     schema_name = resp_spec['ezapi_ref'].split("/")[-1]
 
-                    empty_obj['payloadId'] = shortuuid.uuid()
-                    empty_obj['ezapi_ref'] = resp_spec['ezapi_ref']
-                    empty_obj['name'] = schema_name
-                    empty_obj['type'] = 'ezapi_ref'
-                    empty_obj['ref'] = schema_name
-                    empty_obj['isArray'] = False
+                    final_obj['payloadId'] = shortuuid.uuid()
+                    final_obj['ezapi_ref'] = resp_spec['ezapi_ref']
+                    final_obj['name'] = schema_name
+                    final_obj['type'] = 'ezapi_ref'
+                    final_obj['ref'] = schema_name
+                    final_obj['isArray'] = False
 
-            obj["content"] = empty_obj
+            obj["content"] = final_obj
 
         if obj["content"] and (resp != "200" or not resp.startswith("2")):
             obj["content"] = obj["content"].get("application-json")
@@ -385,7 +426,7 @@ def extract_response_data(path_data, path, method, components):
                 obj["content"] = obj["content"].get("schema")
 
         responses.append(obj)
-    return responses
+        return responses
 
 
 def parse_openapi(jsondata, projectid, db):
@@ -430,7 +471,7 @@ def parse_openapi(jsondata, projectid, db):
         for path in all_paths:
             endpoint = path["endpoint"]
             method = path["method"]
-            schema_name = null
+            schema_name = "null"
             id = path["id"]
             del path["id"]
             request_data = extract_request_data(
