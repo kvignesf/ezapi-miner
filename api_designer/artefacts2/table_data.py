@@ -70,10 +70,14 @@ def get_subset_json(obj, fields, prefix = None):
 
 def handle_required(data, source):
     # data_keys = list(get_all_keys(data))
+    #print("source..", source)
     required_info = list(get_all_required_info(source))
-
+    #print("required_info..", required_info)
     selected = [x[0] for x in required_info if x[1] or random.randint(0, 1)]
+    #print("selected..", selected)
+    #print("data..", data)
     res = get_subset_json(data, selected)
+    #print("res..", res)
     return res
 
 class GetTableData:

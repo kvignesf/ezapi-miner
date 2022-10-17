@@ -482,6 +482,8 @@ def match_request_response_data(testdata):
 
 
 def get_virtual_collection_data(testdata):
+
+
     virtual_service_data = {
         "projectid": testdata["projectid"],
         "api_ops_id": testdata["api_ops_id"],
@@ -492,8 +494,22 @@ def get_virtual_collection_data(testdata):
         "responseStatusCode": testdata["status"],
         "operation_id": testdata["operation_id"]
     }
-
+    #print("virtualdata..1", testdata["inputData"]["body"])
     virtual_service_data["responseBody"] = testdata.get("assertionData", {})
+    respbodyList = []
+
+    if isinstance(testdata["assertionData"], dict):
+        respbodyList.append(testdata["assertionData"])
+        virtual_service_data["responseBody"] = respbodyList
+
+    reqbodyList = []
+    if isinstance(testdata["inputData"]["body"], dict):
+        if virtual_service_data.get("requestBody") == {}:
+            #print("reqbody..", testdata.get("requestBody"), [])
+            virtual_service_data["requestBody"] = reqbodyList
+        else:
+            reqbodyList.append(testdata["inputData"]["body"])
+            virtual_service_data["requestBody"] = reqbodyList
     endpoint = testdata["endpoint"]
 
     # update path parameter
