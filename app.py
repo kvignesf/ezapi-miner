@@ -126,6 +126,23 @@ def ddl_parser_model():
     return json_response(ret, status=ret["status"])
 
 
+@app.route("/raw_spec_parser", methods = ["POST"])
+def raw_spec_parser_model():
+    request_data = request.get_json()
+    projectid = str(request_data.get("projectid", ""))
+    if projectid:
+        model = EzAPIModels(projectid)
+        model.set_db_instance()
+        # ret = model.sim_artefacts_generator()
+        ret = model.raw_spec_parser()
+        model.client.close()
+
+    else:
+        ret = bad_request({"success": False, "message": "Some parameters are missing"})
+
+    return json_response(ret, status=ret["status"])
+
+
 @app.route("/spec_parser", methods=["POST"])
 def spec_parser_model():
     print("Spec Parser Received")
