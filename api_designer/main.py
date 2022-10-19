@@ -11,6 +11,7 @@ from api_designer.matcher.matcher_init import spec_ddl_matcher
 from api_designer.spec_generator.generator_init import generate_spec
 from api_designer.artefacts.artefacts_init import generate_artefacts, generate_simulation_artefacts
 from api_designer.artefacts.artefacts_init import check_keywrd_exists
+from api_designer.raw_spec_parser.parser_init import parse_raw_spec
 
 from api_designer.visualizer.sankey import process_sankey_visualizer
 from api_designer.sql_connect.sql_init import handle_sql_connect
@@ -68,6 +69,10 @@ class EzAPIModels:
 
     def spec_generator(self):
         ret = generate_spec(self.projectid, self.db)
+        return ret
+
+    def raw_spec_parser(self):
+        ret = parse_raw_spec(self.projectid, self.db)
         return ret
 
     def artefacts_generator(self):

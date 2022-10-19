@@ -159,7 +159,7 @@ class TestdataGenerator:
             testcount = 1
 
             data = self.combine_table_dbdata()
-            GSD = GetSchemaData(self.projectid, self.db, data)
+            GSD = GetSchemaData(self.projectid, self.db, data, generation_type="functional", selection_type="incremental")
 
             for op in self.operation_data:
                 endpoint = op["endpoint"]
@@ -171,7 +171,7 @@ class TestdataGenerator:
                     GSD.flush_data()
                     GSD.set_operation_data(method, resp["status_code"])
                     req_datas = GSD.generate_request_data(request_data)
-                    res_data = GSD.generate_response_data(resp)
+                    res_data = GSD.generate_response_data(resp, req_datas[0])
 
                     for req_data in req_datas:
                         testdata.append({

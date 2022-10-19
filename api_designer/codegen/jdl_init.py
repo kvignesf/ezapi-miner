@@ -404,17 +404,17 @@ def generate_jdl_file(projectid, db):
             "message": "Project type not supported for code generation",
         }
 
-    dirpath = Path(USER_ROOT_DIR + "/mnt/codegen/" + projectid)
+    dirpath = Path(USER_ROOT_DIR + "/mnt/codegen/" + projectid + "/javacode")
     if dirpath.exists() and dirpath.is_dir():
         shutil.rmtree(dirpath)
 
-    Path(USER_ROOT_DIR + "/mnt/codegen/" + projectid).mkdir(parents=True, exist_ok=True)
+    Path(USER_ROOT_DIR + "/mnt/codegen/" + projectid + "/javacode").mkdir(parents=True, exist_ok=True)
 
     gt.project_data = project_data
     gt.project_type = project_type
     gt.operation_data = operation_data
     gt.table_data = list(table_data)
-    gt.outfile = USER_ROOT_DIR + "/mnt/codegen/" + projectid + "/" + projectid + ".jdl"
+    gt.outfile = USER_ROOT_DIR + "/mnt/codegen/" + projectid + "/javacode/" + projectid + ".jdl"
 
     schemas_data = None
     if project_type == "both":
@@ -430,7 +430,7 @@ def generate_jdl_file(projectid, db):
 
     # Remove node_modules
     node_modules_path = Path(
-        USER_ROOT_DIR + "/mnt/codegen/" + projectid + "/node_modules"
+        USER_ROOT_DIR + "/mnt/codegen/" + projectid + "/javacode/node_modules"
     )
     if node_modules_path.exists() and node_modules_path.is_dir():
         shutil.rmtree(node_modules_path)
