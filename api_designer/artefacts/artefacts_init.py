@@ -196,8 +196,12 @@ class GenerateData:
         for param in param_list:
             for k, v in param.items():
                 param_type = v.get("type")
+                possible_values = v.get("possibleValues")
 
-                if param_type == "object" and "properties" in v:
+                if possible_values:
+                    random_item = random.choice(possible_values)
+                    ret[k] = random_item
+                elif param_type == "object" and "properties" in v:
                     ret[k] = self.generate_object_data(v)
                 elif param_type == "array" and "items" in v:
                     ret[k] = self.generate_array_data(v, k)
@@ -335,8 +339,18 @@ class GenerateTableData:
             elif v_type in DATA_TYPE_LIST:
                 ret[k] = generate_field_data(v, k)
             elif v_type == "ezapi_table":
-                ret[k] = self.generate_ref_data(v)
-
+                isArray = v.get("isArray")
+                if isArray:
+                    rets = self.generate_array_ref_data(v)
+                    ret[k] = rets
+                else:
+                    ret[k] = self.generate_ref_data(v)
+            elif v_type == "arrayOfObjects" or v_type == "array":
+                rets = []
+                for i in range(2):
+                    obj_data = self.generate_object_data(v["items"])
+                    rets.append(obj_data)
+                ret[k] = rets
         return ret
 
     def generate_param_data(self, param_list):
@@ -344,8 +358,12 @@ class GenerateTableData:
         for param in param_list:
             for k, v in param.items():
                 param_type = v.get("type")
+                possible_values = v.get("possibleValues")
 
-                if param_type == "object" and "properties" in v:
+                if possible_values:
+                    random_item = random.choice(possible_values)
+                    ret[k] = random_item
+                elif param_type == "object" and "properties" in v:
                     ret[k] = self.generate_object_data(v)
                 elif param_type in DATA_TYPE_LIST:
                     ret[k] = generate_field_data(v, k)
