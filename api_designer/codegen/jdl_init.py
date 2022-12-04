@@ -6,7 +6,7 @@ from pprint import pprint
 
 from pathlib import Path
 import json, re, shutil, subprocess
-import requests
+import requests, os
 
 from api_designer.codegen.entity_init import extract_entity_tables
 from api_designer.utils.schema_manager import SchemaDeref
@@ -17,7 +17,7 @@ POJO_URL = config('pojogenurl')
 # POJO_URL = "http://test-1-python.ezapi.ai:8098/gendtopojos"
 # POJO_URL = "http://localhost:8098/gendtopojos"
 
-USER_ROOT_DIR = ""
+USER_ROOT_DIR = "C:\\ezapi\\codegentemplates\\javatmplts\\target1"
 # USER_ROOT_DIR = "/Users/shubham/Desktop/workspace/ezapi"
 
 
@@ -373,7 +373,7 @@ class GenerateSchemas:
                     )
                     pojo_schemas.append(tmp_dict)
 
-        # pprint(pojo_schemas)
+        print("pojo_schemas", pojo_schemas)
 
         try:
             for ps in pojo_schemas:
@@ -403,18 +403,26 @@ def generate_jdl_file(projectid, db):
             "status": 500,
             "message": "Project type not supported for code generation",
         }
+    if os.name == 'nt':
+        USER_ROOT_DIR = "C:/ezapi/codegentemplates/javatmplts/target1/"
+        fullcodePath = USER_ROOT_DIR
+    else:
+        USER_ROOT_DIR = ""
+        fullcodePath = USER_ROOT_DIR + "/mnt/codegen/"
+    #dirpath = Path(USER_ROOT_DIR + "/mnt/codegen/" + projectid + "/javacode")
+        dirpath = Path(fullcodePath + projectid + "/javacode")
+        if dirpath.exists() and dirpath.is_dir():
+            shutil.rmtree(dirpath)
 
-    dirpath = Path(USER_ROOT_DIR + "/mnt/codegen/" + projectid + "/javacode")
-    if dirpath.exists() and dirpath.is_dir():
-        shutil.rmtree(dirpath)
-
-    Path(USER_ROOT_DIR + "/mnt/codegen/" + projectid + "/javacode").mkdir(parents=True, exist_ok=True)
+    #Path(USER_ROOT_DIR + "/mnt/codegen/" + projectid + "/javacode").mkdir(parents=True, exist_ok=True)
+    Path(fullcodePath + projectid + "/javacode").mkdir(parents=True, exist_ok=True)
 
     gt.project_data = project_data
     gt.project_type = project_type
     gt.operation_data = operation_data
     gt.table_data = list(table_data)
-    gt.outfile = USER_ROOT_DIR + "/mnt/codegen/" + projectid + "/javacode/" + projectid + ".jdl"
+    #gt.outfile = USER_ROOT_DIR + "/mnt/codegen/" + projectid + "/javacode/" + projectid + ".jdl"
+    gt.outfile = fullcodePath + projectid + "/javacode/" + projectid + ".jdl"
 
     schemas_data = None
     if project_type == "both":
@@ -426,12 +434,13 @@ def generate_jdl_file(projectid, db):
         gt.matcher_data = list(matcher_data)
 
     gt.generate_jdl()
-    gt.generate_code()
+    params = {"projectid": projectid, "outputFile": gt.outfile}
+    newartefacts_resp = requests.post(url=config('javacodegen_server_url') + "/genJavaCode", json=params)
+    #gt.generate_code()
 
     # Remove node_modules
-    node_modules_path = Path(
-        USER_ROOT_DIR + "/mnt/codegen/" + projectid + "/javacode/node_modules"
-    )
+    # node_modules_path = Path(USER_ROOT_DIR + "/mnt/codegen/" + projectid + "/javacode/node_modules")
+    node_modules_path = Path(fullcodePath + projectid + "/javacode/node_modules")
     if node_modules_path.exists() and node_modules_path.is_dir():
         shutil.rmtree(node_modules_path)
 

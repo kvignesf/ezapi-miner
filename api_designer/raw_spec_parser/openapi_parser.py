@@ -67,6 +67,36 @@ def extract_path_data(path_data):
             reso_path_array.append(path_obj)
     return all_paths, reso_path_array
 
+def generating_attribute_data_format(name, spec_data, custom_count):
+    attribute_obj = {}
+    empty_obj = {}
+
+    cust_schema_name = "custom_schema_" + str(custom_count)
+    cust_schema_ref = "#/components/schemas/"+ cust_schema_name
+    cust_parent_name = "/"+ cust_schema_name
+
+    attribute_obj['name'] = name
+    attribute_obj['type'] = spec_data['type']
+    attribute_obj['format'] = spec_data.get('format', "null")
+    attribute_obj['required'] = spec_data.get('required',True)
+    attribute_obj['level'] = 0
+    attribute_obj['parent'] = "null"
+    attribute_obj['is_child'] = True
+
+    empty_obj['payloadId'] = shortuuid.uuid()
+    empty_obj['name'] = name
+    empty_obj['type'] = spec_data['type']
+    empty_obj['description'] = "null"
+    empty_obj['required'] = spec_data.get('required',True)
+    empty_obj['possibleValues'] = "null"
+    empty_obj['format'] = spec_data.get('format',"null")
+    empty_obj['schemaRef'] = cust_schema_ref
+    empty_obj['schemaName'] = cust_schema_name
+    empty_obj['isArray'] = False
+    empty_obj['parentName'] = cust_parent_name
+
+    return attribute_obj, empty_obj, cust_schema_name
+
 def extract_param_data(param, components):
     if "ezapi_ref" in param:
         param_ref = param["ezapi_ref"]
@@ -115,12 +145,19 @@ def extract_param_data(param, components):
     return param_in, param_data
 
 
-def extract_body_content(body_content):
+def extract_body_content(body_content, components, custom_count):
     # check for 'type' or 'ezapi_ref' for dereferencing
     resp_spec = body_content["schema"]
     final_obj = {}
     properties_obj = {}
+    flag = false
+    schema_data_obj = {}
     if "properties" in resp_spec:
+        components_schema = {
+            "type": "object",
+            "properties": {}
+        }
+        attributes_array = []
         resp_spec = resp_spec.get("properties")
         for name, spec_data in resp_spec.items():
             empty_obj = {}
@@ -143,6 +180,13 @@ def extract_body_content(body_content):
             #     empty_obj['possibleValues'] = "null"
             #     empty_obj['format'] = spec_data.get('format',"null")
 
+            elif "type" in spec_data and spec_data['type'] in _SCHEMA_TYPES:
+                flag = True
+
+                if name not in components_schema["properties"]:
+                    components_schema["properties"][name] = spec_data
+                attribute_obj, empty_obj, cust_schema_name = generating_attribute_data_format(name, spec_data, custom_count)
+
             else:
                 empty_obj['payloadId'] = shortuuid.uuid()
                 empty_obj['schemaName'] = name
@@ -153,6 +197,18 @@ def extract_body_content(body_content):
                 empty_obj['isArray'] = False
 
             properties_obj[name] = empty_obj
+            if attribute_obj:
+                attributes_array.append(attribute_obj)
+
+        if flag and cust_schema_name and components_schema["properties"] and components["schemas"]:
+            components["schemas"][cust_schema_name] = components_schema
+
+        if flag and cust_schema_name and attributes_array:
+            schema_data_obj['name'] = cust_schema_name
+            schema_data_obj['description'] = "null"
+            schema_data_obj['size'] = len(attributes_array)
+            schema_data_obj['max_depth'] = 1
+            schema_data_obj['attributes'] = attributes_array
 
         if len(properties_obj) > 1:
             final_obj["type"] = "object"
@@ -187,12 +243,12 @@ def extract_body_content(body_content):
             final_obj['ref'] = schema_name
             final_obj['isArray'] = False
 
-    return final_obj
+    return final_obj, flag, components, schema_data_obj
 
 def extract_form_content(form_content):
     return form_content["schema"]
 
-def extract_request_body(request_body, components):
+def extract_request_body(request_body, components, custom_count):
     if "ezapi_ref" in request_body:  # body refers to requestBodies
         body_ref = request_body["ezapi_ref"]
         body_ref = body_ref.split("/")[2:]
@@ -216,18 +272,22 @@ def extract_request_body(request_body, components):
         form_content = content["application/octet-stream"]
 
     if body_content:
-        body_content = extract_body_content(body_content)
+        body_content, flag, updated_components, schema_data_obj = extract_body_content(body_content, components, custom_count)
     elif form_content:
         form_content = extract_form_content(form_content)
 
     body_content = body_content or []
     form_content = form_content or []
 
-    return body_content, form_content
+    return body_content, flag, updated_components, schema_data_obj, form_content
 
 
-def extract_request_data(path_data, path, method, components):
+def extract_request_data(path_data, path, method, components, custom_count):
     all_request_params = {}
+    updated_components = components
+    schema_data_obj = {}
+
+    flag = False
     for p in _PARAMETER_TYPES:
         all_request_params[p] = []
 
@@ -247,12 +307,15 @@ def extract_request_data(path_data, path, method, components):
     if request_body:
         (
             all_request_params["body"],
+            flag,
+            updated_components,
+            schema_data_obj,
             all_request_params["formData"],
         ) = extract_request_body(
-            request_body, components
+            request_body, components, custom_count
         )  # may contains ezapi_ref
 
-    return all_request_params
+    return all_request_params, flag, updated_components, schema_data_obj
 
 
 # def extract_response_data(path_data, path, method, components):
@@ -314,10 +377,12 @@ def extract_request_data(path_data, path, method, components):
 #         responses.append(obj)
 #     return responses
 
-def extract_response_data(path_data, path, method, components):
+def extract_response_data(path_data, path, method, components, custom_count):
     # check for 'type' or 'ezapi_ref' for dereferencing if not None
     responses = []
     response_data = path_data[path][method].get("responses")
+    flag = false
+    schema_data_obj = {}
 
     for resp, resp_spec in response_data.items():  # http_status and response object
         if "ezapi_ref" in resp_spec:
@@ -351,9 +416,15 @@ def extract_response_data(path_data, path, method, components):
             final_obj = {}
             properties_obj = {}
             if "properties" in resp_spec:
+                components_schema = {
+                    "type": "object",
+                    "properties": {}
+                }
+                attributes_array = []
                 resp_spec = resp_spec.get("properties")
                 for name, spec_data in resp_spec.items():
                     empty_obj = {}
+                    attribute_obj = {}
 
                     if "type" in spec_data and spec_data['type'] == 'array':
                         empty_obj['payloadId'] = shortuuid.uuid()
@@ -373,6 +444,15 @@ def extract_response_data(path_data, path, method, components):
                     #     empty_obj['possibleValues'] = "null"
                     #     empty_obj['format'] = spec_data.get('format',"null")
 
+                    elif "type" in spec_data and spec_data['type'] in _SCHEMA_TYPES:
+
+                        flag = True
+
+                        if name not in components_schema["properties"]:
+                            components_schema["properties"][name] = spec_data
+                        attribute_obj, empty_obj, cust_schema_name = generating_attribute_data_format(name, spec_data,
+                                                                                                      custom_count)
+
                     else:
                         empty_obj['payloadId'] = shortuuid.uuid()
                         empty_obj['schemaName'] = name
@@ -383,6 +463,18 @@ def extract_response_data(path_data, path, method, components):
                         empty_obj['isArray'] = False
 
                     properties_obj[name] = empty_obj
+                    if attribute_obj:
+                        attributes_array.append(attribute_obj)
+
+                if flag and cust_schema_name and components_schema["properties"] and components["schemas"]:
+                    components["schemas"][cust_schema_name] = components_schema
+
+                if flag and cust_schema_name and attributes_array:
+                    schema_data_obj['name'] = cust_schema_name
+                    schema_data_obj['description'] = "null"
+                    schema_data_obj['size'] = len(attributes_array)
+                    schema_data_obj['max_depth'] = 1
+                    schema_data_obj['attributes'] = attributes_array
 
                 if len(properties_obj) > 1:
                     final_obj["type"] = "object"
@@ -426,10 +518,45 @@ def extract_response_data(path_data, path, method, components):
                 obj["content"] = obj["content"].get("schema")
 
         responses.append(obj)
-        return responses
+        return responses, flag, components, schema_data_obj
 
+def update_schemas_components_rawspec(db, projectid, spec_filename, updated_components_data, schema_data_obj):
+    if updated_components_data:
+        spec_original = db.raw_spec.find_one({"projectid": projectid})
+        spec_original["data"]["components"] = updated_components_data
+        updated_data = spec_original["data"]
 
-def parse_openapi(jsondata, projectid, db):
+        mongo.update_document(
+            "components",
+            {"projectid": projectid},
+            {
+                "$set": {
+                    "data": updated_components_data
+                }
+            },
+            db,
+        )
+
+        mongo.update_document(
+            "raw_spec",
+            {"projectid": projectid},
+            {
+                "$set": {
+                    "data": updated_data
+                }
+            },
+            db,
+        )
+    if schema_data_obj:
+        schema_document = {
+                "filename": spec_filename,
+                "projectid": projectid,
+                "data": schema_data_obj
+        }
+        path_collection = "schemas"
+        mongo.store_document(path_collection, schema_document, db)
+
+def parse_openapi(jsondata, projectid, spec_filename, db):
     try:
         project_orig = db.projects.find_one({"projectId": projectid})
         updated_resources_array = []
@@ -467,19 +594,31 @@ def parse_openapi(jsondata, projectid, db):
                     },
                     db,
                 )
-        
+        custom_count = 1
+
         for path in all_paths:
             endpoint = path["endpoint"]
             method = path["method"]
             schema_name = "null"
             id = path["id"]
             del path["id"]
-            request_data = extract_request_data(
-                path_data, endpoint, method, components_data
+            request_data, flag, updated_components_data, schema_data_obj = extract_request_data(
+                path_data, endpoint, method, components_data, custom_count
             )
-            response_data = extract_response_data(
-                path_data, endpoint, method, components_data
+
+            if flag:
+                custom_count += 1
+                update_schemas_components_rawspec(db, projectid, spec_filename, updated_components_data,
+                                                  schema_data_obj)
+
+            response_data, flag, updated_components_data, schema_data_obj = extract_response_data(
+                path_data, endpoint, method, components_data, custom_count
             )
+
+            if flag:
+                custom_count += 1
+                update_schemas_components_rawspec(db, projectid, spec_filename, updated_components_data,
+                                                  schema_data_obj)
             
             #fetching schemaName from response
             response_obj = response_data[0]

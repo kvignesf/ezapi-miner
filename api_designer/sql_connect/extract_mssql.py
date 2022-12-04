@@ -295,7 +295,7 @@ class Extractor:
         res1 = []
         for s in self.schemas:
             res1= []
-            res = self.conn.execute(f"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES where TABLE_SCHEMA = '{s}' and TABLE_TYPE = 'BASE TABLE'")
+            res = self.conn.execute(f"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES where TABLE_SCHEMA = '{s}' and TABLE_TYPE = 'BASE TABLE' and TABLE_NAME <> 'sysdiagrams'")
             # for x in res:
             #     print("info", f"{s}.{x[0]}")
             res = [f"{s}.{x[0]}" for x in res]
@@ -458,6 +458,16 @@ class Extractor:
                         col_details = self.table_details[tk][col]['decoder']
                         if (col_sample.get('repeat') != 1) or (col_details.get("type") not in ("number", "string")):
                             master = False
+
+                if master:
+                    self.master_tables.append(tk)
+            #below elif block added for swsre_vcatlg to be identified as master
+            elif table_foreign <= 1 and (table_columns + pk_columns) > 0 and table_size <= 25:
+                master = False
+                print(".column_names.", column_names)
+                for col in column_names:
+                    if col == "CODE" or col == "CODETYPE":
+                        master = True
 
                 if master:
                     self.master_tables.append(tk)
