@@ -345,7 +345,6 @@ def run_artefacts2():
         model.set_db_instance()
         ret = model.artefacts_generator2(type)
         model.client.close()
-
     else:
         ret = bad_request({"success": False, "message": "Some parameters are missing"})
 
@@ -384,6 +383,23 @@ def extract_stored_procs():
         ret = bad_request({"success": False, "message": "Some parameters are missing"})
 
     return json_response(ret, status=ret["status"])
+
+@app.route("/mongo_extractor", methods=["POST"])
+def mongo_extractor():
+    print("In DB Extractor")
+    request_data = request.get_json()
+    projectid = str(request_data.get("projectid", ""))
+    dbtype = str(request_data.get("dbtype", ""))
+
+    if projectid and dbtype:
+        model = EzAPIModels(projectid)
+        model.set_db_instance()
+        ret = model.extract_nosql_connect(request_data, dbtype)
+        model.client.close()
+    else:
+        bad_request({"success": False, "message": "Some parameters are missing: projectid, dbtype"})
+
+    return json_response({"data": ret})
 
 
 if __name__ == "__main__":
