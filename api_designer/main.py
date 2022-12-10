@@ -20,6 +20,7 @@ from api_designer.artefacts2.init import TestdataGenerator
 from api_designer.artefacts2.insert_placeholders import TestdataUpdator
 # from api_designer.ddl_parser.parser_init import parse_db_ddl_file
 # from api_designer.ddl_parser.parser_init import gen_db_ddl_file
+from api_designer.nosql_connect.nosql_init import handle_nosql_connect
 
 class BaseEzapiModels:
     def __init__(self, keywrd):
@@ -107,4 +108,8 @@ class EzAPIModels:
 
     def extract_sp_data(self, request_data, dbtype):
         ret = handle_sql_connect(request_data, dbtype, self.projectid, self.db)
+        return ret
+
+    def extract_nosql_connect(self, request_data, dbtype):
+        ret = handle_nosql_connect(request_data, dbtype, self.projectid, self.db)
         return ret
