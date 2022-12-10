@@ -9,6 +9,7 @@ from api_designer.utils.common import *
 
 def parse_raw_spec(projectid, db):   
     spec_orig = db.raw_spec.find_one({"projectid": projectid})
+    spec_filename = spec_orig["filename"]
     jsondata = spec_orig['data']
 
     if "openapi" in jsondata:
@@ -27,7 +28,7 @@ def parse_raw_spec(projectid, db):
         return res
 
     elif version[0] == "3":
-        res = parse_openapi(jsondata, projectid, db)
+        res = parse_openapi(jsondata, projectid, spec_filename, db)
         return res
 
     else:

@@ -196,8 +196,12 @@ class GenerateData:
         for param in param_list:
             for k, v in param.items():
                 param_type = v.get("type")
+                possible_values = v.get("possibleValues")
 
-                if param_type == "object" and "properties" in v:
+                if possible_values:
+                    random_item = random.choice(possible_values)
+                    ret[k] = random_item
+                elif param_type == "object" and "properties" in v:
                     ret[k] = self.generate_object_data(v)
                 elif param_type == "array" and "items" in v:
                     ret[k] = self.generate_array_data(v, k)
@@ -335,8 +339,18 @@ class GenerateTableData:
             elif v_type in DATA_TYPE_LIST:
                 ret[k] = generate_field_data(v, k)
             elif v_type == "ezapi_table":
-                ret[k] = self.generate_ref_data(v)
-
+                isArray = v.get("isArray")
+                if isArray:
+                    rets = self.generate_array_ref_data(v)
+                    ret[k] = rets
+                else:
+                    ret[k] = self.generate_ref_data(v)
+            elif v_type == "arrayOfObjects" or v_type == "array":
+                rets = []
+                for i in range(2):
+                    obj_data = self.generate_object_data(v["items"])
+                    rets.append(obj_data)
+                ret[k] = rets
         return ret
 
     def generate_param_data(self, param_list):
@@ -344,8 +358,12 @@ class GenerateTableData:
         for param in param_list:
             for k, v in param.items():
                 param_type = v.get("type")
+                possible_values = v.get("possibleValues")
 
-                if param_type == "object" and "properties" in v:
+                if possible_values:
+                    random_item = random.choice(possible_values)
+                    ret[k] = random_item
+                elif param_type == "object" and "properties" in v:
                     ret[k] = self.generate_object_data(v)
                 elif param_type in DATA_TYPE_LIST:
                     ret[k] = generate_field_data(v, k)
@@ -773,6 +791,68 @@ def generate_artefacts(projectid, db):
         return {"success": False, "message": str(e), "status": 500}
 
 
+def get_sim_virtual_collection_data(testdata):
+
+
+    virtual_service_data = {
+        "projectid": testdata["projectid"],
+        "api_ops_id": testdata["api_ops_id"],
+        "httpMethod": testdata["method"],
+        "headers": testdata["inputData"]["header"],
+        "formData": testdata["inputData"]["form"],
+        "requestBody": testdata["inputData"]["body"],
+        "responseStatusCode": testdata["status"],
+        "operation_id": testdata["operation_id"]
+    }
+    #print("virtualdata..1", testdata["inputData"]["body"])
+    virtual_service_data["responseBody"] = testdata.get("assertionData", {})
+    respbodyList = []
+
+    if isinstance(testdata["assertionData"], list):
+        #respbodyList.append(testdata["assertionData"])
+        virtual_service_data["responseBody"] = testdata.get("assertionData")
+
+    reqbodyList = []
+    if isinstance(testdata["inputData"]["body"], dict):
+        if virtual_service_data.get("requestBody") == {}:
+            #print("reqbody..", testdata.get("requestBody"), [])
+            virtual_service_data["requestBody"] = reqbodyList
+        else:
+            #reqbodyList.append(testdata["inputData"]["body"])
+            virtual_service_data["requestBody"] = testdata["inputData"]["body"]
+    elif isinstance(testdata["inputData"]["body"], list):
+        virtual_service_data["requestBody"] = testdata["inputData"]["body"]
+
+    endpoint = testdata["endpoint"]
+
+    # update path parameter
+    path_parameters = testdata["inputData"]["path"]
+    if path_parameters:
+        endpoint = endpoint.format(**path_parameters)
+
+    # update query parameter
+    query_parameters = testdata["inputData"]["query"]
+    if query_parameters:
+        endpoint = endpoint + "?" + urlencode(query_parameters)
+
+    # if "{" in testdata["endpoint"]:
+    #     regex = r"\{(.*?)\}"
+    #     text_inside_paranthesis = re.findall(regex, endpoint)
+    #     for xElm in text_inside_paranthesis:
+    #         endpoint = endpoint.replace("{" + xElm + "}", "{" + xElm.lower() + "}")
+
+    # pathData = testdata["inputData"]["path"]
+    # queryData = testdata["inputData"]["query"]
+
+    # endpoint = endpoint.format(**pathData)
+    # tmp = urlencode(queryData)
+    # if tmp:
+    #     endpoint += "?" + tmp
+
+    virtual_service_data["endpoint"] = endpoint
+    return virtual_service_data
+
+
 def generate_simulation_artefacts(projectid, db):
     print("Inside Artefacts Generator")
     try:
@@ -796,6 +876,7 @@ def generate_simulation_artefacts(projectid, db):
 
         project_data = db.projects.find_one({"projectId": projectid})
         project_type = project_data.get("projectType", None)
+        #resourceId = project_type.get("resources.resource", None)
 
         if not project_data or not project_type:
             return {
@@ -839,6 +920,12 @@ def generate_simulation_artefacts(projectid, db):
 
         all_testcases = []
         test_count = 0
+
+        #resourceData = db.resources.find_one({"resourceId": resourceId})
+        #resourcePaths = [z["path"] for z in resourceData]
+
+        #for resourcePath in resourcePaths:
+        #    resourcePath.get("operations")
 
         for path in paths:
             paramswobracs = ""
@@ -931,7 +1018,7 @@ def generate_simulation_artefacts(projectid, db):
                     test_count += 1
 
         virtual_tests = [
-            get_virtual_collection_data(x)
+            get_sim_virtual_collection_data(x)
             for x in all_testcases
             if x["status"][0] == "2"
         ]
