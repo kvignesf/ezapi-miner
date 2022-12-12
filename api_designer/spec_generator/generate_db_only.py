@@ -201,14 +201,19 @@ class SpecGenerator:
                     ret["required"].append(v["name"])
             if v["type"] == "ezapi_table":
                 # dict_merge(ret["properties"], self.generate_table(v, is_parent_object=True))
-                is_array = v["isArray"]
+                #is_array = v["isArray"]
+                is_array = v.get("isArray", False)
                 if is_array:
                     dict_merge(ret["properties"], self.generate_array_table(v, request_body))
                 else:
                     dict_merge(ret["properties"], self.generate_table(v, request_body, is_object=True))
             elif v["type"] in ["string", "number", "integer", "array"] or (v["type"] == "object" and "schemaRef" in v):
                 dict_merge(ret["properties"], self.generate_field(v))
-
+            elif v["type"] == "arrayOfObjects":
+                temp = {
+                    v["name"]: {"type": "array", "items": self.generate_object(v["items"], request_body)},
+                }
+                dict_merge(ret["properties"], temp)
         return ret
 
     def generate_body(self, body_data, request_body):
