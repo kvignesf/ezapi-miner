@@ -318,7 +318,7 @@ class Extractor:
 
     def get_table_size(self):
         for s in self.tables:
-            res = self.conn.execute(f"SELECT COUNT(*) FROM {s}")
+            res = self.conn.execute(f"SELECT COUNT_BIG(*) FROM {s}")
             res = next(res)
             self.table_size[s] = res[0]
 
