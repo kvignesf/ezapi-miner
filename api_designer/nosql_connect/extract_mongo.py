@@ -8,15 +8,19 @@ import decimal
 import json
 import pymongo
 
+from api_designer.nosql_connect.ts2 import get_ts_order
+
 MAXIMUM_MATCH_FIELD_LENGTH = 256
 INTER_MATCH_THRESHOLD = 0.9
 
+
+# Match list2 in list1
 def get_list_intersections(list1, list2):
     type_l1 = [type(x) for x in list1]
     type_l2 = [type(x) for x in list2]
 
-    max_type_l1 = max(set(type_l1), key = type_l1.count)
-    max_type_l2 = max(set(type_l2), key = type_l2.count)
+    max_type_l1 = max(set(type_l1), key=type_l1.count)
+    max_type_l2 = max(set(type_l2), key=type_l2.count)
 
     list1 = [x for x in list1 if type(x) == max_type_l1]
     list2 = [x for x in list2 if type(x) == max_type_l2]
@@ -54,7 +58,7 @@ def get_list_intersections(list1, list2):
                 current_index = j
                 current_occurence += 1
                 j += 1
-                i += 1
+                # i += 1
 
             elif list1[i] < list2[j]:
                 i += 1
@@ -72,7 +76,7 @@ def get_list_intersections(list1, list2):
         current_index = None
 
     if j < n2:
-        unmatched += (n2-j)
+        unmatched += (n2 - j)
         j += 1
 
     ret = {
@@ -82,8 +86,10 @@ def get_list_intersections(list1, list2):
     }
     return ret
 
+
 def average(lst):
     return round(sum(lst) / len(lst), 2)
+
 
 def json_safe(obj):
     if type(obj) in (datetime.datetime, datetime.date, datetime.time):
@@ -101,6 +107,7 @@ def json_safe(obj):
     elif type(obj) == memoryview:
         return obj.tobytes()
     return obj
+
 
 PYMONGO_TYPE_TO_TYPE_STRING = {
     list: "ARRAY",
@@ -123,16 +130,19 @@ PYMONGO_TYPE_TO_TYPE_STRING = {
     bson.objectid.ObjectId: "oid",
 }
 
+
 def get_type(value):
     value_type = type(value)
     if value_type in PYMONGO_TYPE_TO_TYPE_STRING.keys():
         value_type = PYMONGO_TYPE_TO_TYPE_STRING[value_type]
     return value_type
 
+
 def default_to_regular(d):
     if isinstance(d, dict):
         d = {k: default_to_regular(v) for k, v in d.items()}
     return d
+
 
 def beautify_schema(schema):
     schema = default_to_regular(schema)
@@ -140,12 +150,15 @@ def beautify_schema(schema):
     schema = json.loads(json_util.dumps(schema))
     return schema
 
+
 def check_same_dtype(type_dict):
     type_list = list(type_dict.keys())
     return type_list[0] if len(type_list) == 1 else None
 
+
 def get_regex_matches(data):
     pass
+
 
 class MongoExtractor:
     def __init__(self, dbtype, uri, dbname):
@@ -165,7 +178,7 @@ class MongoExtractor:
         self.collections = self.db.list_collection_names()
         for c in self.collections:
             self.schema[c] = self.extract_collection(c)
-        
+
         self.schema = beautify_schema(self.schema)
 
     def extract_collection(self, c, sample_size=300):
@@ -193,7 +206,7 @@ class MongoExtractor:
         return empty_object
 
     def add_document(self, document, schema):
-        for k,v in document.items():
+        for k, v in document.items():
             self.add_value(v, schema[k])
 
         return schema
@@ -212,14 +225,14 @@ class MongoExtractor:
 
     def add_object(self, value, schema, type_str="ezapi_type2"):
         schema[type_str]["object"] += 1
-        schema["ezapi_type"] = max(schema[type_str], key = schema[type_str].get)
+        schema["ezapi_type"] = max(schema[type_str], key=schema[type_str].get)
         if "ezapi_object" not in schema:
             schema["ezapi_object"] = self.init_object()
         self.add_document(value, schema["ezapi_object"])
 
     def add_list(self, value, schema, type_str="ezapi_type2"):
         schema[type_str]["array"] += 1
-        schema["ezapi_type"] = max(schema[type_str], key = schema[type_str].get)
+        schema["ezapi_type"] = max(schema[type_str], key=schema[type_str].get)
         if "ezapi_array" not in schema:
             schema["ezapi_array"] = self.init_object()
 
@@ -231,18 +244,20 @@ class MongoExtractor:
 
         is_all_direct_field = True
         for v in value:
-            if not(isinstance(v, dict) or isinstance(v, list)):
+            if not (isinstance(v, dict) or isinstance(v, list)):
                 value_type = get_type(v)
                 if not type_str in schema["ezapi_array"]:
                     schema["ezapi_array"][type_str] = defaultdict(int)
                 schema["ezapi_array"][type_str][value_type] += 1
-                schema["ezapi_array"]["ezapi_type"] = max(schema["ezapi_array"][type_str], key = schema["ezapi_array"][type_str].get)
+                schema["ezapi_array"]["ezapi_type"] = max(schema["ezapi_array"][type_str],
+                                                          key=schema["ezapi_array"][type_str].get)
 
             elif isinstance(v, dict):
                 if not type_str in schema["ezapi_array"]:
                     schema["ezapi_array"][type_str] = defaultdict(int)
                 schema["ezapi_array"][type_str]["object"] += 1
-                schema["ezapi_array"]["ezapi_type"] = max(schema["ezapi_array"][type_str], key = schema["ezapi_array"][type_str].get)
+                schema["ezapi_array"]["ezapi_type"] = max(schema["ezapi_array"][type_str],
+                                                          key=schema["ezapi_array"][type_str].get)
                 schema["ezapi_array"]["ezapi_object"] = self.init_object()
 
                 self.add_document(v, schema["ezapi_array"]["ezapi_object"])
@@ -253,7 +268,7 @@ class MongoExtractor:
     def add_field(self, value, schema, type_str="ezapi_type2"):
         value_type = get_type(value)
         schema[type_str][value_type] += 1
-        schema["ezapi_type"] = max(schema[type_str], key = schema[type_str].get)
+        schema["ezapi_type"] = max(schema[type_str], key=schema[type_str].get)
 
         if "ezapi_samples" not in schema:
             schema["ezapi_samples"] = []
@@ -270,7 +285,7 @@ class MongoExtractor:
                 if 'ezapi_count' in v and 'ezapi_type2' in v and 'ezapi_samples' in v:
                     v_type = check_same_dtype(v["ezapi_type2"])
                     if v_type in ("string", "integer", "biginteger"):
-                        samples = v["ezapi_samples"]  
+                        samples = v["ezapi_samples"]
 
                         if v_type == "string":
                             maxm_length = max([len(x) for x in samples])
@@ -278,11 +293,11 @@ class MongoExtractor:
                                 match_fields.append(k)
                         else:
                             match_fields.append(k)
-        
+
                         if (len(samples) * 0.95 <= len(set(samples))) and None not in samples and "" not in samples:
                             tmp = [False if " " in str(x) else True for x in samples]
                             tmp = all(tmp)
-                            
+
                             if tmp:
                                 unique_ids.append((k, v_type))
 
@@ -314,7 +329,7 @@ class MongoExtractor:
                     if type(dv) == bson.objectid.ObjectId:
                         new_document[dk].append(dv["$oid"])
                     else:
-                        new_document[dk].append(dv) 
+                        new_document[dk].append(dv)
 
             new_collection_data[pk] = new_document
 
@@ -335,27 +350,24 @@ class MongoExtractor:
                     if ck != uk:
                         for to_match_field, to_match_samples in cv.items():
                             if not to_match_samples: continue
-                            
+
                             if type(to_match_samples[0]) == dict:
                                 to_match_samples = [x["$oid"] for x in to_match_samples]
                                 to_match_type = "oid"
                             else:
                                 to_match_type = type(to_match_samples[0])
                                 to_match_type = PYMONGO_TYPE_TO_TYPE_STRING[to_match_type]
-                                
 
                             if field_type != to_match_type: continue
+
                             match_res = get_list_intersections(field_samples, to_match_samples)
-                            
+
                             common_match = match_res["common"]
                             unmatched = match_res["unmatched"]
                             occurence = match_res["occurence"]
                             matched_ratio = int(round((common_match * 100) / (common_match + unmatched), 0))
 
-                            # print("\n-----------------\n")
-                            # print(field_name, field_samples[:3],to_match_field, to_match_samples[:3] )
-                            # print(match_res)
-                            if matched_ratio >= 70:
+                            if matched_ratio >= 80:
                                 occurence_values = [x[1] for x in occurence]
                                 max_occurence = max(occurence_values)
                                 min_occurence = min(occurence_values)
@@ -368,8 +380,8 @@ class MongoExtractor:
                                 relation_key = f"{uk}.{field_name}"
                                 relation_value = f"{ck}.{to_match_field}"
                                 relation_object = {
-                                    "key": relation_key,
-                                    "reference": relation_value,
+                                    "key": relation_value,
+                                    "reference": relation_key,
                                     "type": relation_type,
                                     "match": matched_ratio
                                 }
@@ -378,7 +390,7 @@ class MongoExtractor:
                                     relation_object["occurence"] = occurence
                                 self.relations.append(relation_object)
 
-    def get_internal_relations(self, sample_size = 100):
+    def get_internal_relations(self, sample_size=100):
         for c in self.collections:
             db_collection = self.db[c]
             documents = db_collection.aggregate([{'$sample': {'size': sample_size}}], allowDiskUse=True)
@@ -428,14 +440,36 @@ class MongoExtractor:
                                     "reference": None
                                 }
                             matches2[dk1]["match"] += 1
-                            matches2[dk1]["reference"] = dk2  
+                            matches2[dk1]["reference"] = dk2
 
-            # filter matches
+                            # filter matches
             for mk, mv in matches2.items():
                 if mv and mv["match"] and mv["match"] >= INTER_MATCH_THRESHOLD * n_documents:
                     print(mk, mv["match"], mv["reference"])
 
+    def get_insertion_order(self):
+        collection_dependencies = []
+        for c in self.collections:
+            foreign_dependencies = set()
+            for r in self.relations:
+                if r["type"] == "OneToMany" and r["key"].split(".")[0] == c:
+                    foreign_dependencies.add(r["reference"].split(".")[0])
 
+            collection_dependencies.append({
+                "key": c,
+                "dependencies": list(foreign_dependencies)
+            })
+        print(collection_dependencies)
+        self.insertion_order = get_ts_order(collection_dependencies)
+
+    def prepare_db_document(self):
+        document = {
+            'projectid': self.projectid,
+            'type': self.dbtype,
+            'collections': self.collections,
+            'order': self.insertion_order
+        }
+        return document
 
     def prepare_schema_documents(self):
         for k, v in self.schema.items():
@@ -452,8 +486,8 @@ class MongoExtractor:
                 if k == rel_collection:
                     document["relations"].append(rel)
 
-
             self.collection_schemas.append(document)
+        return self.collection_schemas
 
     def extract_data(self, projectid):
         self.projectid = projectid
@@ -462,7 +496,13 @@ class MongoExtractor:
         self.get_relations()
         self.get_internal_relations()
 
+        # print(self.collections)
+        # print(self.relations)
+
+        self.get_insertion_order()
+
         # pprint(self.uniques)
         # pprint(self.potential_match_fields)
-        self.prepare_schema_documents()
-        return self.collection_schemas
+        db_document = self.prepare_db_document()
+        collection_document = self.prepare_schema_documents()
+        return db_document, collection_document
