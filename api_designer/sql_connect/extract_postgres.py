@@ -9,6 +9,7 @@ from api_designer.sql_connect.ezsampler import Sampler
 from api_designer.sql_connect.utils import *
 
 _SYSTEM_SCHEMAS = ['pg_toast', 'pg_catalog', 'information_schema']
+regex = re.compile('[@_!#$%^&*()<>?/\|}{~:]')
 
 class Extractor:
     def __init__(self, dbtype, args):
@@ -42,7 +43,13 @@ class Extractor:
 
     def get_table_size(self):
         for s in self.tables:
-            res = self.conn.execute(f"SELECT COUNT(*) FROM \"{s}\"")
+            q = s
+            if (regex.search(s) == None):
+                q = s
+            else:
+                q = s.split(".")[0] + "." + "\"" + s.split(".")[1] + "\""
+                print ("q..", q)
+            res = self.conn.execute(f"SELECT COUNT(*) FROM {q}")
             res = next(res)
             self.table_size[s] = res[0]
 
@@ -149,10 +156,11 @@ class Extractor:
             if (table_foreign + table_columns + pk_columns) <= 3 and table_foreign <= 1 and (table_columns + pk_columns)> 0 and table_size <= 250:
                 master = True
                 for col in column_names:
-                    col_sample = self.sample_data[tk][col]
-                    col_details = self.table_details[tk][col]['decoder']
-                    if (col_sample.get('repeat') != 1) or (col_details.get("type") not in ("number", "string")):
-                        master = False
+                    if len(self.sample_data[tk]) > 0:
+                        col_sample = self.sample_data[tk][col]
+                        col_details = self.table_details[tk][col]['decoder']
+                        if (col_sample.get('repeat') != 1) or (col_details.get("type") not in ("number", "string")):
+                            master = False
 
                 if master:
                     self.master_tables.append(tk)
@@ -354,7 +362,13 @@ class Extractor:
 
     def get_sample_data(self):
         for t in self.tables:
-            table_data = self.conn.execute(f"select * from {t} order by random() limit 100")
+            q = t
+            if (regex.search(t) == None):
+                q = t
+            else:
+                q = t.split(".")[0] + "." + "\"" + t.split(".")[1] + "\""
+                print ("q..", q)
+            table_data = self.conn.execute(f"select * from {q} order by random() limit 100")
             table_keys = list(table_data.keys())
             table_data = [list(x) for x in table_data]
             table_data_with_header = [table_keys] + table_data
