@@ -337,6 +337,7 @@ class GenerateTableData:
             v_type = v.get("type")
             param_param_type = v.get("paramType")
             #is_child = v.get("isChild")
+            parameter_type = v.get("schemaName")
 
             if param_param_type and param_param_type == "documentField":
                 ret[k] = self.generate_documentField_data(v)
@@ -351,6 +352,8 @@ class GenerateTableData:
                     ret[k] = rets
                 else:
                     ret[k] = self.generate_ref_data(v)
+            elif v_type == "array" and parameter_type == "global":
+                ret[k] = random.sample(v["possibleValues"], 2)
             elif v_type == "arrayOfObjects" or v_type == "array":
                 rets = []
                 for i in range(2):
@@ -989,7 +992,7 @@ def generate_simulation_artefacts(projectid, db):
             }
         paths = [x["data"] for x in paths]
 
-        if project_type == "db":
+        if project_type == "db" or project_type == "noinput":
             gd = GenerateTableData()
             gd.db = db
             gd.projectid = projectid
