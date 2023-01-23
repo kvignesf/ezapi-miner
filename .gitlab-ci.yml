@@ -15,6 +15,7 @@ before_script:
   - 'echo \pojogenurl\ = \"$prod_pojogen_url\">> .env.prod'
   - 'echo \dbpasskey\ = \"$prod_db_passkey\">> .env.prod'
   - 'echo \storedprocenv\ = \"$prod_storedprocenv\">> .env.prod'
+  - 'echo \javacodegen_server_url\ = \"$prod_javacodegen_url\">> .env.prod'
   - cat .env.prod
 include:
   project: 'ezapi_poc/infra_poc'
