@@ -691,7 +691,7 @@ class Extractor:
                 else:
                     query += f' "{k}".ToString() as {k},'
             query = query.strip(",")
-            query = f"SELECT TOP 20 {query} FROM {t} ORDER BY newid()"
+            query = f"SELECT TOP 50 {query} FROM {t} ORDER BY newid()"
 
             table_data = self.conn.execute(query)
             table_keys = list(table_data.keys())

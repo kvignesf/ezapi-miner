@@ -524,7 +524,7 @@ def generate_spec(projectid, db):
             "message": "project data or project type not found",
         }
 
-    if project_type == "db":
+    if project_type == "db" or project_type == "noinput":
         return generate_db_only.generate_spec(project_data, projectid, db)
 
     try:

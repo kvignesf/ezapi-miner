@@ -85,7 +85,8 @@ class SpecGenerator:
         if not values["format"]:
             del values["format"]
         if values["type"] == "string":
-            del values["format"]
+            if "format" in values:
+                del values["format"]
         ret[name] = values
         return ret
         

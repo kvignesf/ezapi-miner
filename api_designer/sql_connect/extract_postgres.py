@@ -42,6 +42,7 @@ class Extractor:
             self.tables += res
 
     def get_table_size(self):
+
         for s in self.tables:
             q = s
             if (regex.search(s) == None):
@@ -50,6 +51,7 @@ class Extractor:
                 q = s.split(".")[0] + "." + "\"" + s.split(".")[1] + "\""
                 print ("q..", q)
             res = self.conn.execute(f"SELECT COUNT(*) FROM {q}")
+            print( res )
             res = next(res)
             self.table_size[s] = res[0]
 
@@ -135,6 +137,7 @@ class Extractor:
         return data
 
     def get_master_tables(self):
+        print("table_details", self.table_details)
         for tk, tv in self.table_details.items():
             table_size = self.table_size[tk]
             pk_columns = 0
