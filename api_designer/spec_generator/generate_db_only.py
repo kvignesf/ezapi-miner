@@ -208,6 +208,10 @@ class SpecGenerator:
                     dict_merge(ret["properties"], self.generate_array_table(v, request_body))
                 else:
                     dict_merge(ret["properties"], self.generate_table(v, request_body, is_object=True))
+            elif v["type"] == "object" and v["schemaName"] == "global":
+                param_obj = {}
+                param_obj[k] = self.generate_object(v, request_body)
+                dict_merge(ret["properties"], param_obj)
             elif v["type"] in ["string", "number", "integer", "array"] or (v["type"] == "object" and "schemaRef" in v):
                 dict_merge(ret["properties"], self.generate_field(v))
             elif v["type"] == "arrayOfObjects":
