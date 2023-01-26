@@ -353,7 +353,10 @@ class GenerateTableData:
                 else:
                     ret[k] = self.generate_ref_data(v)
             elif v_type == "array" and parameter_type == "global":
-                ret[k] = random.sample(v["possibleValues"], 2)
+                if len(v["possibleValues"]) == 1:
+                    ret[k] = random.sample(v["possibleValues"], 1)
+                elif len(v["possibleValues"]) > 1:
+                    ret[k] = random.sample(v["possibleValues"], 2)
             elif v_type == "arrayOfObjects" or v_type == "array":
                 rets = []
                 for i in range(2):

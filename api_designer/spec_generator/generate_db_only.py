@@ -212,7 +212,7 @@ class SpecGenerator:
                 param_obj = {}
                 param_obj[k] = self.generate_object(v, request_body)
                 dict_merge(ret["properties"], param_obj)
-            elif v["type"] in ["string", "number", "integer", "array"] or (v["type"] == "object" and "schemaRef" in v):
+            elif v["type"] in ["string", "number", "integer", "array", "boolean"] or (v["type"] == "object" and "schemaRef" in v):
                 dict_merge(ret["properties"], self.generate_field(v))
             elif v["type"] == "arrayOfObjects":
                 temp = {
