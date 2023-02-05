@@ -449,7 +449,7 @@ class GenerateTableData:
 
                 if param_param_type and param_param_type == "documentField":
                     ret[k] = self.generate_documentField_data(v)
-                elif possible_values:
+                elif possible_values and possible_values[0]:
                     random_item = random.choice(possible_values)
                     ret[k] = random_item
                 elif param_type == "object" and "properties" in v:
