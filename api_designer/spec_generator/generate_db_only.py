@@ -7,6 +7,8 @@ from importlib.resources import is_resource
 from pprint import pprint
 from sqlalchemy import false, true                                  
 from api_designer import mongo
+from api_designer.spec_generator.mongo_generator import MongoGenerator
+
 
 PATH_DESCRIPTION_KEYS = ["tags", "summary", "description", "operationId"]
 PARAMETER_KEY = "parameters"
@@ -55,6 +57,7 @@ class SpecGenerator:
         self.schemas = {}
         self.components = {}
         self.schema_counter = {}
+        self.schema_data = {}
 
         self.spec = {}
         self.schemas_list = set()
@@ -62,6 +65,12 @@ class SpecGenerator:
         self.operations = self.db.operationdatas.find({"projectid": self.projectid})
         self.tables = self.db.tables.find({"projectid": self.projectid})
         self.operations = [x["data"] for x in self.operations]
+
+        db_collection = self.db["mongo_collections"]
+        schema_data = db_collection.find({"projectid": self.projectid})
+        schema_data = list(schema_data)
+        for sd in schema_data:
+            self.schema_data[sd["collection"]] = sd["attributes"]
 
         print("DB Data fetched")
 
@@ -192,7 +201,30 @@ class SpecGenerator:
 
         return ret
 
+    def generate_mongo_object(self, object_data, request_body):
+        ret = {"type": "object", "properties": {}}
+
+        field_key = object_data["key"]
+        field_name = object_data["sourceName"]
+
+        field_key = field_key.split(".", 1)
+        field_collection = field_key[0]
+        field_ref = f"{field_key[0]}." if len(field_key) > 1 else field_name
+
+        field_schema = self.schema_data[field_collection]
+        field_data = field_schema
+
+        for fr in field_ref.split("."):
+            field_data = field_data[fr]
+
+        field_type = field_data.get("ezapi_type")
+
+        if request_body:
+            ret["required"] = []
+
     def generate_object(self, object_data, request_body):
+        MG = MongoGenerator(self.projectid, self.db, self.schema_data)
+
         ret = {"type": "object", "properties": {}}
         if request_body:
             ret["required"] = []
@@ -208,11 +240,16 @@ class SpecGenerator:
                     dict_merge(ret["properties"], self.generate_array_table(v, request_body))
                 else:
                     dict_merge(ret["properties"], self.generate_table(v, request_body, is_object=True))
-            elif v["type"] == "object" and v["schemaName"] == "global":
+
+            elif v["type"] == "object" and v.get("paramType") == "documentField":
+                mongo_obj = {}
+                mongo_obj[k] = MG.generate_mongo_object(v)
+                dict_merge(ret["properties"], mongo_obj)
+            elif v["type"] == "object" and v.get("schemaName") == "global":
                 param_obj = {}
                 param_obj[k] = self.generate_object(v, request_body)
                 dict_merge(ret["properties"], param_obj)
-            elif v["type"] in ["string", "number", "integer", "array", "boolean"] or (v["type"] == "object" and "schemaRef" in v):
+            elif v["type"] in ["string", "number", "integer", "array", "boolean", "oid", "date"] or (v["type"] == "object" and "schemaRef" in v):
                 dict_merge(ret["properties"], self.generate_field(v))
             elif v["type"] == "arrayOfObjects":
                 temp = {
