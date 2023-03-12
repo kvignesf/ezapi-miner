@@ -146,8 +146,8 @@ def handle_sql_connect(request_data, dbtype, projectid, db):
         P = MssqlExtractor(dbtype, connection_url)
         #P.extract_sp(projectid)
         db_document, table_documents, sp_docs, dbdata_map_documents = P.extract_data(projectid)
-
-
+        #print("db_document", db_document)
+        #print("table_documents", table_documents)
         store_document("database", db_document, db)
         store_bulk_document("tables", table_documents, db)
         if sp_docs:

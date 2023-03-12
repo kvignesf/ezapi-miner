@@ -138,7 +138,7 @@ class EzFaker:
 
             if v["matchType"] == "word":
                 words = EzFaker.camel_case_words(k)
-                matched = all(w.lower() in self.name.lower() for w in words)
+                matched = all(w.lower() in self.name.lower() for w in words if w != None and self.name != None)
 
             if matched:
                 try:

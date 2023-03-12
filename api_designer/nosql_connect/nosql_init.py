@@ -1,4 +1,4 @@
-from api_designer.mongo import store_bulk_document
+from api_designer.mongo import store_document, store_bulk_document
 from decouple import config
 from api_designer.nosql_connect.extract_mongo import MongoExtractor
 from urllib.parse import urlparse
@@ -64,7 +64,8 @@ def handle_nosql_connect(request_data, dbtype, projectid, db):
     uri = "mongodb://"+username+":"+password+"@"+server+":"+portNo
     print(uri, dbname)
     P = MongoExtractor("mongo", uri, dbname)
-    collection_schemas = P.extract_data(projectid)
+    #collection_schemas = P.extract_data(projectid)
+    db_document, collection_document = P.extract_data(projectid)
 
     # pprint(collection_schemas)
     
@@ -72,7 +73,8 @@ def handle_nosql_connect(request_data, dbtype, projectid, db):
     # with open("sample_airbnb.json", "w") as outfile:
     #     outfile.write(json.dumps(collection_schemas, indent=4))
 
-    if collection_schemas:
-        store_bulk_document("mongo_collections", collection_schemas, db)
+    if db_document and collection_document:
+        store_document("database", db_document, db)
+        store_bulk_document("mongo_collections", collection_document, db)
 
     return {"success": True}

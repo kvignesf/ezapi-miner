@@ -305,6 +305,8 @@ class GenerateTableData:
     def __init__(self, is_response=False):
         self.is_response = is_response
         self.payload = ''.join(random.choices(string.ascii_uppercase + string.digits, k = 10))
+        self.db = None
+        self.projectid = ""
 
     def set_response_flag(self, is_response):
         self.is_response = is_response
@@ -333,8 +335,13 @@ class GenerateTableData:
         ret = {}
         for k, v in param_object["properties"].items():
             v_type = v.get("type")
+            param_param_type = v.get("paramType")
+            #is_child = v.get("isChild")
+            parameter_type = v.get("schemaName")
 
-            if v_type == "object" and "properties" in v:
+            if param_param_type and param_param_type == "documentField":
+                ret[k] = self.generate_documentField_data(v)
+            elif v_type == "object" and "properties" in v:
                 ret[k] = self.generate_object_data(v)
             elif v_type in DATA_TYPE_LIST:
                 ret[k] = generate_field_data(v, k)
@@ -345,6 +352,11 @@ class GenerateTableData:
                     ret[k] = rets
                 else:
                     ret[k] = self.generate_ref_data(v)
+            elif v_type == "array" and parameter_type == "global":
+                if len(v["possibleValues"]) == 1:
+                    ret[k] = random.sample(v["possibleValues"], 1)
+                elif len(v["possibleValues"]) > 1:
+                    ret[k] = random.sample(v["possibleValues"], 2)
             elif v_type == "arrayOfObjects" or v_type == "array":
                 rets = []
                 for i in range(2):
@@ -353,14 +365,91 @@ class GenerateTableData:
                 ret[k] = rets
         return ret
 
+    def generate_documentField_object_data(self, param_object):
+        ret = {}
+        for k, v in param_object.items():
+            v_type = v.get("ezapi_type")
+
+            if v_type == "object":
+                ret[k] = self.generate_documentField_object_data(v["ezapi_object"])
+            elif v_type == "array":
+                ret[k] = self.generate_documentField_array_data(v["ezapi_array"])
+            elif "ezapi_samples" in v and "ezapi_count" in v:
+                samples_array = v["ezapi_samples"]
+                sample_count = v["ezapi_count"]
+                random_index = random.randint(0, sample_count - 1)
+                ret[k] = samples_array[random_index]
+        return ret
+
+    def generate_documentField_array_data(self, param_object):
+        ret = []
+        param_type = param_object.get("ezapi_type")
+        if param_type == "object":
+            ret.append(self.generate_documentField_object_data(param_object["ezapi_object"]))
+        elif param_type == "array":
+            ret.append(self.generate_documentField_array_data(param_object))
+        elif "ezapi_samples" in param_object and "ezapi_count" in param_object:
+            samples_array = param_object["ezapi_samples"]
+            random_index = random.randint(0, len(samples_array) - 1)
+            ret = samples_array[random_index]
+        elif "ezapi_array_samples" in param_object:
+            array_samples_array = param_object["ezapi_array_samples"]
+            random_index = random.randint(0, len(array_samples_array) - 1)
+            ret = array_samples_array[random_index]
+        return ret
+
+    def generate_documentField_data(self, param_object):
+        ret = None
+        v_type = param_object.get("type")
+        db = self.db
+        projectid = self.projectid
+        collection = db.mongo_collections.find_one({"projectid": projectid, "collection": param_object["tableName"]})
+        attributes = collection["attributes"]
+        if v_type == "object":
+            ret = {}
+            if param_object["ref"]:
+                split_list = param_object["ref"].split(".")
+                new_object = attributes[split_list[2]][split_list[3]]
+                ret = self.generate_documentField_object_data(new_object)
+            else:
+                new_object = attributes[param_object["sourceName"]]["ezapi_object"]
+                ret = self.generate_documentField_object_data(new_object)
+        elif v_type == "array":
+            ret = []
+            if param_object["ref"]:
+                split_list = param_object["ref"].split(".")
+                new_object = attributes[split_list[2]][split_list[3]]
+                ret = self.generate_documentField_array_data(new_object)
+            else:
+                new_object = attributes[param_object["sourceName"]]["ezapi_array"]
+                ret = self.generate_documentField_array_data(new_object)
+        else:
+            if param_object.get("ref"):
+                split_list = param_object["ref"].split(".")
+                param = attributes[split_list[2]][split_list[3]]
+                param = param[param_object["sourceName"]]
+            else:
+                param = attributes[param_object["sourceName"]]
+            if "ezapi_samples" in param and "ezapi_count" in param:
+                samples_array = param["ezapi_samples"]
+                sample_count = param["ezapi_count"]
+                random_index = random.randint(0, sample_count - 1)
+                ret = samples_array[random_index]
+
+        return ret
+
     def generate_param_data(self, param_list):
         ret = {}
         for param in param_list:
             for k, v in param.items():
                 param_type = v.get("type")
                 possible_values = v.get("possibleValues")
+                param_param_type = v.get("paramType")
+                is_child = v.get("isChild")
 
-                if possible_values:
+                if param_param_type and param_param_type == "documentField":
+                    ret[k] = self.generate_documentField_data(v)
+                elif possible_values and possible_values[0]:
                     random_item = random.choice(possible_values)
                     ret[k] = random_item
                 elif param_type == "object" and "properties" in v:
@@ -403,8 +492,12 @@ class GenerateTableData:
             return ret
         body_type = body.get("type")
         isArray = body.get("isArray")
+        param_param_type = body.get("paramType")
+        is_child = body.get("isChild")
 
-        if body_type == "object" and "properties" in body:
+        if param_param_type and param_param_type == "documentField":
+            ret = self.generate_documentField_data(body)
+        elif body_type == "object" and "properties" in body:
             ret = self.generate_object_data(body)
         elif body_type == "ezapi_table":
             if isArray:
@@ -902,8 +995,10 @@ def generate_simulation_artefacts(projectid, db):
             }
         paths = [x["data"] for x in paths]
 
-        if project_type == "db":
+        if project_type == "db" or project_type == "noinput":
             gd = GenerateTableData()
+            gd.db = db
+            gd.projectid = projectid
         else:
             components = db.components.find_one({"projectid": projectid})
             components = components["data"]

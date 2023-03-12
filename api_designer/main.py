@@ -18,6 +18,7 @@ from api_designer.sql_connect.sql_init import handle_sql_connect
 from api_designer.codegen.jdl_init import generate_jdl_file
 from api_designer.artefacts2.init import TestdataGenerator
 from api_designer.artefacts2.insert_placeholders import TestdataUpdator
+from api_designer.artefacts2.mongo_init import TestdataGenerator as MongoTestGenerator
 # from api_designer.ddl_parser.parser_init import parse_db_ddl_file
 # from api_designer.ddl_parser.parser_init import gen_db_ddl_file
 from api_designer.nosql_connect.nosql_init import handle_nosql_connect
@@ -113,3 +114,8 @@ class EzAPIModels:
     def extract_nosql_connect(self, request_data, dbtype):
         ret = handle_nosql_connect(request_data, dbtype, self.projectid, self.db)
         return ret
+
+    def artefacts_generator_mongo(self, type):
+        MTG = MongoTestGenerator(self.projectid, self.db, type)
+        MTG.fetch_data()
+        return MTG.generate_testdata()

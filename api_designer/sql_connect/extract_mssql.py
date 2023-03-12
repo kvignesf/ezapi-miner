@@ -318,7 +318,7 @@ class Extractor:
 
     def get_table_size(self):
         for s in self.tables:
-            res = self.conn.execute(f"SELECT COUNT(*) FROM {s}")
+            res = self.conn.execute(f"SELECT COUNT_BIG(*) FROM {s}")
             res = next(res)
             self.table_size[s] = res[0]
 
@@ -691,7 +691,7 @@ class Extractor:
                 else:
                     query += f' "{k}".ToString() as {k},'
             query = query.strip(",")
-            query = f"SELECT TOP 100 {query} FROM {t} ORDER BY newid()"
+            query = f"SELECT TOP 50 {query} FROM {t} ORDER BY newid()"
 
             table_data = self.conn.execute(query)
             table_keys = list(table_data.keys())

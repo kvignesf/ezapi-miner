@@ -401,6 +401,24 @@ def mongo_extractor():
 
     return json_response({"data": ret})
 
+@app.route("/artefacts_mongo", methods=["POST"])
+def run_artefacts_mongo():
+    print("Artefacts Mongo Received")
+    request_data = request.get_json()
+    projectid = str(request_data.get("projectid", ""))
+    type = str(request_data.get("type", "functional")) # or performance
+
+    if projectid:
+        model = EzAPIModels(projectid)
+        model.set_db_instance()
+        ret = model.artefacts_generator_mongo(type)
+        model.client.close()
+
+    else:
+        ret = bad_request({"success": False, "message": "Some mongo parameters are missing"})
+
+    return json_response(ret, status=ret["status"])
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
