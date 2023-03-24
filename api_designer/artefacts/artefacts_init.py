@@ -1129,4 +1129,8 @@ def generate_simulation_artefacts(projectid, db):
         print("Artefacts Error - ", exc_type, fname, exc_tb.tb_lineno, str(e))
 
         print("Artefacts Generator Error - ", str(e))
-        return {"success": False, "message": str(e), "status": 500}
+        msg = str(e)
+        if (msg.__contains__("object has no attribute 'items'")):
+            msg = "object cannot be empty and must have at least one attribute"
+
+        return {"success": False, "message": msg, "status": 500}
