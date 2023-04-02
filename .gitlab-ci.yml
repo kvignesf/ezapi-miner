@@ -10,6 +10,7 @@ before_script:
   - 'echo \pojogenurl\ = \"$stage_pojogen_url\">> .env.stage'
   - 'echo \dbpasskey\ = \"$stage_db_passkey\">> .env.stage'
   - 'echo \storedprocenv\ = \"$stage_storedprocenv\">> .env.stage'
+  - 'echo \javacodegen_server_url\ = \"$stage_javacodegen_url\">> .env.stage'
   - cat .env.stage
   - 'echo \dbconfig\ = \"$prod_db_instance\">> .env.prod'
   - 'echo \pojogenurl\ = \"$prod_pojogen_url\">> .env.prod'

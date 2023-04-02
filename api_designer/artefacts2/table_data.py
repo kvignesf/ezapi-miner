@@ -346,7 +346,7 @@ class GetTableData:
                     ret[k] = self.get_array_table_ref_data(v, checking_dict)
                 ret[k] = self.get_table_ref_data(v)
             elif v_type == "object" and "properties" in v:
-                ret[k] = self.get_object_data(v)
+                ret[k] = self.get_object_data(v, checking_dict)
             elif v_type in DATA_TYPE_LIST:
                 ret[k] = self.get_field_data(v)
         return ret
@@ -384,9 +384,10 @@ class GetTableData:
 
         for k, v in object_ref["properties"].items():
             v_type = v.get("type")
-            table_name = v["key"]
+
 
             if v_type == "ezapi_table":
+                table_name = v["key"]
                 ret[k] = DBG.generate_testcase_data(table_name, [x["sourceName"] for x in v["selectedColumns"]])
                 # ret[k] = DBG.generate_testcase_data(table_name, selected_columns)
 
@@ -403,6 +404,7 @@ class GetTableData:
                 ret[k] = self.get_request_object_data(v, DBG)
 
             elif v_type in DATA_TYPE_LIST:
+                table_name = v["key"]
                 if table_name not in table_columns:
                     table_columns[table_name] = []
                 table_columns[table_name].append((v["sourceName"], k))

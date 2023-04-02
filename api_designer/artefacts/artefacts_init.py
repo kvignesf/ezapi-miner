@@ -449,7 +449,7 @@ class GenerateTableData:
 
                 if param_param_type and param_param_type == "documentField":
                     ret[k] = self.generate_documentField_data(v)
-                elif possible_values:
+                elif possible_values and possible_values[0]:
                     random_item = random.choice(possible_values)
                     ret[k] = random_item
                 elif param_type == "object" and "properties" in v:
@@ -1129,4 +1129,8 @@ def generate_simulation_artefacts(projectid, db):
         print("Artefacts Error - ", exc_type, fname, exc_tb.tb_lineno, str(e))
 
         print("Artefacts Generator Error - ", str(e))
-        return {"success": False, "message": str(e), "status": 500}
+        msg = str(e)
+        if (msg.__contains__("object has no attribute 'items'")):
+            msg = "object cannot be empty and must have at least one attribute"
+
+        return {"success": False, "message": msg, "status": 500}
