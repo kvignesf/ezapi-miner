@@ -61,7 +61,18 @@ def handle_nosql_connect(request_data, dbtype, projectid, db):
         if password and passkey:
             decryptedpassword = _decrypt(bytes(password, 'utf-8'), "", passkey)
             password = bytes.decode(decryptedpassword)
-    uri = "mongodb://"+username+":"+password+"@"+server+":"+portNo
+
+    ipAddressRegex = re.compile(r'\b(?:\d{1,3}\.){3}\d{1,3}\b')
+    if ipAddressRegex.match(server) and not portNo:
+        portNo = "27017";
+    elif server.__contains__(".mongodb.net"):
+        portNo = "";
+
+    if portNo:
+        uri = "mongodb://"+username+":"+password+"@"+server+":"+portNo
+    else:
+        uri = "mongodb+srv://"+username+":"+password+"@"+server+"/?ssl=true&ssl_cert_reqs=CERT_NONE"
+
     print(uri, dbname)
     P = MongoExtractor("mongo", uri, dbname)
     #collection_schemas = P.extract_data(projectid)
