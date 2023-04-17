@@ -2,6 +2,7 @@ from email.policy import default
 from api_designer.mongo import store_document, store_bulk_document
 from api_designer.sql_connect.extract_postgres import Extractor as PsqlExtractor
 from api_designer.sql_connect.extract_mysql import Extractor as MysqlExtractor
+from api_designer.sql_connect.extract_oracle import Extractor as OracleExtractor
 from api_designer.sql_connect.extract_mssql import Extractor as MssqlExtractor
 from api_designer.utils.decrypter import _decrypt
 
@@ -115,6 +116,31 @@ def handle_sql_connect(request_data, dbtype, projectid, db):
         else:
             return {"success": False}
 
+    elif dbtype == "oracle":
+        if not portNo:
+            portNo = POSTGRES_DEFAULT_PORT
+
+        if database:
+            args = {
+                "host": server,
+                "user": username,
+                "serviceName": database,
+                "password": password,
+                "port": portNo
+            }
+
+        P = OracleExtractor(dbtype, args)
+        db_document, table_documents = P.extract_data(projectid)
+        # db_document, table_documents = P.extract_data(projectid)
+        # P.get_schemas()
+        # P.get_tables()
+
+        if db_document and table_documents:
+            store_document("database", db_document, db)
+            store_bulk_document("tables", table_documents, db)
+            return {"success": True}
+        else:
+            return {"success": False}
 
     elif dbtype == "mysql":
         args = {
