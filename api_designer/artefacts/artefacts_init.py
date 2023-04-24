@@ -311,12 +311,41 @@ class GenerateTableData:
     def set_response_flag(self, is_response):
         self.is_response = is_response
 
+    def extract_field_sample_data(self, param, param_key):
+        ret = None
+        param_type = param.get("paramType")
+        db = self.db
+        projectid = self.projectid
+
+        if param_type and param_type == "column":
+            table_collection = db.tables.find_one({"projectid": projectid, "key": param["key"]})
+            table_data = table_collection["data"]
+
+            column_list = table_data[0]
+            column_index = None
+            for index, column_name in enumerate(column_list):
+                if column_name == param["name"]:
+                    column_index = index
+                    break
+            if len(table_data) > 1:
+                random_sub_array = random.choice(table_data[1:])
+                ret = random_sub_array[column_index]
+                if ret:
+                    return ret
+        elif param.get("schemaName") == "global":
+            possible_values_array = param.get("possibleValues")
+            if possible_values_array:
+                ret = random.choice(possible_values_array)
+                return ret
+        ret = generate_field_data(param, param_key)
+        return ret
+
     def generate_ref_data(self, param_ref):
         selected_columns = param_ref.get("selectedColumns", [])
         ret = {}
         for s in selected_columns:
             sname = s["name"]
-            ret[sname] = generate_field_data(s, sname)
+            ret[sname] = self.extract_field_sample_data(s, sname) #generate_field_data(s, sname)
 
         return ret
 
@@ -327,7 +356,7 @@ class GenerateTableData:
             ret = {}
             for s in selected_columns:
                 sname = s["name"]
-                ret[sname] = generate_field_data(s, sname)
+                ret[sname] = self.extract_field_sample_data(s, sname) #generate_field_data(s, sname)
             rets.append(ret)
         return rets
 
@@ -344,7 +373,7 @@ class GenerateTableData:
             elif v_type == "object" and "properties" in v:
                 ret[k] = self.generate_object_data(v)
             elif v_type in DATA_TYPE_LIST:
-                ret[k] = generate_field_data(v, k)
+                ret[k] = self.extract_field_sample_data(v, k) #generate_field_data(v, k)
             elif v_type == "ezapi_table":
                 isArray = v.get("isArray")
                 if isArray:
@@ -455,7 +484,7 @@ class GenerateTableData:
                 elif param_type == "object" and "properties" in v:
                     ret[k] = self.generate_object_data(v)
                 elif param_type in DATA_TYPE_LIST:
-                    ret[k] = generate_field_data(v, k)
+                    ret[k] = self.extract_field_sample_data(v, k) #generate_field_data(v, k)
                 elif param_type == "ezapi_table":
                     ret[k] = self.generate_ref_data(v)
 
@@ -470,7 +499,7 @@ class GenerateTableData:
                 if param_type == "object" and "properties" in v:
                     ret[k.lower()] = self.generate_object_data(v)
                 elif param_type in DATA_TYPE_LIST:
-                    ret[k.lower()] = generate_field_data(v, k)
+                    ret[k.lower()] = self.extract_field_sample_data(v, k) #generate_field_data(v, k)
                 elif param_type == "ezapi_table":
                     ret[k.lower()] = self.generate_ref_data(v)
 
@@ -556,7 +585,11 @@ def match_schema(s1, s2):
     matches = []
     for k1, v1 in s1.items():
         for k2, v2 in s2.items():
-            if type(v1) == type(v2) and is_name_matched(k1, k2):
+            if isinstance(v2, dict):
+                for k3, v3 in v2.items():
+                    if type(v1) == type(v3) and is_name_matched(k1, k3):
+                        matches.append((k1, k3))
+            elif type(v1) == type(v2) and is_name_matched(k1, k2):
                 matches.append((k1, k2))
 
     return matches
@@ -585,8 +618,14 @@ def match_request_response_data(testdata):
                         if m[1] in response_data[i]:
                             response_data[i][m[1]] = source_value
                 else:
-                    if m[1] in response_data:
-                        response_data[m[1]] = source_value
+                    for key, value in response_data.items():
+                        if m[1] == key:
+                            response_data[m[1]] = source_value
+                        elif isinstance(value, dict):
+                            if m[1] in value:
+                                response_data[key][m[1]] = source_value
+                    # if m[1] in response_data:
+                    #     response_data[m[1]] = source_value
 
     testdata["assertionData"] = response_data
     return testdata
