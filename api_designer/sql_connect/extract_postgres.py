@@ -1,6 +1,6 @@
 import psycopg2
 import re
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 from api_designer.sql_connect.ts2 import get_ts_order
 from api_designer.sql_connect.postgres_decoder import DTDecoder
@@ -32,12 +32,12 @@ class Extractor:
         self.master_tables = []
 
     def get_schemas(self):
-        self.schemas = self.conn.execute("select schema_name from information_schema.schemata")
+        self.schemas = self.conn.execute(text("select schema_name from information_schema.schemata"))
         self.schemas = [x[0] for x in self.schemas if x[0] not in _SYSTEM_SCHEMAS]
 
     def get_tables(self):
         for s in self.schemas:
-            res = self.conn.execute(f"SELECT table_name FROM information_schema.tables WHERE table_schema = '{s}' and table_type = 'BASE TABLE'")
+            res = self.conn.execute(text(f"SELECT table_name FROM information_schema.tables WHERE table_schema = '{s}' and table_type = 'BASE TABLE'"))
             res = [f"{s}.{x[0]}" for x in res]
             self.tables += res
 
@@ -49,9 +49,9 @@ class Extractor:
                 q = s
             else:
                 q = s.split(".")[0] + "." + "\"" + s.split(".")[1] + "\""
-                print ("q..", q)
-            res = self.conn.execute(f"SELECT COUNT(*) FROM {q}")
-            print( res )
+                #print ("q..", q)
+            res = self.conn.execute(text(f"SELECT COUNT(*) FROM {q}"))
+            #print( res )
             res = next(res)
             self.table_size[s] = res[0]
 
@@ -80,7 +80,7 @@ class Extractor:
                 kcu.table_name,
                 kcu.ordinal_position
         """
-        res = self.conn.execute(query)
+        res = self.conn.execute(text(query))
         columns = list(res.keys())
         res = [x for x in res]
 
@@ -114,7 +114,7 @@ class Extractor:
                     kcu.table_name,
                     position;
             """
-            res = self.conn.execute(query)
+            res = self.conn.execute(text(query))
             columns = list(res.keys())
             res = [x for x in res]
 
@@ -171,7 +171,7 @@ class Extractor:
     def get_table_details(self):
         for t in self.tables:
             t_schema, t_name = t.split(".")
-            column_desc = self.conn.execute(f"SELECT * from information_schema.columns where table_schema='{t_schema}' and table_name = '{t_name}'")
+            column_desc = self.conn.execute(text(f"SELECT * from information_schema.columns where table_schema='{t_schema}' and table_name = '{t_name}'"))
             column_keys = column_desc.keys()
             column_desc = list(column_desc)
             
@@ -324,7 +324,7 @@ class Extractor:
         order by tc.table_schema,
                 tc.table_name
         """
-        res = self.conn.execute(query)
+        res = self.conn.execute(text(query))
         column_keys = list(res.keys())
         res = [x for x in res]
 
@@ -370,8 +370,8 @@ class Extractor:
                 q = t
             else:
                 q = t.split(".")[0] + "." + "\"" + t.split(".")[1] + "\""
-                print ("q..", q)
-            table_data = self.conn.execute(f"select * from {q} order by random() limit 100")
+                #print ("q..", q)
+            table_data = self.conn.execute(text(f"select * from {q} order by random() limit 100"))
             table_keys = list(table_data.keys())
             table_data = [list(x) for x in table_data]
             table_data_with_header = [table_keys] + table_data
