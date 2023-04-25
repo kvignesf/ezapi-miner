@@ -342,7 +342,7 @@ class Extractor:
 
         for r in res:
             tmp = {x:y for x, y in zip(columns, r)}
-            self.user_defined_types[r['name']] = tmp
+            self.user_defined_types[r[0]] = tmp
 
     # Reference - https://stackoverflow.com/a/18929992
     def get_foreign_relations(self):
