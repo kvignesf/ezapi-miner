@@ -778,6 +778,8 @@ def generate_artefacts(projectid, db):
 
         if project_type == "db":
             gd = GenerateTableData()
+            gd.db = db
+            gd.projectid = projectid
         else:
             components = db.components.find_one({"projectid": projectid})
             components = components["data"]
