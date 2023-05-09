@@ -268,6 +268,33 @@ class Generator:
 
         return ret
 
+    def oracle_generator(self):
+        examples = self.sample["samples"]
+        null_count = self.sample["null"]
+        value_count = len(examples)
+
+        if null_count > 0 and value_count > 0:
+            toss = random.random()
+            if toss < null_count / (null_count + value_count):
+                return None
+
+        if not examples:
+            return None
+
+        if self.format == "array":
+            ret = random.choice(examples)
+            ret = str(ret)
+            ret = ret.replace("[", "{")
+            ret = ret.replace("]", "}")
+
+        else:
+            ret = random.choice(examples)
+        if self.format == 'jsonb':
+            ret = str(ret)
+            ret = ret.replace("'", '"')
+
+        return ret
+
     def generate_data(self, n=1):
         ret = None
 
@@ -283,6 +310,8 @@ class Generator:
             ret = self.mssql_generator()
         elif self.type == "postgres":
             ret = self.postgres_generator()
+        elif self.type == "oracle":
+            ret = self.oracle_generator()
         else:
             print(f"** Error - Unable to generate data for {self.field} with data type {self.type}")
 

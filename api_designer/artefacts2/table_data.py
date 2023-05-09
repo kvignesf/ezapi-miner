@@ -310,17 +310,42 @@ class GetTableData:
                     rrow = self.functional[table_name][self.selection_counter[table_name]]
                     self.selection_counter[table_name] = (self.selection_counter[table_name] + 1) % len(self.functional[table_name])
 
-                matched_id = rrow['ezapi-data-id']
+                # matched_id = rrow['ezapi-data-id']
+                #
+                # if field_name not in rrow:
+                #     ret = shortuuid.uuid()
+                #     for ft in range(len(self.functional[table_name])):
+                #         if self.functional[table_name][ft]["ezapi-data-id"] == matched_id:
+                #             # self.functional[table_name][ft][field_name] = ret
+                #             break
+                # else:
+                #     ret = rrow[field_name]
+                # self.matched_row_id[table_name] = matched_id
+                if isinstance(rrow, list):
+                    print("entered:")
+                    matched_id = rrow[0]['ezapi-data-id']
+                    if field_name not in rrow[0]:
+                        ret = shortuuid.uuid()
+                        for ft in range(len(self.functional[table_name])):
+                            if self.functional[table_name][ft][0]["ezapi-data-id"] == matched_id:
+                                # self.functional[table_name][ft][field_name] = ret
+                                break
+                    else:
+                        ret = rrow[0][field_name]
+                    self.matched_row_id[table_name] = matched_id
 
-                if field_name not in rrow:
-                    ret = shortuuid.uuid()
-                    for ft in range(len(self.functional[table_name])):
-                        if self.functional[table_name][ft]["ezapi-data-id"] == matched_id:
-                            # self.functional[table_name][ft][field_name] = ret
-                            break
                 else:
-                    ret = rrow[field_name]
-                self.matched_row_id[table_name] = matched_id
+                    matched_id = rrow['ezapi-data-id']
+
+                    if field_name not in rrow:
+                        ret = shortuuid.uuid()
+                        for ft in range(len(self.functional[table_name])):
+                            if self.functional[table_name][ft]["ezapi-data-id"] == matched_id:
+                                # self.functional[table_name][ft][field_name] = ret
+                                break
+                    else:
+                        ret = rrow[field_name]
+                    self.matched_row_id[table_name] = matched_id
 
             if table_name in self.placeholders and column_name in self.placeholders[table_name]:
                 if self.method.lower() == "post" and is_body:
@@ -346,7 +371,7 @@ class GetTableData:
                     ret[k] = self.get_array_table_ref_data(v, checking_dict)
                 ret[k] = self.get_table_ref_data(v)
             elif v_type == "object" and "properties" in v:
-                ret[k] = self.get_object_data(v)
+                ret[k] = self.get_object_data(v, checking_dict)
             elif v_type in DATA_TYPE_LIST:
                 ret[k] = self.get_field_data(v)
         return ret
@@ -384,9 +409,10 @@ class GetTableData:
 
         for k, v in object_ref["properties"].items():
             v_type = v.get("type")
-            table_name = v["key"]
+
 
             if v_type == "ezapi_table":
+                table_name = v["key"]
                 ret[k] = DBG.generate_testcase_data(table_name, [x["sourceName"] for x in v["selectedColumns"]])
                 # ret[k] = DBG.generate_testcase_data(table_name, selected_columns)
 
@@ -403,6 +429,7 @@ class GetTableData:
                 ret[k] = self.get_request_object_data(v, DBG)
 
             elif v_type in DATA_TYPE_LIST:
+                table_name = v["key"]
                 if table_name not in table_columns:
                     table_columns[table_name] = []
                 table_columns[table_name].append((v["sourceName"], k))

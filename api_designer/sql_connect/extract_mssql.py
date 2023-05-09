@@ -1,5 +1,5 @@
 import re
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 import requests
 
 from api_designer.sql_connect.ts2 import get_ts_order
@@ -209,13 +209,14 @@ class Extractor:
         self.master_tables = []
 
     def get_schemas(self):
-        self.schemas = self.conn.execute("""
+        query = """
             select s.name
             from sys.schemas s
             inner join sys.sysusers u
             on u.uid = s.principal_id
             where u.name = 'dbo'
-        """)
+        """
+        self.schemas = self.conn.execute(text(query))
         self.schemas = [x[0] for x in self.schemas]
 
     def get_sps(self):
@@ -226,7 +227,7 @@ class Extractor:
             inner join sys.schemas sc 
                 on sc.schema_id = p.schema_id
         """
-        res = self.conn.execute(query)
+        res = self.conn.execute(text(query))
         columns = list(res.keys())
         res = [x for x in res]
 
@@ -244,7 +245,7 @@ class Extractor:
             outputAttr = []
             prname = sp.split(".")[1]
 
-            res = self.conn.execute(f"select pa.name as attribute_name, "
+            res = self.conn.execute(text(f"select pa.name as attribute_name, "
                                     f"pa.is_output as output_col, pr.name as sp_name, t.name as datatype, s.name as schemaName, "
                                     f"pa.precision as PRECISION, pa.scale as SCALE, pa.max_length as LENGTH "
                                     f"from sys.parameters pa inner join sys.procedures pr "
@@ -253,7 +254,7 @@ class Extractor:
                                     f"on pa.system_type_id = t.system_type_id "
                                     f"inner join sys.schemas s "
                                     f"on s.schema_id = pr.schema_id AND pa.user_type_id = t.user_type_id "
-                                    f"where pr.name ='{prname}'")
+                                    f"where pr.name ='{prname}'"))
             columns = list(res.keys())
             res = [x for x in res]
             attr_details={}
@@ -295,7 +296,7 @@ class Extractor:
         res1 = []
         for s in self.schemas:
             res1= []
-            res = self.conn.execute(f"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES where TABLE_SCHEMA = '{s}' and TABLE_TYPE = 'BASE TABLE' and TABLE_NAME <> 'sysdiagrams'")
+            res = self.conn.execute(text(f"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES where TABLE_SCHEMA = '{s}' and TABLE_TYPE = 'BASE TABLE' and TABLE_NAME <> 'sysdiagrams'"))
             # for x in res:
             #     print("info", f"{s}.{x[0]}")
             res = [f"{s}.{x[0]}" for x in res]
@@ -318,7 +319,7 @@ class Extractor:
 
     def get_table_size(self):
         for s in self.tables:
-            res = self.conn.execute(f"SELECT COUNT_BIG(*) FROM {s}")
+            res = self.conn.execute(text(f"SELECT COUNT_BIG(*) FROM {s}"))
             res = next(res)
             self.table_size[s] = res[0]
 
@@ -335,13 +336,13 @@ class Extractor:
             ON t2.system_type_id = t1.system_type_id and t2.is_user_defined = 0 
             WHERE t1.is_user_defined = 1 and t2.name <> 'sysname' order by t1.name;
         """
-        res = self.conn.execute(query)
+        res = self.conn.execute(text(query))
         columns = list(res.keys())
         res = [x for x in res]
 
         for r in res:
             tmp = {x:y for x, y in zip(columns, r)}
-            self.user_defined_types[r['name']] = tmp
+            self.user_defined_types[r[0]] = tmp
 
     # Reference - https://stackoverflow.com/a/18929992
     def get_foreign_relations(self):
@@ -369,7 +370,7 @@ class Extractor:
             INNER JOIN sys.columns col2
                 ON col2.column_id = referenced_column_id AND col2.object_id = tab2.object_id;
         """
-        res = self.conn.execute(query)
+        res = self.conn.execute(text(query))
         columns = list(res.keys())
         res = [x for x in res]
 
@@ -406,7 +407,7 @@ class Extractor:
                                         for xml path ('') ) D (column_names)
             order by schema_name(tab.schema_id), pk.[name]
         """
-        res = self.conn.execute(query)
+        res = self.conn.execute(text(query))
         column_keys = list(res.keys())
         res = [x for x in res]
 
@@ -477,7 +478,7 @@ class Extractor:
             t_schema, t_name = t.split(".")
             if "[" in t_name :
                 t_name = t_name.replace("[","").replace("]","")
-            column_desc = self.conn.execute(f"exec sp_columns @table_name=N'{t_name}', @table_owner=N'{t_schema}'")
+            column_desc = self.conn.execute(text(f"exec sp_columns @table_name=N'{t_name}', @table_owner=N'{t_schema}'"))
             column_keys = column_desc.keys()
             column_desc = list(column_desc)
 
@@ -616,7 +617,7 @@ class Extractor:
                 and con.parent_object_id = col.object_id
         order by con.name
         """
-        res = self.conn.execute(query)
+        res = self.conn.execute(text(query))
         column_keys = list(res.keys())
         res = [x for x in res]
 
@@ -643,7 +644,7 @@ class Extractor:
             INNER JOIN sys.tables tt ON cc.object_id = tt.object_id
             INNER JOIN sys.schemas ss ON ss.schema_id = tt.schema_id;
         """
-        res = self.conn.execute(query)
+        res = self.conn.execute(text(query))
         column_keys = list(res.keys())
         res = [x for x in res]
 
@@ -693,7 +694,7 @@ class Extractor:
             query = query.strip(",")
             query = f"SELECT TOP 50 {query} FROM {t} ORDER BY newid()"
 
-            table_data = self.conn.execute(query)
+            table_data = self.conn.execute(text(query))
             table_keys = list(table_data.keys())
             table_data = [list(x) for x in table_data]
             table_data_with_header = [table_keys] + table_data

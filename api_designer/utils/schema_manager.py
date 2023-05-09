@@ -33,7 +33,7 @@ class SchemaSize:
     def __init__(self, schemas):
         self.schemas = schemas  # All schemas
 
-    def get_array_size(self, param_array):  # dereferencing array
+    def get_array_size(self, param_array, visited_schema_list):  # dereferencing array
         assert param_array["type"] == "array"
         res = 0
         depth = 0
@@ -43,29 +43,34 @@ class SchemaSize:
 
         if "ezapi_ref" in array_items:
             ref_schema = array_items["ezapi_ref"].split("/")[-1]
+            ref_schema_name = ref_schema
             ref_schema = self.schemas[ref_schema]
-            tmp = self.get_schema_size(ref_schema)
-            res += tmp[0]
-            depth = max(depth, 1 + tmp[1])
+            if ref_schema_name not in visited_schema_list:
+                visited_schema_list.append(ref_schema_name)
+                tmp = self.get_schema_size(ref_schema, visited_schema_list)
+                visited_schema_list.remove(ref_schema_name)
+                res += tmp[0]
+                depth = max(depth, 1 + tmp[1])
 
         else:
             if array_items_type == "array":
-                tmp = self.get_array_size(array_items)
+                tmp = self.get_array_size(array_items, visited_schema_list)
                 res += tmp[0]
                 depth = max(depth, tmp[1])
 
             elif array_items_type == "object":
-                tmp = self.get_object_size(array_items)
+                tmp = self.get_object_size(array_items, visited_schema_list)
                 res += tmp[0]
                 depth = max(depth, 1 + tmp[1])
 
             else:
+                print("enteredHere")
                 res += 1
                 depth = max(depth, 1)
 
         return res, depth
 
-    def get_object_size(self, param_object):  # dereferencing object
+    def get_object_size(self, param_object, visited_schema_list):  # dereferencing object
         assert param_object["type"] == "object"
         res = 0
         depth = 0
@@ -76,19 +81,23 @@ class SchemaSize:
 
                 if "ezapi_ref" in value:
                     ref_schema = value["ezapi_ref"].split("/")[-1]
+                    ref_schema_name = ref_schema
                     ref_schema = self.schemas[ref_schema]
-                    tmp = self.get_schema_size(ref_schema)
-                    res += tmp[0]
-                    depth = max(depth, 1 + tmp[1])
+                    if ref_schema_name not in visited_schema_list:
+                        visited_schema_list.append(ref_schema_name)
+                        tmp = self.get_schema_size(ref_schema, visited_schema_list)
+                        visited_schema_list.remove(ref_schema_name)
+                        res += tmp[0]
+                        depth = max(depth, 1 + tmp[1])
 
                 else:
                     if value_type == "object":
-                        tmp = self.get_object_size(value)
+                        tmp = self.get_object_size(value, visited_schema_list)
                         res += tmp[0]
                         depth = max(depth, 1 + tmp[1])
 
                     elif value_type == "array":
-                        tmp = self.get_array_size(value)
+                        tmp = self.get_array_size(value, visited_schema_list)
                         res += tmp[0]
                         depth = max(depth, tmp[1])
 
@@ -98,14 +107,15 @@ class SchemaSize:
 
         return res, depth
 
-    def get_schema_size(self, param_schema):  # dereferencing schema
+    def get_schema_size(self, param_schema, visited_schema_list):  # dereferencing schema
         res = 0
         depth = 0
 
         if "allOf" in param_schema:
             all_schema = param_schema["allOf"]
             for s in all_schema:
-                tmp = self.get_schema_size(s)
+                print("s:", s, "\n")
+                tmp = self.get_schema_size(s, visited_schema_list)
                 res += tmp[0]
                 depth = max(depth, tmp[1])
 
@@ -113,18 +123,25 @@ class SchemaSize:
             st = param_schema.get("type")
             if "ezapi_ref" in param_schema:
                 ref_schema = param_schema["ezapi_ref"].split("/")[-1]
+                ref_schema_name = ref_schema
                 ref_schema = self.schemas[ref_schema]
-                tmp = self.get_schema_size(ref_schema)
-                res += tmp[0]
-                depth = max(depth, tmp[1])
+                print("ref_schema:", ref_schema, "\n")
+                if ref_schema_name not in visited_schema_list:
+                    visited_schema_list.append(ref_schema_name)
+                    tmp = self.get_schema_size(ref_schema, visited_schema_list)
+                    visited_schema_list.remove(ref_schema_name)
+                    res += tmp[0]
+                    depth = max(depth, tmp[1])
 
             elif st == "object":
-                tmp = self.get_object_size(param_schema)
+                print("obj_param_schema: ", param_schema, "\n")
+                tmp = self.get_object_size(param_schema, visited_schema_list)
                 res += tmp[0]
                 depth = max(depth, tmp[1])
 
             elif st == "array":
-                tmp = self.get_array_size(param_schema)
+                print("array_param_schema: ", param_schema, "\n")
+                tmp = self.get_array_size(param_schema, visited_schema_list)
                 res += tmp[0]
                 depth = max(depth, tmp[1])
 
@@ -375,8 +392,11 @@ class SchemaCrawler:
 def crawl_schema(schemas):
     crawled_schema = []
     ss = SchemaSize(schemas)
+    visited_schema_list = []
 
     for k, v in schemas.items():
+        print("schemaName:", k)
+        visited_schema_list.append(k)
         schema_name = k
         schema_description = v.get("description")
 
@@ -388,7 +408,7 @@ def crawl_schema(schemas):
         ]
 
         if len(original_elements) > 0:  # filter out combination of other schemas
-            schema_size, schema_depth = ss.get_schema_size(v)
+            schema_size, schema_depth = ss.get_schema_size(v, visited_schema_list)
 
             crawled_schema.append(
                 {
@@ -399,5 +419,5 @@ def crawl_schema(schemas):
                     "attributes": elements,
                 }
             )
-
+            visited_schema_list = []
     return crawled_schema
