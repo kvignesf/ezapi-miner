@@ -324,7 +324,7 @@ class GenerateTableData:
             column_list = table_data[0]
             column_index = None
             for index, column_name in enumerate(column_list):
-                if column_name == param["name"]:
+                if column_name == param["sourceName"]:
                     column_index = index
                     break
             if len(table_data) > 1:
@@ -1036,7 +1036,7 @@ def generate_simulation_artefacts(projectid, db):
             }
         paths = [x["data"] for x in paths]
 
-        if project_type == "db" or project_type == "noinput":
+        if project_type == "db" or project_type == "noinput" or project_type == "aggregate":
             gd = GenerateTableData()
             gd.db = db
             gd.projectid = projectid
@@ -1173,5 +1173,7 @@ def generate_simulation_artefacts(projectid, db):
         msg = str(e)
         if (msg.__contains__("object has no attribute 'items'")):
             msg = "object cannot be empty and must have at least one attribute"
+        elif (msg.__contains__("'properties'")):
+            msg = "array of objects cannot be empty and must have at least one attribute"
 
         return {"success": False, "message": msg, "status": 500}
