@@ -988,7 +988,7 @@ def get_sim_virtual_collection_data(testdata):
     return virtual_service_data
 
 
-def generate_simulation_artefacts(projectid, db):
+def generate_simulation_artefacts(projectid, db, operationId):
     print("Inside Artefacts Generator")
     try:
         # Remove esisting testcases
@@ -1025,8 +1025,10 @@ def generate_simulation_artefacts(projectid, db):
             filename = filename[0]["name"]
         except:
             filename = None
-
-        paths = db.operationdatas.find({"projectid": projectid})
+        if operationId:
+            paths = db.operationdatas.find({"projectid": projectid, "id": operationId})
+        else:
+            paths = db.operationdatas.find({"projectid": projectid})
         paths = list(paths)
 
         if not paths:
