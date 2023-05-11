@@ -936,7 +936,8 @@ def get_sim_virtual_collection_data(testdata):
         "formData": testdata["inputData"]["form"],
         "requestBody": testdata["inputData"]["body"],
         "responseStatusCode": testdata["status"],
-        "operation_id": testdata["operation_id"]
+        "operation_id": testdata["operation_id"],
+        "operationId":testdata["operationId"]
     }
     #print("virtualdata..1", testdata["inputData"]["body"])
     virtual_service_data["responseBody"] = testdata.get("assertionData", {})
@@ -1034,7 +1035,10 @@ def generate_simulation_artefacts(projectid, db):
                 "message": "project data not found",
                 "status": 404,
             }
-        paths = [x["data"] for x in paths]
+        paths = [[x["data"], x["id"]] for x in paths]
+
+
+
 
         if project_type == "db" or project_type == "noinput" or project_type == "aggregate":
             gd = GenerateTableData()
@@ -1063,7 +1067,9 @@ def generate_simulation_artefacts(projectid, db):
         #for resourcePath in resourcePaths:
         #    resourcePath.get("operations")
 
-        for path in paths:
+        for xpath in paths:
+            path = xpath[0]
+
             paramswobracs = ""
             testdata = {
                 "projectid": projectid,
@@ -1081,7 +1087,8 @@ def generate_simulation_artefacts(projectid, db):
                 "status": None,
                 "assertionData": None,
                 "testcaseId": None,
-                "mock": True
+                "mock": True,
+                "operationId": xpath[1]
             }
             if ("{" in path.get("endpoint")) and ("}" in path.get("endpoint")):
                 pathparams = re.findall(r'\{.*?\}', path.get("endpoint"))
@@ -1153,11 +1160,8 @@ def generate_simulation_artefacts(projectid, db):
                     all_testcases.append(test_copy)
                     test_count += 1
 
-        virtual_tests = [
-            get_sim_virtual_collection_data(x)
-            for x in all_testcases
-            if x["status"][0] == "2"
-        ]
+
+        virtual_tests = [get_sim_virtual_collection_data(x) for x in all_testcases if x["status"][0] == "2"]
 
         mongo.store_bulk_document(SIM_TESTCASE_COLLECTION, all_testcases, db)
         mongo.store_bulk_document(SIM_VIRTUAL_COLLECTION, virtual_tests, db)
