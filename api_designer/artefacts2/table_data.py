@@ -310,17 +310,42 @@ class GetTableData:
                     rrow = self.functional[table_name][self.selection_counter[table_name]]
                     self.selection_counter[table_name] = (self.selection_counter[table_name] + 1) % len(self.functional[table_name])
 
-                matched_id = rrow['ezapi-data-id']
+                # matched_id = rrow['ezapi-data-id']
+                #
+                # if field_name not in rrow:
+                #     ret = shortuuid.uuid()
+                #     for ft in range(len(self.functional[table_name])):
+                #         if self.functional[table_name][ft]["ezapi-data-id"] == matched_id:
+                #             # self.functional[table_name][ft][field_name] = ret
+                #             break
+                # else:
+                #     ret = rrow[field_name]
+                # self.matched_row_id[table_name] = matched_id
+                if isinstance(rrow, list):
+                    print("entered:")
+                    matched_id = rrow[0]['ezapi-data-id']
+                    if field_name not in rrow[0]:
+                        ret = shortuuid.uuid()
+                        for ft in range(len(self.functional[table_name])):
+                            if self.functional[table_name][ft][0]["ezapi-data-id"] == matched_id:
+                                # self.functional[table_name][ft][field_name] = ret
+                                break
+                    else:
+                        ret = rrow[0][field_name]
+                    self.matched_row_id[table_name] = matched_id
 
-                if field_name not in rrow:
-                    ret = shortuuid.uuid()
-                    for ft in range(len(self.functional[table_name])):
-                        if self.functional[table_name][ft]["ezapi-data-id"] == matched_id:
-                            # self.functional[table_name][ft][field_name] = ret
-                            break
                 else:
-                    ret = rrow[field_name]
-                self.matched_row_id[table_name] = matched_id
+                    matched_id = rrow['ezapi-data-id']
+
+                    if field_name not in rrow:
+                        ret = shortuuid.uuid()
+                        for ft in range(len(self.functional[table_name])):
+                            if self.functional[table_name][ft]["ezapi-data-id"] == matched_id:
+                                # self.functional[table_name][ft][field_name] = ret
+                                break
+                    else:
+                        ret = rrow[field_name]
+                    self.matched_row_id[table_name] = matched_id
 
             if table_name in self.placeholders and column_name in self.placeholders[table_name]:
                 if self.method.lower() == "post" and is_body:

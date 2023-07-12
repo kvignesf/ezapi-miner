@@ -213,11 +213,12 @@ def simulation_model():
     print("Sim Artefacts Received")
     request_data = request.get_json()
     projectid = str(request_data.get("projectid", ""))
+    operationId = str(request_data.get("operationId", ""))
 
     if projectid:
         model = EzAPIModels(projectid)
         model.set_db_instance()
-        ret = model.sim_artefacts_generator()
+        ret = model.sim_artefacts_generator(operationId)
         model.client.close()
 
     else:

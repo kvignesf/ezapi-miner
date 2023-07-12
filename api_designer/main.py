@@ -81,8 +81,8 @@ class EzAPIModels:
         ret = generate_artefacts(self.projectid, self.db)
         return ret
 
-    def sim_artefacts_generator(self):
-        ret = generate_simulation_artefacts(self.projectid, self.db)
+    def sim_artefacts_generator(self, operationId):
+        ret = generate_simulation_artefacts(self.projectid, self.db, operationId)
         return ret
 
     def sankey_generator(self):

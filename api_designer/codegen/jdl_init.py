@@ -395,61 +395,65 @@ def generate_jdl_file(projectid, db):
     table_data = db.tables.find({"projectid": projectid})
 
     project_type = project_data.get("projectType", None)
+    try:
+        gt = GenerateTemplate()
+        if project_type not in ("db", "both"):
+            return {
+                "success": False,
+                "status": 500,
+                "message": "Project type not supported for code generation",
+            }
+        if os.name == 'nt':
+            USER_ROOT_DIR = "C:/ezapi/codegentemplates/javatmplts/target1/"
+            fullcodePath = USER_ROOT_DIR
+        else:
+            USER_ROOT_DIR = ""
+            fullcodePath = USER_ROOT_DIR + "/mnt/codegen/"
+        #dirpath = Path(USER_ROOT_DIR + "/mnt/codegen/" + projectid + "/javacode")
+            dirpath = Path(fullcodePath + projectid + "/javacode")
+            if dirpath.exists() and dirpath.is_dir():
+                shutil.rmtree(dirpath)
 
-    gt = GenerateTemplate()
-    if project_type not in ("db", "both"):
-        return {
-            "success": False,
-            "status": 500,
-            "message": "Project type not supported for code generation",
-        }
-    if os.name == 'nt':
-        USER_ROOT_DIR = "C:/ezapi/codegentemplates/javatmplts/target1/"
-        fullcodePath = USER_ROOT_DIR
-    else:
-        USER_ROOT_DIR = ""
-        fullcodePath = USER_ROOT_DIR + "/mnt/codegen/"
-    #dirpath = Path(USER_ROOT_DIR + "/mnt/codegen/" + projectid + "/javacode")
-        dirpath = Path(fullcodePath + projectid + "/javacode")
-        if dirpath.exists() and dirpath.is_dir():
-            shutil.rmtree(dirpath)
+        #Path(USER_ROOT_DIR + "/mnt/codegen/" + projectid + "/javacode").mkdir(parents=True, exist_ok=True)
+        Path(fullcodePath + projectid + "/javacode").mkdir(parents=True, exist_ok=True)
 
-    #Path(USER_ROOT_DIR + "/mnt/codegen/" + projectid + "/javacode").mkdir(parents=True, exist_ok=True)
-    Path(fullcodePath + projectid + "/javacode").mkdir(parents=True, exist_ok=True)
+        gt.project_data = project_data
+        gt.project_type = project_type
+        gt.operation_data = operation_data
+        gt.table_data = list(table_data)
+        #gt.outfile = USER_ROOT_DIR + "/mnt/codegen/" + projectid + "/javacode/" + projectid + ".jdl"
+        gt.outfile = fullcodePath + projectid + "/javacode/" + projectid + ".jdl"
 
-    gt.project_data = project_data
-    gt.project_type = project_type
-    gt.operation_data = operation_data
-    gt.table_data = list(table_data)
-    #gt.outfile = USER_ROOT_DIR + "/mnt/codegen/" + projectid + "/javacode/" + projectid + ".jdl"
-    gt.outfile = fullcodePath + projectid + "/javacode/" + projectid + ".jdl"
+        schemas_data = None
+        if project_type == "both":
+            schemas_data = db.components.find_one({"projectid": projectid})
+            schemas_data = schemas_data.get("data").get("schemas", {})
+            gt.schemas_data = schemas_data
 
-    schemas_data = None
-    if project_type == "both":
-        schemas_data = db.components.find_one({"projectid": projectid})
-        schemas_data = schemas_data.get("data").get("schemas", {})
-        gt.schemas_data = schemas_data
+            matcher_data = db.matcher.find({"projectid": projectid})
+            gt.matcher_data = list(matcher_data)
 
-        matcher_data = db.matcher.find({"projectid": projectid})
-        gt.matcher_data = list(matcher_data)
+        gt.generate_jdl()
+        params = {"projectid": projectid, "outputFile": gt.outfile}
+        newartefacts_resp = requests.post(url=config('javacodegen_server_url') + "/genJavaCode", json=params)
+        #gt.generate_code()
 
-    gt.generate_jdl()
-    params = {"projectid": projectid, "outputFile": gt.outfile}
-    newartefacts_resp = requests.post(url=config('javacodegen_server_url') + "/genJavaCode", json=params)
-    #gt.generate_code()
+        # Remove node_modules
+        # node_modules_path = Path(USER_ROOT_DIR + "/mnt/codegen/" + projectid + "/javacode/node_modules")
+        node_modules_path = Path(fullcodePath + projectid + "/javacode/node_modules")
+        if node_modules_path.exists() and node_modules_path.is_dir():
+            shutil.rmtree(node_modules_path)
 
-    # Remove node_modules
-    # node_modules_path = Path(USER_ROOT_DIR + "/mnt/codegen/" + projectid + "/javacode/node_modules")
-    node_modules_path = Path(fullcodePath + projectid + "/javacode/node_modules")
-    if node_modules_path.exists() and node_modules_path.is_dir():
-        shutil.rmtree(node_modules_path)
+        GS = GenerateSchemas(operation_data, project_data, schemas_data)
+        ret, message = GS.get_operation_schema()
 
-    GS = GenerateSchemas(operation_data, project_data, schemas_data)
-    ret, message = GS.get_operation_schema()
+        if not ret:
+            return {"success": False, "status": 500, "message": message}
 
-    if not ret:
-        return {"success": False, "status": 500, "message": message}
+        db.projects.update_one({"projectId": projectid}, {"$set": {"codegen": True}})
 
-    db.projects.update_one({"projectId": projectid}, {"$set": {"codegen": True}})
-
-    return {"success": True, "status": 200, "message": "ok"}
+        return {"success": True, "status": 200, "message": "ok"}
+    except Exception as e:
+        #if "Max retries exceeded with url" in e:
+        print("Unable to Generate Java Code", e)
+        return {"success": False, "status": 400, "message": "Unable to Generate Java Code"}
