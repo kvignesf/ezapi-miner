@@ -4,9 +4,13 @@
 
 
 import copy
+import json
+
 import pymongo
 from decouple import config
 import datetime, decimal
+from bson.json_util import loads, dumps
+
 
 def json_safe(obj):
     if type(obj) in (datetime.datetime, datetime.date, datetime.time):
@@ -49,6 +53,10 @@ def update_bulk_document(collection, document_list, db):
 def store_bulk_document(collection, document_list, db):
     document_list_copy = copy.deepcopy(json_safe(document_list))
     db_collection = db[collection]
+    document_list_copy = [dumps(x) for x in document_list_copy]
+
+    document_list_copy = [loads(x) for x in document_list_copy]
+
     db_collection.insert_many(document_list_copy)
 
 def delete_bulk_query(collection, query, db):
