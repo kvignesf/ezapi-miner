@@ -41,6 +41,7 @@ def handle_nosql_connect(request_data, dbtype, projectid, db):
         dbname = str(config("mongo_db_name"))
     else:
         #mongodb://root:JRVvuh9D5V0IZxCW@34.66.45.162:27017
+        authdb = request_data.get("authdb", "")
         passkey = config('dbpasskey', default=None)
         server = str(request_data.get("server", ""))
         username = str(request_data.get("username", ""))
@@ -69,7 +70,10 @@ def handle_nosql_connect(request_data, dbtype, projectid, db):
         portNo = "";
 
     if portNo:
-        uri = "mongodb://"+username+":"+password+"@"+server+":"+portNo
+        uri = "mongodb://" + username + ":" + password + "@" + server + ":" + portNo
+        if authdb:
+            uri = "mongodb://"+username+":"+password+"@"+server+":"+portNo+"/?authSource="+dbname
+
     else:
         uri = "mongodb+srv://"+username+":"+password+"@"+server+"/?ssl=true&ssl_cert_reqs=CERT_NONE"
 
