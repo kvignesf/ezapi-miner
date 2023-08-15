@@ -62,9 +62,9 @@ def get_ts_order(table_data):
          G.add_edge(u, v)
 
    table_order = G.ts()
-
+   print("table_order", table_order)
    for i, to in enumerate(table_order):
-        #print(i)
+        print(i)
         table_order[i] = table_invert_mapping[table_order[i]]
 
 
