@@ -38,7 +38,7 @@ class Graph:
             return None
 
 def get_ts_order(table_data):
-   #print(table_data)
+   print(table_data)
    for i in range(len(table_data)):
       if table_data[i]["key"] in table_data[i]["dependencies"]:
          table_data[i]["dependencies"].remove(table_data[i]["key"])
