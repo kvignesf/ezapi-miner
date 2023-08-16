@@ -35,7 +35,13 @@ class Graph:
         if cnt == self.V:
             return ts_order
         else:
-            return None
+            #return None
+            for i in self.graph:
+                if i not in ts_order:
+                    ts_order.append(i)
+                # print("ts_order..", ts_order)
+            return ts_order
+
 
 def get_ts_order(table_data):
    #print(table_data)
@@ -62,7 +68,7 @@ def get_ts_order(table_data):
          G.add_edge(u, v)
 
    table_order = G.ts()
-
+   #print("table_order", table_order)
    for i, to in enumerate(table_order):
         #print(i)
         table_order[i] = table_invert_mapping[table_order[i]]
