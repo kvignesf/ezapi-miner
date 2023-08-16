@@ -390,6 +390,8 @@ class Extractor:
 
     def get_insertion_order(self):
         tables = []
+        #print("tbls", self.tables)
+        #print("frgn", self.foreign.items())
         for t in self.tables:
             foreign_dependencies = set()
 
@@ -401,6 +403,8 @@ class Extractor:
                 "key": t,
                 "dependencies": list(foreign_dependencies)
             })
+            #print("tables1", tables)
+
         self.insertion_order = get_ts_order(tables)
 
     def prepare_db_document(self):
