@@ -15,17 +15,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Step 2: Set up Python 3.10
+      # Step 2: Set up Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
-      # Step 3: Install system dependencies (for pyodbc, cx_Oracle, etc.)
+      # Step 3: Install system dependencies
       - name: Install system packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y unixodbc-dev g++ libaio1
+          # libaio1 was renamed to libaio-dev in Ubuntu 24.04+
+          sudo apt-get install -y unixodbc-dev g++ libaio-dev
 
       # Step 4: Install Python dependencies
       - name: Install dependencies
@@ -33,7 +34,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r REQUIREMENTS.txt
 
-      # Step 5: Create dummy environment files (for all envs)
+      # Step 5: Create dummy .env
       - name: Create dummy .env files
         run: |
           echo "Creating .env files for all environments..."
@@ -45,15 +46,14 @@ jobs:
           echo "SECRET_KEY=dummysecret" >> .env
           echo "ENV_TYPE=local" >> .env
 
-      # Step 6: Verify imports or run basic syntax check
+      # Step 6: Verify syntax
       - name: Verify Python imports
         run: |
           echo "Checking syntax..."
           python -m py_compile app.py
 
-      # Step 7 (Optional): Try to run Flask briefly to verify
+      # Step 7: Smoke test
       - name: Start Flask app (smoke test)
         run: |
           echo "Starting Flask app for quick test..."
           python app.py & sleep 5 && pkill -f app.py
-
