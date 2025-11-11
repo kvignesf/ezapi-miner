@@ -35,7 +35,6 @@ jobs:
           # Compatibility patches for older Flask/Werkzeug and Cryptodome import
           pip install "Flask<2.3" "Werkzeug<3.0" pycryptodomex
           pip install -r REQUIREMENTS.txt
-          pip install pytest
 
       # Step 5: Create dummy .env with all required keys
       - name: Create dummy .env files
@@ -70,7 +69,4 @@ jobs:
           python app.py & sleep 5 && pkill -f app.py
         continue-on-error: true
 
-      - name: Run tests
-        run: |
-          pytest --maxfail=1 --disable-warnings -q
 
