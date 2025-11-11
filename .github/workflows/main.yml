@@ -1,104 +1,59 @@
-name: EzAPI Intelligent Miner Python CI/CD
+name: CI for ezapi_miner
 
 on:
   push:
-    branches:
-      - refactoredv3
-      - stage
-      - master
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
-  build-deploy:
+  build:
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: . 
-
-    env:
-      # TEST ENV (refactoredv3 branch)
-      TEST_DB_INSTANCE: ${{ secrets.TEST_DB_INSTANCE }}
-      TEST_POJOGEN_URL: ${{ secrets.TEST_POJOGEN_URL }}
-      TEST_DB_PASSKEY: ${{ secrets.TEST_DB_PASSKEY }}
-      TEST_STOREDPROCENV: ${{ secrets.TEST_STOREDPROCENV }}
-      TEST_JAVACODEGEN_URL: ${{ secrets.TEST_JAVACODEGEN_URL }}
-
-      # STAGE ENV (master branch)
-      STAGE_DB_INSTANCE: ${{ secrets.STAGE_DB_INSTANCE }}
-      STAGE_POJOGEN_URL: ${{ secrets.STAGE_POJOGEN_URL }}
-      STAGE_DB_PASSKEY: ${{ secrets.STAGE_DB_PASSKEY }}
-      STAGE_STOREDPROCENV: ${{ secrets.STOREDPROCENV }}
-      STAGE_JAVACODEGEN_URL: ${{ secrets.STAGE_JAVACODEGEN_URL }}
-
-      # PROD ENV (stage branch)
-      PROD_DB_INSTANCE: ${{ secrets.PROD_DB_INSTANCE }}
-      PROD_POJOGEN_URL: ${{ secrets.PROD_POJOGEN_URL }}
-      PROD_DB_PASSKEY: ${{ secrets.PROD_DB_PASSKEY }}
-      PROD_STOREDPROCENV: ${{ secrets.PROD_STOREDPROCENV }}
-      PROD_JAVACODEGEN_URL: ${{ secrets.PROD_JAVACODEGEN_URL }}
-
     steps:
-      - name: Checkout repository
+      # Step 1: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
+      # Step 2: Set up Python 3.10
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.10"
 
-      - name: Install system dependencies
+      # Step 3: Install system dependencies (for pyodbc, cx_Oracle, etc.)
+      - name: Install system packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y unixodbc-dev g++
+          sudo apt-get install -y unixodbc-dev g++ libaio1
 
-      - name: Install Python dependencies
+      # Step 4: Install Python dependencies
+      - name: Install dependencies
         run: |
-          python -m venv venv
-          source venv/bin/activate
-          pip install --upgrade pip
-          pip install -r REQUIREMENTS.txt 
+          python -m pip install --upgrade pip
+          pip install -r REQUIREMENTS.txt
 
-      - name: Create environment files
+      # Step 5: Create dummy environment files (for all envs)
+      - name: Create dummy .env files
         run: |
           echo "Creating .env files for all environments..."
-          echo "dbconfig=${TEST_DB_INSTANCE}" > .env.test
-          echo "pojogenurl=${TEST_POJOGEN_URL}" >> .env.test
-          echo "dbpasskey=${TEST_DB_PASSKEY}" >> .env.test
-          echo "storedprocenv=${TEST_STOREDPROCENV}" >> .env.test
-          echo "javacodegen_server_url=${TEST_JAVACODEGEN_URL}" >> .env.test
+          echo "FLASK_ENV=development" > .env
+          echo "DB_USER=dummy_user" >> .env
+          echo "DB_PASS=dummy_pass" >> .env
+          echo "DB_HOST=localhost" >> .env
+          echo "DB_NAME=test_db" >> .env
+          echo "SECRET_KEY=dummysecret" >> .env
+          echo "ENV_TYPE=local" >> .env
 
-          echo "dbconfig=${STAGE_DB_INSTANCE}" > .env.stage
-          echo "pojogenurl=${STAGE_POJOGEN_URL}" >> .env.stage
-          echo "dbpasskey=${STAGE_DB_PASSKEY}" >> .env.stage
-          echo "storedprocenv=${STAGE_STOREDPROCENV}" >> .env.stage
-          echo "javacodegen_server_url=${STAGE_JAVACODEGEN_URL}" >> .env.stage
-
-          echo "dbconfig=${PROD_DB_INSTANCE}" > .env.prod
-          echo "pojogenurl=${PROD_POJOGEN_URL}" >> .env.prod
-          echo "dbpasskey=${PROD_DB_PASSKEY}" >> .env.prod
-          echo "storedprocenv=${PROD_STOREDPROCENV}" >> .env.prod
-          echo "javacodegen_server_url=${PROD_JAVACODEGEN_URL}" >> .env.prod
-
-      - name: Run build (same as GitLab build stage)
-        if: github.ref == 'refs/heads/refactoredv3' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage'
+      # Step 6: Verify imports or run basic syntax check
+      - name: Verify Python imports
         run: |
-          echo "Building application"
+          echo "Checking syntax..."
+          python -m py_compile app.py
+
+      # Step 7 (Optional): Try to run Flask briefly to verify
+      - name: Start Flask app (smoke test)
+        run: |
+          echo "Starting Flask app for quick test..."
           python app.py & sleep 5 && pkill -f app.py
 
-      - name: Deploy - Test (refactoredv3 branch)
-        if: github.ref == 'refs/heads/refactoredv3'
-        run: |
-          echo "Deploying to TEST environment"
-          echo "Using .env.test for deployment"
-
-      - name: Deploy - Stage (master branch)
-        if: github.ref == 'refs/heads/master'
-        run: |
-          echo "Deploying to STAGE environment"
-          echo "Using .env.stage for deployment"
-
-      - name: Deploy - Prod (stage branch)
-        if: github.ref == 'refs/heads/stage'
-        run: |
-          echo "Deploying to PROD environment"
-          echo "Using .env.prod for deployment"
