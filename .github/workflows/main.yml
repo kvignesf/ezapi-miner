@@ -1,72 +1,60 @@
-name: EzAPI Miner Python CI/CD
+name: CI for ezapi_miner
 
 on:
   push:
-    branches:
-      - refactoredv3
-      - stage
-      - master
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
-  build-deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      # Step 1: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
+      # Step 2: Set up Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.10"
 
-      # --- Dependency setup ---
+      # Step 3: Install system dependencies
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          # libaio1 was renamed to libaio-dev in Ubuntu 24.04+
+          sudo apt-get install -y unixodbc-dev g++ libaio-dev
+      # Step 4: Install Python dependencies
+      
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip setuptools wheel
-
-          # Fixes for older Flask & Werkzeug version compatibility
-          pip install "Flask==2.1.2" "Werkzeug<3.0" "itsdangerous<2.1" "click<8.2"
-
-          # Ensure Cryptodome works with both import paths
+          python -m pip install --upgrade pip
+          # Compatibility patches for older Flask/Werkzeug and Cryptodome import
+          pip install "Flask<2.3" "Werkzeug<3.0"
           pip install pycryptodomex
-
-          # Install all required dependencies
           pip install -r REQUIREMENTS.txt
 
-      # --- Environment file creation ---
-      - name: Create environment files
+      # Step 5: Create dummy .env
+      - name: Create dummy .env files
         run: |
           echo "Creating .env files for all environments..."
-          # Dummy secrets (replace in actual pipeline)
-          echo "dbconfig=dummy" > .env.test
-          echo "pojogenurl=http://dummy" >> .env.test
-          echo "dbpasskey=secret" >> .env.test
-          echo "storedprocenv=test" >> .env.test
-          echo "javacodegen_server_url=http://dummy" >> .env.test
-
-      # --- Quick sanity test for app startup ---
-      - name: Start Flask app for quick test
+          echo "FLASK_ENV=development" > .env
+          echo "DB_USER=dummy_user" >> .env
+          echo "DB_PASS=dummy_pass" >> .env
+          echo "DB_HOST=localhost" >> .env
+          echo "DB_NAME=test_db" >> .env
+          echo "SECRET_KEY=dummysecret" >> .env
+          echo "ENV_TYPE=local" >> .env
+      # Step 6: Verify syntax
+      - name: Verify Python imports
+        run: |
+          echo "Checking syntax..."
+          python -m py_compile app.py
+      # Step 7: Smoke test
+      - name: Start Flask app (smoke test)
         run: |
           echo "Starting Flask app for quick test..."
           python app.py & sleep 5 && pkill -f app.py
-        continue-on-error: true
-
-      # --- Deploy to appropriate environment ---
-      - name: Deploy - Test (refactoredv3)
-        if: github.ref == 'refs/heads/refactoredv3'
-        run: |
-          echo "Deploying to TEST environment..."
-          echo "Using .env.test for deployment"
-
-      - name: Deploy - Stage (master)
-        if: github.ref == 'refs/heads/master'
-        run: |
-          echo "Deploying to STAGE environment..."
-          echo "Using .env.stage for deployment"
-
-      - name: Deploy - Prod (stage)
-        if: github.ref == 'refs/heads/stage'
-        run: |
-          echo "Deploying to PROD environment..."
-          echo "Using .env.prod for deployment"
