@@ -69,3 +69,7 @@ jobs:
           python app.py & sleep 5 && pkill -f app.py
         continue-on-error: true
 
+      - name: Run tests
+        run: |
+          pytest --maxfail=1 --disable-warnings -q
+
