@@ -96,7 +96,8 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > private_key.pem
           chmod 600 private_key.pem
           ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST << 'EOF'
-            cd /home/azureuser/ezapi_miner || git clone https://github.com/Reshmareshu786/ezapi_miner.git
+            cd /home/azureuser/ezapi_miner || git clone git@github.com:Reshmareshu786/ezapi_miner.git
+
             cd ezapi_miner
             git pull origin main
             docker-compose down || true
