@@ -2,71 +2,116 @@ name: CI for ezapi_miner
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, stage, refactoredv3 ]
   pull_request:
     branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      # Step 1: Checkout repository
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Step 2: Set up Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
-      # Step 3: Install system dependencies
       - name: Install system packages
         run: |
           sudo apt-get update
-          # libaio1 was renamed to libaio-dev in Ubuntu 24.04+
           sudo apt-get install -y unixodbc-dev g++ libaio-dev
 
-      # Step 4: Install Python dependencies
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          # Compatibility patches for older Flask/Werkzeug and Cryptodome import
           pip install "Flask<2.3" "Werkzeug<3.0" pycryptodomex
           pip install -r REQUIREMENTS.txt
 
-      # Step 5: Create dummy .env with all required keys
       - name: Create dummy .env files
         run: |
-          echo "Creating .env file..."
-          {
-            echo "FLASK_ENV=development"
-            echo "dbconfig=dummy_db"
-            echo "pojogenurl=http://dummy-pojo-url"
-            echo "dbpasskey=dummy_key"
-            echo "storedprocenv=test_env"
-            echo "javacodegen_server_url=http://dummy-javacodegen-url"
-            echo "DB_USER=dummy_user"
-            echo "DB_PASS=dummy_pass"
-            echo "DB_HOST=localhost"
-            echo "DB_NAME=test_db"
-            echo "SECRET_KEY=dummysecret"
-            echo "ENV_TYPE=local"
-          } > .env
-          cat .env
+          echo "FLASK_ENV=development" > .env
+          echo "DB_USER=dummy_user" >> .env
+          echo "DB_PASS=dummy_pass" >> .env
+          echo "DB_HOST=localhost" >> .env
+          echo "DB_NAME=test_db" >> .env
 
-      # Step 6: Verify Python imports
       - name: Verify Python imports
-        run: |
-          echo "Checking syntax..."
-          python -m py_compile app.py
+        run: python -m py_compile app.py
 
-      # Step 7: Smoke test for Flask app
-      - name: Start Flask app (smoke test)
+      - name: Smoke test Flask app
         run: |
-          echo "Starting Flask app for quick test..."
           python app.py & sleep 5 && pkill -f app.py
         continue-on-error: true
+
+  # DEPLOY TO TEST (refactoredv3)
+  deploy-test:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/refactoredv3'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Prepare env for test
+        run: |
+          echo "dbconfig=$test_db_instance" >> .env.test
+          echo "pojogenurl=$test_pojogen_url" >> .env.test
+          echo "dbpasskey=$test_db_passkey" >> .env.test
+          echo "storedprocenv=$test_storedprocenv" >> .env.test
+          echo "javacodegen_server_url=$test_javacodegen_url" >> .env.test
+          cat .env.test
+
+      - name: Deploy to TEST
+        run: |
+          echo "Deploying to TEST environment..."
+          # add deployment script/ssh/docker/kubectl command here
+
+  # DEPLOY TO STAGE (main)
+  deploy-stage:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Prepare env for stage
+        run: |
+          echo "dbconfig=$stage_db_instance" >> .env.stage
+          echo "pojogenurl=$stage_pojogen_url" >> .env.stage
+          echo "dbpasskey=$stage_db_passkey" >> .env.stage
+          echo "storedprocenv=$stage_storedprocenv" >> .env.stage
+          echo "javacodegen_server_url=$stage_javacodegen_url" >> .env.stage
+          cat .env.stage
+
+      - name: Deploy to STAGE
+        run: |
+          echo "Deploying to STAGE environment..."
+          # add stage deploy command here
+
+  # DEPLOY TO MASTER (stage)
+  deploy-master:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/stage'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Prepare env for production
+        run: |
+          echo "dbconfig=$prod_db_instance" >> .env.prod
+          echo "pojogenurl=$prod_pojogen_url" >> .env.prod
+          echo "dbpasskey=$prod_db_passkey" >> .env.prod
+          echo "storedprocenv=$prod_storedprocenv" >> .env.prod
+          echo "javacodegen_server_url=$prod_javacodegen_url" >> .env.prod
+          cat .env.prod
+
+      - name: Deploy to MASTER
+        run: |
+          echo "Deploying to PRODUCTION environment..."
+          # add prod deploy command here
 
 
