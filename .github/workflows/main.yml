@@ -7,6 +7,9 @@ on:
     branches: [ main ]
 
 jobs:
+  # ====================
+  # BUILD JOB
+  # ====================
   build:
     runs-on: ubuntu-latest
     steps:
@@ -29,7 +32,7 @@ jobs:
           pip install "Flask<2.3" "Werkzeug<3.0" pycryptodomex
           pip install -r REQUIREMENTS.txt
 
-      - name: Create dummy .env files
+      - name: Create dummy .env
         run: |
           echo "FLASK_ENV=development" > .env
           echo "DB_USER=dummy_user" >> .env
@@ -46,7 +49,9 @@ jobs:
         continue-on-error: true
 
 
-  # DEPLOY TO TEST (refactoredv3)
+  # ====================
+  # DEPLOY TO TEST
+  # ====================
   deploy-test:
     runs-on: ubuntu-latest
     needs: build
@@ -55,7 +60,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Prepare env for test
+      - name: Prepare env for TEST
         run: |
           echo "dbconfig=$test_db_instance" >> .env.test
           echo "pojogenurl=$test_pojogen_url" >> .env.test
@@ -67,10 +72,12 @@ jobs:
       - name: Deploy to TEST
         run: |
           echo "Deploying to TEST environment..."
-          # Add deployment script/ssh/docker/kubectl command here
+          # Add TEST server SSH or Docker command here if applicable
 
 
+  # ====================
   # DEPLOY TO STAGE (main)
+  # ====================
   deploy-stage:
     runs-on: ubuntu-latest
     needs: build
@@ -79,36 +86,69 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Prepare env for stage
-        run: |
-          echo "dbconfig=$stage_db_instance" >> .env.stage
-          echo "pojogenurl=$stage_pojogen_url" >> .env.stage
-          echo "dbpasskey=$stage_db_passkey" >> .env.stage
-          echo "storedprocenv=$stage_storedprocenv" >> .env.stage
-          echo "javacodegen_server_url=$stage_javacodegen_url" >> .env.stage
-          cat .env.stage
-
-      - name: Deploy to STAGE
+      - name: Deploy to STAGE (auto Docker or Python fallback)
         env:
           HOST: 20.255.48.190
           USER: azureuser
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
-          echo "Deploying to STAGE environment..."
+          echo "🚀 Deploying to STAGE environment..."
           echo "$SSH_PRIVATE_KEY" > private_key.pem
           chmod 600 private_key.pem
+
           ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST << 'EOF'
-            cd /home/azureuser/ezapi_miner || git clone git@github.com:Reshmareshu786/ezapi_miner.git
+            set -e
+            cd /home/azureuser
+
+            # Clone or update repo
+            if [ ! -d "ezapi_miner" ]; then
+              git clone https://github.com/Reshmareshu786/ezapi_miner.git
+            fi
 
             cd ezapi_miner
             git pull origin main
-            docker-compose down || true
-            docker-compose up -d --build
-            echo "Deployment complete on STAGE VM!"
+
+            # 🐳 Install Docker if not present
+            if ! command -v docker &> /dev/null; then
+              echo "Installing Docker & Docker Compose..."
+              sudo apt update
+              sudo apt install -y docker.io docker-compose
+              sudo systemctl enable docker
+              sudo systemctl start docker
+            fi
+
+            # 🚀 Deploy via Docker or fallback to Python
+            if [ -f "docker-compose.yml" ]; then
+              echo "Starting app using Docker Compose..."
+              sudo docker-compose down || true
+              sudo docker-compose up -d --build
+            else
+              echo "Docker Compose not found, running Flask app via virtualenv..."
+              sudo apt install -y python3-venv python3-dev libpq-dev unixodbc-dev g++
+
+              python3 -m venv venv
+              source venv/bin/activate
+              pip install --upgrade pip setuptools wheel
+              pip install -r REQUIREMENTS.txt
+              pip install psycopg2 pyodbc Werkzeug==2.0.3 pycryptodomex
+
+              cat > .env <<EENV
+pojogenurl=https://dummy-pojogen-service.com
+dbconfig=mydbinstance
+dbpasskey=secret123
+storedprocenv=stage
+javacodegen_server_url=https://dummy-javacodegen-service.com
+EENV
+
+              nohup python app.py > app.log 2>&1 &
+              echo "✅ Flask app started (check app.log)"
+            fi
           EOF
 
 
-  # DEPLOY TO MASTER (stage → prod)
+  # ====================
+  # DEPLOY TO MASTER (stage branch → production)
+  # ====================
   deploy-master:
     runs-on: ubuntu-latest
     needs: build
@@ -117,46 +157,62 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Prepare env for production
+      - name: Deploy to PRODUCTION (auto Docker or Python fallback)
+        env:
+          HOST: 20.255.48.190  # replace with your prod VM IP if different
+          USER: azureuser
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
-          echo "dbconfig=$prod_db_instance" >> .env.prod
-          echo "pojogenurl=$prod_pojogen_url" >> .env.prod
-          echo "dbpasskey=$prod_db_passkey" >> .env.prod
-          echo "storedprocenv=$prod_storedprocenv" >> .env.prod
-          echo "javacodegen_server_url=$prod_javacodegen_url" >> .env.prod
-          cat .env.prod
+          echo "🚀 Deploying to PRODUCTION environment..."
+          echo "$SSH_PRIVATE_KEY" > private_key.pem
+          chmod 600 private_key.pem
 
-      - name: Setup Python and system dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y python-is-python3 libpq-dev unixodbc-dev g++ python3-dev
+          ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST << 'EOF'
+            set -e
+            cd /home/azureuser
 
-          python -m pip install --upgrade pip setuptools wheel virtualenv
+            # Clone or update repo
+            if [ ! -d "ezapi_miner" ]; then
+              git clone https://github.com/Reshmareshu786/ezapi_miner.git
+            fi
 
-      - name: Setup Virtual Environment and Install Packages
-        run: |
-          python -m virtualenv venv
-          source ./venv/bin/activate
-          pip install -r REQUIREMENTS.txt
-          pip install psycopg2 pyodbc Werkzeug==2.0.3 pycryptodomex
-          pip list | grep -E "psycopg2|pyodbc|Werkzeug|pycryptodomex"
+            cd ezapi_miner
+            git pull origin stage
 
-      - name: Create Production .env
-        run: |
-          touch .env
-          echo "pojogenurl=https://dummy-pojogen-service.com" >> .env
-          echo "dbconfig=mydbinstance" >> .env
-          echo "dbpasskey=secret123" >> .env
-          echo "storedprocenv=dev" >> .env
-          echo "javacodegen_server_url=https://dummy-javacodegen-service.com" >> .env
-          cat .env
+            # 🐳 Install Docker if not present
+            if ! command -v docker &> /dev/null; then
+              echo "Installing Docker & Docker Compose..."
+              sudo apt update
+              sudo apt install -y docker.io docker-compose
+              sudo systemctl enable docker
+              sudo systemctl start docker
+            fi
 
-      - name: Run Flask App (Smoke Test)
-        run: |
-          source ./venv/bin/activate
-          python app.py & sleep 10 && pkill -f app.py
-        continue-on-error: true
+            # 🚀 Deploy via Docker or fallback to Python
+            if [ -f "docker-compose.yml" ]; then
+              echo "Starting app using Docker Compose..."
+              sudo docker-compose down || true
+              sudo docker-compose up -d --build
+            else
+              echo "Docker Compose not found, running Flask app via virtualenv..."
+              sudo apt install -y python3-venv python3-dev libpq-dev unixodbc-dev g++
 
-      - name: Confirm Production Deployment
-        run: echo "✅ Production deployment setup complete!"
+              python3 -m venv venv
+              source venv/bin/activate
+              pip install --upgrade pip setuptools wheel
+              pip install -r REQUIREMENTS.txt
+              pip install psycopg2 pyodbc Werkzeug==2.0.3 pycryptodomex
+
+              cat > .env <<EENV
+pojogenurl=https://dummy-pojogen-service.com
+dbconfig=mydbinstance
+dbpasskey=secret123
+storedprocenv=prod
+javacodegen_server_url=https://dummy-javacodegen-service.com
+EENV
+
+              nohup python app.py > app.log 2>&1 &
+              echo "✅ Flask app started in production (check app.log)"
+            fi
+          EOF
 
