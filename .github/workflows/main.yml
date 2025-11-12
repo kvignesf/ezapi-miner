@@ -86,26 +86,23 @@ jobs:
           echo "javacodegen_server_url=$stage_javacodegen_url" >> .env.stage
           cat .env.stage
 
-      - name: Deploy to STAGE VM
-        env:
-          HOST: 20.255.48.190
-          USER: azureuser
-        run: |
-          echo "Deploying to STAGE environment..."
-          
-          # Write private key from GitHub Secret to a file
-          echo "$SSH_PRIVATE_KEY" > private_key.pem
-          chmod 600 private_key.pem
-          
-          # Connect and deploy
-          ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST << 'EOF'
-            cd /home/azureuser/ezapi_miner || git clone https://github.com/Reshmareshu786/ezapi_miner.git
-            cd ezapi_miner
-            git pull origin main
-            docker-compose down || true
-            docker-compose up -d --build
-            echo "Deployment complete on STAGE VM!"
-          EOF
+          - name: Deploy to STAGE
+            env:
+              HOST: 20.255.48.190
+              USER: azureuser
+            run: |
+              echo "Deploying to STAGE environment..."
+              echo "$SSH_PRIVATE_KEY_B64" | base64 -d > private_key.pem
+              chmod 600 private_key.pem
+              ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST << 'EOF'
+              cd /home/azureuser/ezapi_miner || git clone https://github.com/Reshmareshu786/ezapi_miner.git
+              cd ezapi_miner
+              git pull origin main
+              docker-compose down || true
+              docker-compose up -d --build
+              echo "Deployment complete on STAGE VM!"
+            EOF
+
 
   # DEPLOY TO MASTER (stage)
   deploy-master:
