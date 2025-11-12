@@ -69,7 +69,7 @@ jobs:
           # add deployment script/ssh/docker/kubectl command here
 
   # DEPLOY TO STAGE (main)
-    deploy-stage:
+  deploy-stage:
     runs-on: ubuntu-latest
     needs: build
     if: github.ref == 'refs/heads/main'
@@ -106,7 +106,6 @@ jobs:
             docker-compose up -d --build
             echo "Deployment complete on STAGE VM!"
           EOF
-
 
   # DEPLOY TO MASTER (stage)
   deploy-master:
