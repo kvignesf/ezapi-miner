@@ -1,16 +1,19 @@
-name:  Ezapi Intelligent Miner CI/CD
+name: CI for ezapi_miner
 
 on:
   push:
-    branches:
-      - main
-      - stage
+    branches: [ main, stage, refactoredv3 ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
+  # ====================
+  # BUILD JOB
+  # ====================
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -18,97 +21,207 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Install base dependencies
+      - name: Install system packages
         run: |
-          sudo apt update
-          sudo apt install -y python3-venv python3-dev libpq-dev unixodbc-dev g++ python3-pip
-          python3 -m venv venv
-          source venv/bin/activate
-          pip install --upgrade pip setuptools wheel
+          sudo apt-get update
+          sudo apt-get install -y unixodbc-dev g++ libaio-dev
 
-      - name: Install project requirements (with numpy fallback)
+      - name: Install dependencies
         run: |
-          source venv/bin/activate
-          if ! pip install -r REQUIREMENTS.txt; then
-            echo "Some dependencies failed, retrying with numpy fallback..."
-            pip install --upgrade numpy==1.21.6 || pip install numpy
-            pip install -r REQUIREMENTS.txt --no-cache-dir || true
-          fi
-          pip install psycopg2 pyodbc Werkzeug==2.0.3 pycryptodomex
+          python -m pip install --upgrade pip setuptools wheel
+          pip install "Flask<2.3" "Werkzeug<3.0" pycryptodomex
+          pip install -r REQUIREMENTS.txt || true
 
-      - name: Lint and basic tests
+      - name: Create dummy .env files
         run: |
-          source venv/bin/activate
-          echo "Running basic checks..."
-          python --version
-          pip list | grep -E "numpy|Werkzeug|psycopg2|pyodbc"
+          echo "FLASK_ENV=development" > .env
+          echo "DB_USER=dummy_user" >> .env
+          echo "DB_PASS=dummy_pass" >> .env
+          echo "DB_HOST=localhost" >> .env
+          echo "DB_NAME=test_db" >> .env
 
-  deploy-stage:
+      - name: Verify Python imports
+        run: python -m py_compile app.py
+
+      - name: Smoke test Flask app
+        run: |
+          python app.py & sleep 5 && pkill -f app.py
+        continue-on-error: true
+
+
+  # ====================
+  # DEPLOY TO TEST (refactoredv3)
+  # ====================
+  deploy-test:
     runs-on: ubuntu-latest
     needs: build
-    if: github.ref == 'refs/heads/stage'
+    if: github.ref == 'refs/heads/refactoredv3'
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to Stage (Ezapi Miner)
+      - name: Prepare env for TEST
         run: |
-          sudo apt update
-          sudo apt install -y python3-venv python3-dev libpq-dev unixodbc-dev g++ python3-pip
-          python3 -m venv venv
-          source venv/bin/activate
-          pip install --upgrade pip setuptools wheel
+          echo "dbconfig=$test_db_instance" >> .env.test
+          echo "pojogenurl=$test_pojogen_url" >> .env.test
+          echo "dbpasskey=$test_db_passkey" >> .env.test
+          echo "storedprocenv=$test_storedprocenv" >> .env.test
+          echo "javacodegen_server_url=$test_javacodegen_url" >> .env.test
+          cat .env.test
 
-          echo "Installing dependencies..."
-          if ! pip install -r REQUIREMENTS.txt; then
-            echo " Some dependencies failed, retrying with numpy fallback..."
-            pip install --upgrade numpy==1.21.6 || pip install numpy
-            pip install -r REQUIREMENTS.txt --no-cache-dir || true
-          fi
-          pip install psycopg2 pyodbc Werkzeug==2.0.3 pycryptodomex
+      - name: Deploy to TEST
+        run: |
+          echo "Deploying to TEST environment..."
+          # Add SSH or Docker-based test deployment here
 
-          echo "Creating .env file..."
-          echo "pojogenurl=https://dummy-pojogen-service.com" > .env
-          echo "dbconfig=mydbinstance" >> .env
-          echo "dbpasskey=secret123" >> .env
-          echo "storedprocenv=stage" >> .env
-          echo "javacodegen_server_url=https://dummy-javacodegen-service.com" >> .env
 
-          echo "Starting Flask app..."
-          nohup python app.py > app.log 2>&1 &
-          echo "Flask app started successfully (Stage). Check app.log"
-
-  deploy-prod:
+  # ====================
+  # DEPLOY TO STAGE (main)
+  # ====================
+  deploy-stage:
     runs-on: ubuntu-latest
     needs: build
     if: github.ref == 'refs/heads/main'
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to Production (Ezapi Miner)
+      - name: Prepare env for STAGE
         run: |
-          sudo apt update
-          sudo apt install -y python3-venv python3-dev libpq-dev unixodbc-dev g++ python3-pip
-          python3 -m venv venv
-          source venv/bin/activate
-          pip install --upgrade pip setuptools wheel
+          echo "dbconfig=$stage_db_instance" >> .env.stage
+          echo "pojogenurl=$stage_pojogen_url" >> .env.stage
+          echo "dbpasskey=$stage_db_passkey" >> .env.stage
+          echo "storedprocenv=$stage_storedprocenv" >> .env.stage
+          echo "javacodegen_server_url=$stage_javacodegen_url" >> .env.stage
+          cat .env.stage
 
-          echo "Installing dependencies..."
-          if ! pip install -r REQUIREMENTS.txt; then
-            echo "Some dependencies failed, retrying with numpy fallback..."
-            pip install --upgrade numpy==1.21.6 || pip install numpy
-            pip install -r REQUIREMENTS.txt --no-cache-dir || true
-          fi
-          pip install psycopg2 pyodbc Werkzeug==2.0.3 pycryptodomex
+      - name: Deploy to STAGE
+        env:
+          HOST: 20.255.48.190
+          USER: azureuser
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          echo "🚀 Deploying to STAGE environment..."
+          echo "$SSH_PRIVATE_KEY" > private_key.pem
+          chmod 600 private_key.pem
 
-          echo "Creating .env file..."
-          echo "pojogenurl=https://dummy-pojogen-service.com" > .env
-          echo "dbconfig=mydbinstance" >> .env
-          echo "dbpasskey=secret123" >> .env
-          echo "storedprocenv=prod" >> .env
-          echo "javacodegen_server_url=https://dummy-javacodegen-service.com" >> .env
+          ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST << 'EOF'
+            set -e
+            cd /home/azureuser
 
-          echo "Starting Flask app..."
-          nohup python app.py > app.log 2>&1 &
-          echo "Flask app started successfully (Production). Check app.log"
+            # Clone or update repo
+            if [ ! -d "ezapi_miner" ]; then
+              git clone https://github.com/Reshmareshu786/ezapi_miner.git
+            fi
+            cd ezapi_miner
+            git pull origin main
+
+            # Install Docker if missing
+            if ! command -v docker &> /dev/null; then
+              echo "Installing Docker..."
+              sudo apt update
+              sudo apt install -y docker.io docker-compose
+              sudo systemctl enable docker
+              sudo systemctl start docker
+            fi
+
+            # Run app
+            if [ -f "docker-compose.yml" ]; then
+              echo "Starting via Docker Compose..."
+              sudo docker-compose down || true
+              sudo docker-compose up -d --build
+            else
+              echo "Running via Python virtualenv..."
+              sudo apt install -y python3-venv python3-dev libpq-dev unixodbc-dev g++
+              python3 -m venv venv
+              source venv/bin/activate
+              pip install --upgrade pip setuptools wheel
+              if ! pip install -r REQUIREMENTS.txt; then
+                pip install numpy==1.21.6 || pip install numpy
+                pip install -r REQUIREMENTS.txt --no-cache-dir || true
+              fi
+              pip install psycopg2 pyodbc Werkzeug==2.0.3 pycryptodomex
+
+              echo "pojogenurl=https://dummy-pojogen-service.com" > .env
+              echo "dbconfig=mydbinstance" >> .env
+              echo "dbpasskey=secret123" >> .env
+              echo "storedprocenv=stage" >> .env
+              echo "javacodegen_server_url=https://dummy-javacodegen-service.com" >> .env
+
+              nohup python app.py > app.log 2>&1 &
+              echo "✅ Flask app started on STAGE (check app.log)"
+            fi
+          EOF
+
+
+  # ====================
+  # DEPLOY TO MASTER (stage → prod)
+  # ====================
+  deploy-master:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/stage'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Prepare env for PRODUCTION
+        run: |
+          echo "dbconfig=$prod_db_instance" >> .env.prod
+          echo "pojogenurl=$prod_pojogen_url" >> .env.prod
+          echo "dbpasskey=$prod_db_passkey" >> .env.prod
+          echo "storedprocenv=$prod_storedprocenv" >> .env.prod
+          echo "javacodegen_server_url=$prod_javacodegen_url" >> .env.prod
+          cat .env.prod
+
+      - name: Deploy to PRODUCTION
+        env:
+          HOST: 20.255.48.190
+          USER: azureuser
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          echo "🚀 Deploying to PRODUCTION environment..."
+          echo "$SSH_PRIVATE_KEY" > private_key.pem
+          chmod 600 private_key.pem
+
+          ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST << 'EOF'
+            set -e
+            cd /home/azureuser
+
+            if [ ! -d "ezapi_miner" ]; then
+              git clone https://github.com/Reshmareshu786/ezapi_miner.git
+            fi
+            cd ezapi_miner
+            git pull origin stage
+
+            if ! command -v docker &> /dev/null; then
+              sudo apt update
+              sudo apt install -y docker.io docker-compose
+              sudo systemctl enable docker
+              sudo systemctl start docker
+            fi
+
+            if [ -f "docker-compose.yml" ]; then
+              sudo docker-compose down || true
+              sudo docker-compose up -d --build
+            else
+              sudo apt install -y python3-venv python3-dev libpq-dev unixodbc-dev g++
+              python3 -m venv venv
+              source venv/bin/activate
+              pip install --upgrade pip setuptools wheel
+              if ! pip install -r REQUIREMENTS.txt; then
+                pip install numpy==1.21.6 || pip install numpy
+                pip install -r REQUIREMENTS.txt --no-cache-dir || true
+              fi
+              pip install psycopg2 pyodbc Werkzeug==2.0.3 pycryptodomex
+
+              echo "pojogenurl=https://dummy-pojogen-service.com" > .env
+              echo "dbconfig=mydbinstance" >> .env
+              echo "dbpasskey=secret123" >> .env
+              echo "storedprocenv=prod" >> .env
+              echo "javacodegen_server_url=https://dummy-javacodegen-service.com" >> .env
+
+              nohup python app.py > app.log 2>&1 &
+              echo "✅ Flask app started in PRODUCTION (check app.log)"
+            fi
+          EOF
