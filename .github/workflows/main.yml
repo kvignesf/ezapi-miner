@@ -45,6 +45,7 @@ jobs:
           python app.py & sleep 5 && pkill -f app.py
         continue-on-error: true
 
+
   # DEPLOY TO TEST (refactoredv3)
   deploy-test:
     runs-on: ubuntu-latest
@@ -67,6 +68,7 @@ jobs:
         run: |
           echo "Deploying to TEST environment..."
           # Add deployment script/ssh/docker/kubectl command here
+
 
   # DEPLOY TO STAGE (main)
   deploy-stage:
@@ -105,7 +107,8 @@ jobs:
             echo "Deployment complete on STAGE VM!"
           EOF
 
-  # DEPLOY TO MASTER (stage)
+
+  # DEPLOY TO MASTER (stage → prod)
   deploy-master:
     runs-on: ubuntu-latest
     needs: build
@@ -123,7 +126,37 @@ jobs:
           echo "javacodegen_server_url=$prod_javacodegen_url" >> .env.prod
           cat .env.prod
 
-      - name: Deploy to MASTER
+      - name: Setup Python and system dependencies
         run: |
-          echo "Deploying to PRODUCTION environment..."
-          # Add prod deploy command here
+          sudo apt update
+          sudo apt install -y python-is-python3 libpq-dev unixodbc-dev g++ python3-dev
+
+          python -m pip install --upgrade pip setuptools wheel virtualenv
+
+      - name: Setup Virtual Environment and Install Packages
+        run: |
+          python -m virtualenv venv
+          source ./venv/bin/activate
+          pip install -r REQUIREMENTS.txt
+          pip install psycopg2 pyodbc Werkzeug==2.0.3 pycryptodomex
+          pip list | grep -E "psycopg2|pyodbc|Werkzeug|pycryptodomex"
+
+      - name: Create Production .env
+        run: |
+          touch .env
+          echo "pojogenurl=https://dummy-pojogen-service.com" >> .env
+          echo "dbconfig=mydbinstance" >> .env
+          echo "dbpasskey=secret123" >> .env
+          echo "storedprocenv=dev" >> .env
+          echo "javacodegen_server_url=https://dummy-javacodegen-service.com" >> .env
+          cat .env
+
+      - name: Run Flask App (Smoke Test)
+        run: |
+          source ./venv/bin/activate
+          python app.py & sleep 10 && pkill -f app.py
+        continue-on-error: true
+
+      - name: Confirm Production Deployment
+        run: echo "✅ Production deployment setup complete!"
+
