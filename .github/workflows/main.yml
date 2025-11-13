@@ -3,7 +3,7 @@ name: Build and Deploy to Azure VM
 on:
   push:
     branches:
-      - main  # Change if your deploy branch is different
+      - main  # Change if your deploy branch differs
 
 env:
   DBCONFIG: ${{ secrets.DB_INSTANCE }}
@@ -27,7 +27,7 @@ jobs:
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: 3.10
 
       - name: Install Python dependencies
         run: |
@@ -52,7 +52,7 @@ jobs:
           source: "."
           target: "/home/${{ secrets.AZURE_VM_USER }}/ezapi-miner"
 
-      - name: SSH and restart app on Azure VM
+      - name: SSH and prepare VM environment, restart app
         uses: appleboy/ssh-action@v0.1.8
         with:
           host: ${{ secrets.AZURE_VM_HOST }}
@@ -60,7 +60,17 @@ jobs:
           key: ${{ secrets.AZURE_VM_SSH_KEY }}
           script: |
             cd /home/${{ secrets.AZURE_VM_USER }}/ezapi-miner
+            
+            if [ ! -d "venv" ]; then
+              python3 -m venv venv
+            fi
+            
             source venv/bin/activate
+            
+            pip install --upgrade pip
+            pip install -r REQUIREMENTS.txt
+            
             pkill -f "python3 app.py" || true
+            
             nohup python3 app.py &
 
