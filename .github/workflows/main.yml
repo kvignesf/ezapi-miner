@@ -3,10 +3,9 @@ name: Build and Deploy to Azure VM
 on:
   push:
     branches:
-      - main  # or your deployment branch
+      - main  # Change to your deploy branch if different
 
 env:
-  # Add env keys here if you want defaults
   DBCONFIG: ${{ secrets.DB_INSTANCE }}
   POJOGENURL: ${{ secrets.POJOGEN_URL }}
   DBPASSKEY: ${{ secrets.DB_PASSKEY }}
@@ -20,7 +19,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      - name: Set up Python
+      - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: 3.10
@@ -56,8 +55,7 @@ jobs:
           script: |
             cd /home/${{ secrets.AZURE_VM_USER }}/ezapi-miner
             source venv/bin/activate
-            # Stop any existing app first, e.g., using pm2, systemctl or kill (customize as needed)
-            # Restart app command below
+            # Example: kill existing app if running (customize if needed)
+            pkill -f "python3 app.py" || true
             nohup python3 app.py &
-
 
