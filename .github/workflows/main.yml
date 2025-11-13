@@ -1,227 +1,63 @@
-name: CI for ezapi_miner
+name: Build and Deploy to Azure VM
 
 on:
   push:
-    branches: [ main, stage, refactoredv3 ]
-  pull_request:
-    branches: [ main ]
+    branches:
+      - main  # or your deployment branch
+
+env:
+  # Add env keys here if you want defaults
+  DBCONFIG: ${{ secrets.DB_INSTANCE }}
+  POJOGENURL: ${{ secrets.POJOGEN_URL }}
+  DBPASSKEY: ${{ secrets.DB_PASSKEY }}
+  STOREDPROCENV: ${{ secrets.STOREDPROC_ENV }}
+  JAVACODEGEN_SERVER_URL: ${{ secrets.JAVACODEGEN_URL }}
 
 jobs:
-  # ====================
-  # BUILD JOB
-  # ====================
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
-
-      - name: Install system packages
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y unixodbc-dev g++ libaio-dev
+          python-version: 3.10
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install "Flask<2.3" "Werkzeug<3.0" pycryptodomex
-          pip install -r REQUIREMENTS.txt || true
+          python -m venv venv
+          source venv/bin/activate
+          pip install -r REQUIREMENTS.txt
 
-      - name: Create dummy .env files
-        run: |
-          echo "FLASK_ENV=development" > .env
-          echo "DB_USER=dummy_user" >> .env
-          echo "DB_PASS=dummy_pass" >> .env
-          echo "DB_HOST=localhost" >> .env
-          echo "DB_NAME=test_db" >> .env
-
-      - name: Verify Python imports
-        run: python -m py_compile app.py
-
-      - name: Smoke test Flask app
-        run: |
-          python app.py & sleep 5 && pkill -f app.py
-        continue-on-error: true
-
-
-  # ====================
-  # DEPLOY TO TEST (refactoredv3)
-  # ====================
-  deploy-test:
+  deploy:
     runs-on: ubuntu-latest
     needs: build
-    if: github.ref == 'refs/heads/refactoredv3'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Prepare env for TEST
-        run: |
-          echo "dbconfig=$test_db_instance" >> .env.test
-          echo "pojogenurl=$test_pojogen_url" >> .env.test
-          echo "dbpasskey=$test_db_passkey" >> .env.test
-          echo "storedprocenv=$test_storedprocenv" >> .env.test
-          echo "javacodegen_server_url=$test_javacodegen_url" >> .env.test
-          cat .env.test
+      - name: Copy files to Azure VM
+        uses: appleboy/scp-action@v0.1.5
+        with:
+          host: ${{ secrets.AZURE_VM_HOST }}
+          username: ${{ secrets.AZURE_VM_USER }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          source: "."
+          target: "/home/${{ secrets.AZURE_VM_USER }}/ezapi-miner"
 
-      - name: Deploy to TEST
-        run: |
-          echo "Deploying to TEST environment..."
-          # Add SSH or Docker-based test deployment here
-
-
-  # ====================
-  # DEPLOY TO STAGE (main)
-  # ====================
-  deploy-stage:
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Prepare env for STAGE
-        run: |
-          echo "dbconfig=$stage_db_instance" >> .env.stage
-          echo "pojogenurl=$stage_pojogen_url" >> .env.stage
-          echo "dbpasskey=$stage_db_passkey" >> .env.stage
-          echo "storedprocenv=$stage_storedprocenv" >> .env.stage
-          echo "javacodegen_server_url=$stage_javacodegen_url" >> .env.stage
-          cat .env.stage
-
-      - name: Deploy to STAGE
-        env:
-          HOST: 20.255.48.190
-          USER: azureuser
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-        run: |
-          echo "🚀 Deploying to STAGE environment..."
-          echo "$SSH_PRIVATE_KEY" > private_key.pem
-          chmod 600 private_key.pem
-
-          ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST << 'EOF'
-            set -e
-            cd /home/azureuser
-
-            # Clone or update repo
-            if [ ! -d "ezapi_miner" ]; then
-              git clone https://github.com/Reshmareshu786/ezapi_miner.git
-            fi
-            cd ezapi_miner
-            git pull origin main
-
-            # Install Docker if missing
-            if ! command -v docker &> /dev/null; then
-              echo "Installing Docker..."
-              sudo apt update
-              sudo apt install -y docker.io docker-compose
-              sudo systemctl enable docker
-              sudo systemctl start docker
-            fi
-
-            # Run app
-            if [ -f "docker-compose.yml" ]; then
-              echo "Starting via Docker Compose..."
-              sudo docker-compose down || true
-              sudo docker-compose up -d --build
-            else
-              echo "Running via Python virtualenv..."
-              sudo apt install -y python3-venv python3-dev libpq-dev unixodbc-dev g++
-              python3 -m venv venv
-              source venv/bin/activate
-              pip install --upgrade pip setuptools wheel
-              if ! pip install -r REQUIREMENTS.txt; then
-                pip install numpy==1.21.6 || pip install numpy
-                pip install -r REQUIREMENTS.txt --no-cache-dir || true
-              fi
-              pip install psycopg2 pyodbc Werkzeug==2.0.3 pycryptodomex
-
-              echo "pojogenurl=https://dummy-pojogen-service.com" > .env
-              echo "dbconfig=mydbinstance" >> .env
-              echo "dbpasskey=secret123" >> .env
-              echo "storedprocenv=stage" >> .env
-              echo "javacodegen_server_url=https://dummy-javacodegen-service.com" >> .env
-
-              nohup python app.py > app.log 2>&1 &
-              echo "✅ Flask app started on STAGE (check app.log)"
-            fi
-          EOF
+      - name: SSH and restart app on Azure VM
+        uses: appleboy/ssh-action@v0.1.8
+        with:
+          host: ${{ secrets.AZURE_VM_HOST }}
+          username: ${{ secrets.AZURE_VM_USER }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          script: |
+            cd /home/${{ secrets.AZURE_VM_USER }}/ezapi-miner
+            source venv/bin/activate
+            # Stop any existing app first, e.g., using pm2, systemctl or kill (customize as needed)
+            # Restart app command below
+            nohup python3 app.py &
 
 
-  # ====================
-  # DEPLOY TO MASTER (stage → prod)
-  # ====================
-  deploy-master:
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/stage'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Prepare env for PRODUCTION
-        run: |
-          echo "dbconfig=$prod_db_instance" >> .env.prod
-          echo "pojogenurl=$prod_pojogen_url" >> .env.prod
-          echo "dbpasskey=$prod_db_passkey" >> .env.prod
-          echo "storedprocenv=$prod_storedprocenv" >> .env.prod
-          echo "javacodegen_server_url=$prod_javacodegen_url" >> .env.prod
-          cat .env.prod
-
-      - name: Deploy to PRODUCTION
-        env:
-          HOST: 20.255.48.190
-          USER: azureuser
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-        run: |
-          echo "🚀 Deploying to PRODUCTION environment..."
-          echo "$SSH_PRIVATE_KEY" > private_key.pem
-          chmod 600 private_key.pem
-
-          ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST << 'EOF'
-            set -e
-            cd /home/azureuser
-
-            if [ ! -d "ezapi_miner" ]; then
-              git clone https://github.com/Reshmareshu786/ezapi_miner.git
-            fi
-            cd ezapi_miner
-            git pull origin stage
-
-            if ! command -v docker &> /dev/null; then
-              sudo apt update
-              sudo apt install -y docker.io docker-compose
-              sudo systemctl enable docker
-              sudo systemctl start docker
-            fi
-
-            if [ -f "docker-compose.yml" ]; then
-              sudo docker-compose down || true
-              sudo docker-compose up -d --build
-            else
-              sudo apt install -y python3-venv python3-dev libpq-dev unixodbc-dev g++
-              python3 -m venv venv
-              source venv/bin/activate
-              pip install --upgrade pip setuptools wheel
-              if ! pip install -r REQUIREMENTS.txt; then
-                pip install numpy==1.21.6 || pip install numpy
-                pip install -r REQUIREMENTS.txt --no-cache-dir || true
-              fi
-              pip install psycopg2 pyodbc Werkzeug==2.0.3 pycryptodomex
-
-              echo "pojogenurl=https://dummy-pojogen-service.com" > .env
-              echo "dbconfig=mydbinstance" >> .env
-              echo "dbpasskey=secret123" >> .env
-              echo "storedprocenv=prod" >> .env
-              echo "javacodegen_server_url=https://dummy-javacodegen-service.com" >> .env
-
-              nohup python app.py > app.log 2>&1 &
-              echo "✅ Flask app started in PRODUCTION (check app.log)"
-            fi
-          EOF
